@@ -130,3 +130,20 @@ export interface IProject {
     coordSystem: 'cartesian' | 'geographic';
   };
 }
+
+/**
+ * 日志级别
+ */
+export type LogLevel = 'info' | 'warn' | 'error' | 'success' | 'debug';
+
+/**
+ * 日志条目接口
+ */
+export interface ILogEntry {
+  id: string;
+  timestamp: string;
+  level: LogLevel;
+  source: 'Renderer' | 'Main'; // 标记日志来源
+  message: string;
+  details?: any; // 可选的详细对象（如错误堆栈）
+}

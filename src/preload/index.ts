@@ -2,7 +2,9 @@ import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = { // 监听主进程日志
+  onSystemLog: (callback: (log: any) => void) => ipcRenderer.on('system-log', (_event, log) => callback(log))
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

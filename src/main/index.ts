@@ -3,6 +3,19 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
+let mainWindow: BrowserWindow | null = null
+
+function sendLogToRenderer(message: string, level: 'info'|'warn'|'error' = 'info', details?: any) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('system-log', {
+      message,
+      level,
+      source: 'Main',
+      details
+    })
+  }
+}
+
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -17,10 +30,11 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow.on('ready-to-show', () => {
+    mainWindow?.show()
+    sendLogToRenderer('Application Main Process Started', 'success')
   })
-
+  
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
