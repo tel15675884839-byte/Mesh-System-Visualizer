@@ -46,6 +46,15 @@ export interface ILoop {
 }
 
 /**
+ * 视图显示设置 (持久化)
+ */
+export interface IViewSettings {
+  iconScale: number;   // 10 - 300 (%)
+  labelColor: string;  // Hex color
+  mapOpacity: number;  // 0 - 1
+}
+
+/**
  * 核心设备节点接口
  */
 export interface INode {
@@ -55,25 +64,12 @@ export interface INode {
   role: DeviceRole;
   type: DeviceType;
   label: string;
-  
-  // 物理位置
   buildingId: string;
   floorId: string;
   position: Vector3 | null;
-  
-  // 是否已布点
   isPlaced: boolean;
-
-  // 逻辑归属
   loopId?: string;
-  
-  // [修改] 差异状态: 
-  // 'new': 新增未确认 (绿点)
-  // 'missing': 缺失 (幽灵)
-  // 'unchanged': 本次更新中存在的旧设备
-  // 'normal': 普通状态 (无特殊显示)
   diffStatus?: 'new' | 'missing' | 'unchanged' | 'normal';
-  
   metadata?: Record<string, any>;
 }
 
@@ -111,6 +107,9 @@ export interface IProject {
   edges: IEdge[];
   buildings: IBuilding[];
   loops: ILoop[];
+  
+  // [新增] 视图设置
+  viewSettings?: IViewSettings;
   
   settings: {
     theme: 'light' | 'dark';

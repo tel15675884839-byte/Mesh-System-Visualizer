@@ -2,9 +2,12 @@
 import { computed } from 'vue'
 import { useProjectStore } from '../stores/projectStore'
 import { storeToRefs } from 'pinia'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, DArrowRight } from '@element-plus/icons-vue' // [新增] DArrowRight 图标
 import { ElMessageBox } from 'element-plus'
 import { DeviceRole, DeviceType } from '../types'
+
+// [新增] 定义向外发送的事件
+const emit = defineEmits(['close'])
 
 const store = useProjectStore()
 const { selectedNode } = storeToRefs(store)
@@ -30,7 +33,11 @@ const isInfrastructure = computed(() => {
   return selectedNode.value.role === DeviceRole.LEADER || selectedNode.value.role === DeviceRole.ROUTER
 })
 
-// 设备型号选项
+const deviceCategoryLabel = computed(() => {
+  if (isInfrastructure.value) return 'Node'
+  return 'Device'
+})
+
 const deviceTypeOptions = [
   { label: 'Smoke Detector (烟感)', value: DeviceType.SMOKE_DETECTOR },
   { label: 'Heat Detector (温感)', value: DeviceType.HEAT_DETECTOR },
@@ -63,6 +70,14 @@ const deletePermanently = () => {
   <div class="property-panel-container">
     <div class="panel-header">
       <span>属性面板</span>
+      <!-- [新增] 收起按钮 -->
+      <el-button 
+        link 
+        size="small" 
+        :icon="DArrowRight" 
+        @click="emit('close')" 
+        title="隐藏面板"
+      />
     </div>
 
     <div v-if="selectedNode" class="panel-content">
@@ -79,14 +94,13 @@ const deletePermanently = () => {
           <el-form-item label="所属回路" style="flex: 1; margin-right: 5px;">
             <el-tag type="info" size="small">{{ loopName }}</el-tag>
           </el-form-item>
-          <el-form-item label="角色" style="flex: 1;">
-            <el-tag :type="selectedNode.role === 'Leader' ? 'danger' : 'primary'" size="small">
-              {{ selectedNode.role }}
+          <el-form-item label="设备类别" style="flex: 1;">
+            <el-tag :type="isInfrastructure ? 'danger' : 'primary'" size="small">
+              {{ deviceCategoryLabel }}
             </el-tag>
           </el-form-item>
         </div>
 
-        <!-- [新增] 设备型号选择 (仅对终端设备显示) -->
         <el-form-item v-if="!isInfrastructure" label="设备型号 (Model)">
           <el-select v-model="selectedNode.type" placeholder="Select Model">
             <el-option
@@ -148,7 +162,19 @@ const deletePermanently = () => {
 
 <style scoped>
 .property-panel-container { display: flex; flex-direction: column; height: 100%; border-left: none; background-color: var(--panel-bg); }
-.panel-header { height: 40px; display: flex; align-items: center; padding: 0 10px; background-color: var(--bg-color); border-bottom: 1px solid var(--border-color); color: var(--text-color); font-weight: bold; font-size: 13px; }
+/* [修改] 使用 justify-content: space-between 让按钮靠右 */
+.panel-header { 
+  height: 40px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 0 10px; 
+  background-color: var(--bg-color); 
+  border-bottom: 1px solid var(--border-color); 
+  color: var(--text-color); 
+  font-weight: bold; 
+  font-size: 13px; 
+}
 .panel-content { padding: 15px; overflow-y: auto; color: var(--text-color); }
 .row { display: flex; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-color); opacity: 0.5; font-size: 13px; }
