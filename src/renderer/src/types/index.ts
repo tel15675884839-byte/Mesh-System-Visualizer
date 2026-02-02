@@ -36,13 +36,13 @@ export interface Vector3 {
 }
 
 /**
- * [新增] 回路接口
+ * 回路接口
  */
 export interface ILoop {
-  id: string;        // 内部ID
-  name: string;      // 显示名称 (如 "Loop 1")
-  htmlSource?: string; // 来源文件名
-  deviceCount: number; // 设备数量统计
+  id: string;
+  name: string;
+  htmlSource?: string;
+  deviceCount: number;
 }
 
 /**
@@ -59,18 +59,24 @@ export interface INode {
   // 物理位置
   buildingId: string;
   floorId: string;
-  position: Vector3;
+  position: Vector3 | null;
   
-  // [新增] 逻辑归属
-  loopId?: string; // 所属回路 ID
+  // 是否已布点
+  isPlaced: boolean;
+
+  // 逻辑归属
+  loopId?: string;
   
-  diffStatus?: 'new' | 'removed' | 'unchanged';
+  // [修改] 差异状态: 
+  // 'new': 新增未确认 (绿点)
+  // 'missing': 缺失 (幽灵)
+  // 'unchanged': 本次更新中存在的旧设备
+  // 'normal': 普通状态 (无特殊显示)
+  diffStatus?: 'new' | 'missing' | 'unchanged' | 'normal';
+  
   metadata?: Record<string, any>;
 }
 
-/**
- * 拓扑连线接口
- */
 export interface IEdge {
   id: string;
   sourceId: string;
@@ -79,9 +85,6 @@ export interface IEdge {
   isParentChild: boolean;
 }
 
-/**
- * 楼层接口
- */
 export interface IFloor {
   id: string;
   name: string;
@@ -92,18 +95,12 @@ export interface IFloor {
   pixelPerMeter?: number;
 }
 
-/**
- * 建筑接口
- */
 export interface IBuilding {
   id: string;
   name: string;
   floors: IFloor[];
 }
 
-/**
- * 工程文件结构
- */
 export interface IProject {
   version: string;
   name: string;
@@ -113,7 +110,7 @@ export interface IProject {
   nodes: INode[];
   edges: IEdge[];
   buildings: IBuilding[];
-  loops: ILoop[]; // [新增] 回路列表
+  loops: ILoop[];
   
   settings: {
     theme: 'light' | 'dark';

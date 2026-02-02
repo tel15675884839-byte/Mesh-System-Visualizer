@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { useProjectStore } from '../stores/projectStore'
-import { Moon, Sunny, FolderOpened, RefreshRight, Rank } from '@element-plus/icons-vue'
+import { Moon, Sunny, FolderOpened, RefreshRight, Rank, Operation } from '@element-plus/icons-vue'
 
 const store = useProjectStore()
 
-// [修改] 处理菜单点击
 const handleMenuCommand = async (command: string) => {
   switch (command) {
     case 'save':
@@ -15,10 +14,13 @@ const handleMenuCommand = async (command: string) => {
       await store.loadFromDisk()
       break
     case 'exit':
-      store.closeProject() // 退回到启动页
+      store.closeProject() 
       break
     case 'new':
-      store.closeProject() // 先关闭当前，让用户回到启动页点新建
+      store.closeProject() 
+      break
+    case 'config-building': // [新增]
+      store.toggleBuildingEditor(true)
       break
   }
 }
@@ -30,7 +32,6 @@ const handleMenuCommand = async (command: string) => {
       <div class="logo-area">
         <span class="app-icon">🧊</span>
         <span class="app-title">Numens Mesh Studio</span>
-        <!-- 显示当前文件名 -->
         <span v-if="store.projectInfo.filePath" style="font-weight: normal; font-size: 12px; margin-left: 10px; color: #909399">
           - {{ store.projectInfo.name }}
         </span>
@@ -50,12 +51,15 @@ const handleMenuCommand = async (command: string) => {
           </template>
         </el-dropdown>
 
-        <el-dropdown trigger="click">
+        <el-dropdown trigger="click" @command="handleMenuCommand">
           <span class="menu-item">编辑 (Edit)</span>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item>撤销 (Undo)</el-dropdown-item>
               <el-dropdown-item>重做 (Redo)</el-dropdown-item>
+              <el-dropdown-item divided command="config-building" :icon="Operation">
+                建筑与图纸配置...
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -83,11 +87,15 @@ const handleMenuCommand = async (command: string) => {
       </div>
     </div>
 
-    <!-- 工具栏只在项目加载后显示 -->
     <div class="toolbar-row" v-if="store.isProjectLoaded">
       <el-button-group class="tool-group">
         <el-tooltip content="保存当前更改" placement="bottom">
           <el-button size="small" @click="store.saveToDisk">💾</el-button>
+        </el-tooltip>
+        
+        <!-- [新增] 快速入口 -->
+        <el-tooltip content="配置建筑与图纸" placement="bottom">
+          <el-button size="small" @click="store.toggleBuildingEditor(true)" :icon="Operation"></el-button>
         </el-tooltip>
       </el-button-group>
 
@@ -104,20 +112,10 @@ const handleMenuCommand = async (command: string) => {
 
 <style scoped>
 .menubar-container {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--header-bg);
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.3s;
+  display: flex; flex-direction: column; background-color: var(--header-bg);
+  border-bottom: 1px solid var(--border-color); transition: background-color 0.3s;
 }
-.top-menu-row {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--border-color);
-}
+.top-menu-row { height: 30px; display: flex; align-items: center; padding: 0 10px; font-size: 13px; border-bottom: 1px solid var(--border-color); }
 .logo-area { margin-right: 20px; font-weight: bold; color: var(--text-color); display: flex; align-items: center; gap: 6px; }
 .menus { flex: 1; display: flex; gap: 15px; }
 .menu-item { cursor: pointer; padding: 2px 6px; border-radius: 4px; color: var(--text-color); user-select: none; }

@@ -5,15 +5,15 @@ export interface ITreeNode {
   id: string
   label: string
   type: 'loop' | 'device' | 'orphan-group'
-  role?: string // 用于决定图标颜色
+  role?: string 
   children?: ITreeNode[]
   isLeaf?: boolean
-  data?: INode // 原始数据引用
+  data?: INode
 }
 
 /**
- * 将扁平的拓扑数据转换为树形结构
- * 逻辑：Loop -> Leader -> (BFS Spanning Tree) -> Routers/Children
+ * 构建逻辑层级树：扁平化骨干网，层级化终端
+ * 结构：Leader -> [Direct Children] + [All Routers -> Their Children]
  */
 export function buildTopologyTree(
   nodes: INode[],
@@ -22,85 +22,133 @@ export function buildTopologyTree(
 ): ITreeNode[] {
   const treeData: ITreeNode[] = []
 
-  // 1. 预处理：构建邻接表 (Adjacency List) 以加速查找
-  const adjList = new Map<string, string[]>()
+  // 1. 预处理：构建邻接表，方便查找 Child 连接了谁
+  // Map<ChildID, Set<ParentID>>
+  const connections = new Map<string, Set<string>>()
+  
   edges.forEach(edge => {
-    if (!adjList.has(edge.sourceId)) adjList.set(edge.sourceId, [])
-    if (!adjList.has(edge.targetId)) adjList.set(edge.targetId, [])
+    if (!edge.sourceId || !edge.targetId) return
     
-    // 无向图处理 (Thread 连接是双向的)
-    adjList.get(edge.sourceId)?.push(edge.targetId)
-    adjList.get(edge.targetId)?.push(edge.sourceId)
+    // 记录双向连接
+    if (!connections.has(edge.sourceId)) connections.set(edge.sourceId, new Set())
+    if (!connections.has(edge.targetId)) connections.set(edge.targetId, new Set())
+    
+    connections.get(edge.sourceId)?.add(edge.targetId)
+    connections.get(edge.targetId)?.add(edge.sourceId)
   })
 
-  // 2. 遍历每个 Loop 构建子树
+  // 2. 遍历每个 Loop
   loops.forEach(loop => {
-    // 找出属于该 Loop 的所有节点
     const loopNodes = nodes.filter(n => n.loopId === loop.id)
-    if (loopNodes.length === 0) return
-
+    
     const loopRoot: ITreeNode = {
       id: `loop-root-${loop.id}`,
-      label: loop.name || '未命名回路',
+      label: loop.name || `Loop ${loop.id}`,
       type: 'loop',
       children: []
     }
 
-    // A. 寻找 Leader (根节点)
-    const leader = loopNodes.find(n => n.role === DeviceRole.LEADER)
-    const visited = new Set<string>()
-    
-    // B. 如果有 Leader，从 Leader 开始 BFS 构建树
-    if (leader) {
-      const leaderNode = createTreeNode(leader)
-      visited.add(leader.id)
-      
-      // BFS 队列: [当前树节点, 对应的设备ID]
-      const queue: { treeNode: ITreeNode, deviceId: string }[] = []
-      queue.push({ treeNode: leaderNode, deviceId: leader.id })
-
-      while (queue.length > 0) {
-        const { treeNode, deviceId } = queue.shift()!
-        const neighbors = adjList.get(deviceId) || []
-        
-        // 排序：Router 优先，然后是 ID 顺序 (让列表好看点)
-        const neighborNodes = neighbors
-          .map(id => loopNodes.find(n => n.id === id))
-          .filter(n => n !== undefined && !visited.has(n.id)) as INode[]
-        
-        neighborNodes.sort((a, b) => {
-           // 优先级：Router > 其他
-           const isARouter = a.role === DeviceRole.ROUTER
-           const isBRouter = b.role === DeviceRole.ROUTER
-           if (isARouter && !isBRouter) return -1
-           if (!isARouter && isBRouter) return 1
-           return a.id.localeCompare(b.id)
-        })
-
-        neighborNodes.forEach(neighbor => {
-          visited.add(neighbor.id)
-          const childTreeNode = createTreeNode(neighbor)
-          
-          if (!treeNode.children) treeNode.children = []
-          treeNode.children.push(childTreeNode)
-          
-          // 继续向下探索
-          queue.push({ treeNode: childTreeNode, deviceId: neighbor.id })
-        })
-      }
-
-      loopRoot.children?.push(leaderNode)
+    if (loopNodes.length === 0) {
+      treeData.push(loopRoot)
+      return
     }
 
-    // C. 处理孤岛节点 (Orphans)
-    // 那些属于这个 Loop，但没被 BFS 访问到的节点
-    const orphans = loopNodes.filter(n => !visited.has(n.id))
+    // 3. 角色分类
+    const leaders = loopNodes.filter(n => n.role === DeviceRole.LEADER)
+    const routers = loopNodes.filter(n => n.role === DeviceRole.ROUTER)
+    const children = loopNodes.filter(n => n.role !== DeviceRole.LEADER && n.role !== DeviceRole.ROUTER)
+
+    // 4. 建立逻辑归属关系 (Child -> ParentID)
+    const parentMap = new Map<string, string>() // ChildID -> ParentID
+    const assignedChildren = new Set<string>()
+
+    children.forEach(child => {
+      const neighbors = connections.get(child.id)
+      if (!neighbors) return // 孤儿
+
+      let chosenParentId: string | null = null
+      
+      // 优先级检查：
+      // 1. 优先找 Leader
+      for (const neighborId of neighbors) {
+        const neighbor = loopNodes.find(n => n.id === neighborId)
+        if (neighbor && neighbor.role === DeviceRole.LEADER) {
+          chosenParentId = neighbor.id
+          break // 找到 Leader 就定下来
+        }
+      }
+
+      // 2. 没连 Leader，找任意 Router
+      if (!chosenParentId) {
+        for (const neighborId of neighbors) {
+          const neighbor = loopNodes.find(n => n.id === neighborId)
+          if (neighbor && neighbor.role === DeviceRole.ROUTER) {
+            chosenParentId = neighbor.id
+            break // 找到第一个 Router 就定下来 (简化逻辑)
+          }
+        }
+      }
+
+      if (chosenParentId) {
+        parentMap.set(child.id, chosenParentId)
+        assignedChildren.add(child.id)
+      }
+    })
+
+    // 辅助函数：创建树节点
+    const createTreeNode = (n: INode): ITreeNode => ({
+      id: n.id,
+      label: n.label || n.mac.slice(-4),
+      type: 'device',
+      role: n.role,
+      data: n,
+      children: [] // 默认为空数组，el-tree 会处理
+    })
+
+    // 辅助函数：排序 (按名称)
+    const sortNodes = (a: ITreeNode, b: ITreeNode) => a.label.localeCompare(b.label)
+
+    // 5. 组装树结构
+    
+    // A. 处理 Routers 及其下级
+    // 先把所有 Router 包装成树节点，并填入它们的 Child
+    const routerTreeNodes = routers.map(r => {
+      const rNode = createTreeNode(r)
+      // 找到归属这个 Router 的 Children
+      const myChildren = children.filter(c => parentMap.get(c.id) === r.id)
+      rNode.children = myChildren.map(createTreeNode).sort(sortNodes)
+      return rNode
+    }).sort(sortNodes)
+
+    // B. 处理 Leader 及其下级
+    if (leaders.length > 0) {
+      leaders.forEach(leader => {
+        const leaderNode = createTreeNode(leader)
+        
+        // 1. 先加：直连 Leader 的 Children
+        const directChildren = children.filter(c => parentMap.get(c.id) === leader.id)
+        const directChildrenNodes = directChildren.map(createTreeNode).sort(sortNodes)
+        leaderNode.children!.push(...directChildrenNodes)
+
+        // 2. 后加：所有 Routers (扁平化)
+        leaderNode.children!.push(...routerTreeNodes)
+
+        loopRoot.children?.push(leaderNode)
+      })
+    } else {
+      // 异常情况：没有 Leader
+      // 直接把 Routers 放在 Loop 下面
+      loopRoot.children?.push(...routerTreeNodes)
+    }
+
+    // C. 处理孤岛 (既没连 Leader 也没连 Router)
+    const orphans = children.filter(c => !assignedChildren.has(c.id))
     if (orphans.length > 0) {
       const orphanGroup: ITreeNode = {
-        id: `orphan-group-${loop.id}`,
-        label: `❓ 未连接设备 (${orphans.length})`,
+        id: `orphan-${loop.id}`,
+        label: `⚠️ 离线/孤立设备 (${orphans.length})`,
         type: 'orphan-group',
-        children: orphans.map(n => createTreeNode(n))
+        children: orphans.map(createTreeNode).sort(sortNodes)
       }
       loopRoot.children?.push(orphanGroup)
     }
@@ -109,15 +157,4 @@ export function buildTopologyTree(
   })
 
   return treeData
-}
-
-function createTreeNode(node: INode): ITreeNode {
-  return {
-    id: node.id,
-    label: node.label || node.mac.slice(-4), // 优先显示 Label，没有则显示 MAC 后四位
-    type: 'device',
-    role: node.role,
-    data: node,
-    // 初始没有 children，el-tree 会视情况渲染展开箭头
-  }
 }

@@ -3,13 +3,16 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // 自定义 API 定义
 const api = {
-  // 监听日志
+  // 监听后端日志
   onSystemLog: (callback: (log: any) => void) => ipcRenderer.on('system-log', (_event, log) => callback(log)),
   
-  // 保存项目 (返回 Promise)
+  // 发送日志到终端 (新增)
+  logToTerminal: (level: string, message: string, details?: any) => ipcRenderer.send('log-to-terminal', { level, message, details }),
+
+  // 保存项目
   saveProject: (content: string) => ipcRenderer.invoke('save-project', content),
   
-  // 打开项目 (返回 Promise)
+  // 打开项目
   openProject: () => ipcRenderer.invoke('open-project')
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Log } from './utils/logger'
-import { useProjectStore } from './stores/projectStore' // [新增] 引入 Store
+import { useProjectStore } from './stores/projectStore'
 
 // 组件引入
 import MenuBar from './components/MenuBar.vue'
@@ -9,9 +9,10 @@ import DeviceList from './components/DeviceList.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import DebugConsole from './components/DebugConsole.vue'
 import TwoDView from './components/TwoDView.vue'
-import WelcomeScreen from './components/WelcomeScreen.vue' // [新增] 引入启动页
+import WelcomeScreen from './components/WelcomeScreen.vue'
+import BuildingEditorModal from './components/BuildingEditorModal.vue' // [新增]
 
-const store = useProjectStore() // [新增] 实例化 Store
+const store = useProjectStore()
 
 // --- 布局状态 ---
 const leftWidth = ref(280)
@@ -27,7 +28,7 @@ const startResizeLeft = () => { isResizingLeft = true; document.body.style.curso
 const startResizeRight = () => { isResizingRight = true; document.body.style.cursor = 'col-resize' }
 
 const handleMouseMove = (e: MouseEvent) => {
-  if (!store.isProjectLoaded) return // [新增] 如果在启动页，禁用拖拽逻辑
+  if (!store.isProjectLoaded) return 
 
   if (isResizingLeft) {
     const newWidth = e.clientX
@@ -49,7 +50,7 @@ const stopResize = () => {
 }
 
 onMounted(() => {
-  Log.info('UI 布局初始化完成')
+  Log.info('UI Layout Initialized')
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('mouseup', stopResize)
 })
@@ -62,17 +63,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-root">
-    <!-- 1. 顶部菜单栏 (始终显示) -->
+    <!-- 1. 顶部菜单栏 -->
     <MenuBar />
 
-    <!-- 2. 主体区域：根据项目加载状态切换 -->
-    
-    <!-- 状态 A: 启动页 -->
+    <!-- 2. 主体区域 -->
     <WelcomeScreen v-if="!store.isProjectLoaded" />
 
-    <!-- 状态 B: 工作区 (Flex 布局) -->
     <div v-else class="workspace">
-      
       <!-- 左侧栏 -->
       <aside class="sidebar left" :style="{ width: leftWidth + 'px' }">
         <DeviceList />
@@ -93,62 +90,21 @@ onBeforeUnmount(() => {
       <aside class="sidebar right" :style="{ width: rightWidth + 'px' }">
         <PropertyPanel />
       </aside>
-
     </div>
 
-    <!-- 3. 底部调试台 (始终显示，方便排查启动问题) -->
+    <!-- 3. 全局弹窗与调试 -->
+    <BuildingEditorModal /> <!-- [新增] 建筑编辑器弹窗 -->
     <DebugConsole />
   </div>
 </template>
 
 <style scoped>
-.app-root {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background-color: var(--bg-color);
-}
-
-.workspace {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  position: relative;
-}
-
-.sidebar {
-  background-color: var(--panel-bg);
-  border-color: var(--border-color);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
+.app-root { display: flex; flex-direction: column; height: 100vh; background-color: var(--bg-color); }
+.workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
+.sidebar { background-color: var(--panel-bg); border-color: var(--border-color); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
 .sidebar.left { border-right: 1px solid var(--border-color); }
 .sidebar.right { border-left: 1px solid var(--border-color); }
-
-.resizer {
-  width: 5px;
-  background-color: transparent;
-  cursor: col-resize;
-  z-index: 10;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
-}
-.resizer:hover, .resizer:active {
-  background-color: #409eff;
-}
-
-.viewport {
-  flex: 1;
-  background-color: var(--viewport-bg);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: 0;
-  overflow: hidden;
-}
+.resizer { width: 5px; background-color: transparent; cursor: col-resize; z-index: 10; transition: background-color 0.2s; flex-shrink: 0; }
+.resizer:hover, .resizer:active { background-color: #409eff; }
+.viewport { flex: 1; background-color: var(--viewport-bg); position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0; overflow: hidden; }
 </style>

@@ -13,13 +13,23 @@ const onNewProject = () => {
 }
 
 const onWizardFinish = (data: any) => {
-  Log.info('向导完成，初始化数据...', { deviceCount: data.nodes.length })
-  store.createProject(data.name, data.buildings, data.loops, data.nodes, data.edges)
+  Log.info('Wizard completed, initializing project data...', { 
+    deviceCount: data.nodes.length, 
+    loopCount: data.loops.length 
+  })
+  
+  store.createProject(
+    data.name, 
+    data.buildings, 
+    data.loops, 
+    data.nodes, 
+    data.edges
+  )
+  
   showWizard.value = false
-  Log.success('项目初始化完成')
+  Log.success('Project initialized successfully, entering workspace')
 }
 
-// [修改] 绑定真实的打开逻辑
 const onOpenProject = async () => {
   await store.loadFromDisk()
 }
@@ -65,9 +75,16 @@ const onOpenProject = async () => {
   background-color: var(--bg-color);
   color: var(--text-color);
 }
-.content-box { text-align: center; max-width: 500px; padding: 40px; }
+
+.content-box {
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+  padding: 40px;
+}
+
 .logo-placeholder { font-size: 80px; margin-bottom: 20px; user-select: none; }
-.app-title { font-size: 28px; font-weight: 600; margin-bottom: 10px; }
+.app-title { font-size: 28px; font-weight: 600; margin-bottom: 10px; color: var(--text-color); }
 .app-version { color: #909399; font-size: 14px; margin-bottom: 40px; }
 .action-buttons { display: flex; flex-direction: column; gap: 15px; margin-bottom: 40px; align-items: center; }
 .welcome-btn { width: 200px; height: 45px; font-size: 16px; }

@@ -2,11 +2,10 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import fs from 'fs/promises' // 使用 Promise 版本的 fs
+import fs from 'fs/promises'
 
 let mainWindow: BrowserWindow | null = null
 
-// --- 辅助函数：发送日志到前端 ---
 function sendLogToRenderer(message: string, level: 'info'|'warn'|'error' = 'info', details?: any) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('system-log', {
@@ -18,14 +17,34 @@ function sendLogToRenderer(message: string, level: 'info'|'warn'|'error' = 'info
   }
 }
 
-// --- IPC 核心业务逻辑 ---
+// --- IPC Core Logic ---
 
-// 1. 保存项目
+// [English] Log to terminal handler
+ipcMain.on('log-to-terminal', (_event, { level, message, details }) => {
+  const timestamp = new Date().toLocaleTimeString()
+  const detailStr = details ? JSON.stringify(details) : ''
+  
+  switch (level) {
+    case 'error':
+      console.error(`\x1b[31m[RENDERER-ERR] ${timestamp} ${message}\x1b[0m`, detailStr)
+      break
+    case 'warn':
+      console.warn(`\x1b[33m[RENDERER-WARN] ${timestamp} ${message}\x1b[0m`, detailStr)
+      break
+    case 'success':
+      console.log(`\x1b[32m[RENDERER-OK] ${timestamp} ${message}\x1b[0m`, detailStr)
+      break
+    default:
+      console.log(`[RENDERER-INFO] ${timestamp} ${message}`, detailStr)
+  }
+})
+
+// 1. Save Project
 ipcMain.handle('save-project', async (_event, content: string) => {
   if (!mainWindow) return { success: false, message: 'Window not found' }
   
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: '保存项目文件',
+    title: 'Save Project File',
     defaultPath: 'my-fire-project.json',
     filters: [{ name: 'JSON Project', extensions: ['json'] }]
   })
@@ -34,20 +53,20 @@ ipcMain.handle('save-project', async (_event, content: string) => {
 
   try {
     await fs.writeFile(filePath, content, 'utf-8')
-    sendLogToRenderer(`项目已保存至: ${filePath}`, 'success')
+    sendLogToRenderer(`Project saved to: ${filePath}`, 'success')
     return { success: true, filePath }
   } catch (error: any) {
-    sendLogToRenderer(`保存失败: ${error.message}`, 'error')
+    sendLogToRenderer(`Save failed: ${error.message}`, 'error')
     return { success: false, message: error.message }
   }
 })
 
-// 2. 打开项目
+// 2. Open Project
 ipcMain.handle('open-project', async () => {
   if (!mainWindow) return null
   
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: '打开项目文件',
+    title: 'Open Project File',
     filters: [{ name: 'JSON Project', extensions: ['json'] }],
     properties: ['openFile']
   })
@@ -57,10 +76,10 @@ ipcMain.handle('open-project', async () => {
   try {
     const filePath = filePaths[0]
     const content = await fs.readFile(filePath, 'utf-8')
-    sendLogToRenderer(`已读取项目文件: ${filePath}`, 'success')
+    sendLogToRenderer(`Project file loaded: ${filePath}`, 'success')
     return { content, filePath }
   } catch (error: any) {
-    sendLogToRenderer(`读取失败: ${error.message}`, 'error')
+    sendLogToRenderer(`Load failed: ${error.message}`, 'error')
     return null
   }
 })
@@ -70,7 +89,7 @@ function createWindow(): void {
     width: 1200,
     height: 800,
     show: false,
-    autoHideMenuBar: true, // 隐藏默认菜单栏
+    autoHideMenuBar: true, 
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -80,7 +99,8 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
-    sendLogToRenderer('主进程已就绪 (File System Ready)', 'success')
+    mainWindow?.webContents.openDevTools()
+    sendLogToRenderer('Main Process Ready (DevTools Enabled)', 'success')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

@@ -1,85 +1,97 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount, computed } from 'vue'
 import { DataSet } from 'vis-data'
 import { Network } from 'vis-network'
 import { useProjectStore } from '../stores/projectStore'
 import { Log } from '../utils/logger'
-import { DeviceRole } from '../types'
+import { DeviceRole, DeviceType } from '../types' 
+import { ElMessage } from 'element-plus'
+// [引用] 直接引用刚才创建的静态资产
+import { IconRegistry } from '../utils/iconAssets'
 
-// 容器引用
 const container = ref<HTMLElement | null>(null)
 const store = useProjectStore()
 
-// Vis.js 实例变量
+const currentBuildingId = ref<string>('')
+const currentFloorId = ref<string>('')
+
 let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-// 节点样式映射 (根据之前的 HTML 代码还原)
-const getNodeColor = (role: string) => {
-  if (role === DeviceRole.LEADER) return '#FF8F00' // 橙色
-  if (role === DeviceRole.ROUTER) return '#FFD600' // 黄色
-  return '#2962FF' // 默认为蓝色 (End Device)
+const initDefaultFloor = () => {
+  if (store.buildings.length > 0) {
+    currentBuildingId.value = store.buildings[0].id
+    if (store.buildings[0].floors.length > 0) {
+      currentFloorId.value = store.buildings[0].floors[0].id
+    }
+  }
 }
 
-// 初始化 2D 网络图
+const currentFloor = computed(() => {
+  const bld = store.buildings.find(b => b.id === currentBuildingId.value)
+  return bld?.floors.find(f => f.id === currentFloorId.value)
+})
+
+const availableFloors = computed(() => {
+  const bld = store.buildings.find(b => b.id === currentBuildingId.value)
+  return bld ? bld.floors : []
+})
+
+// [简化] 直接从注册表取值，不再需要文件路径
+const getIconData = (role: string, type: string) => {
+  // 1. 基础设施
+  if (role === DeviceRole.LEADER) return IconRegistry.LEADER
+  if (role === DeviceRole.ROUTER) return IconRegistry.ROUTER
+
+  // 2. 终端设备
+  switch (type) {
+    case DeviceType.SMOKE_DETECTOR: return IconRegistry.SMOKE
+    case DeviceType.HEAT_DETECTOR: return IconRegistry.HEAT
+    case DeviceType.MULT_DETECTOR: return IconRegistry.HEAT
+    case DeviceType.MANUAL_CALL_POINT: return IconRegistry.MCP
+    case DeviceType.IO_MODULE: return IconRegistry.IO
+    case DeviceType.SOUNDER: return IconRegistry.SOUNDER
+    default: return IconRegistry.SMOKE 
+  }
+}
+
 const initNetwork = () => {
   if (!container.value) return
+  initDefaultFloor()
+  updateVisData() 
 
-  // 1. 准备 Vis.js 数据
-  // 我们使用 DataSet，这样可以动态增删改查而不需要重绘整个网络
-  updateVisData()
-
-  const data = {
-    nodes: visNodes,
-    edges: visEdges
-  }
-
-  // 2. 配置选项 (复刻之前的 floor 模式体验)
+  const data = { nodes: visNodes, edges: visEdges }
   const options = {
-    // 节点样式
     nodes: {
-      shape: 'dot',
-      size: 20,
-      font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff' },
-      borderWidth: 2,
-      shadow: true
+      shape: 'image', 
+      size: 30,       
+      font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff', face: 'arial' },
+      borderWidth: 0, 
+      shadow: false,
+      // 备用图标 (红点)
+      brokenImage: IconRegistry.SMOKE
     },
-    // 连线样式
     edges: {
-      width: 2,
-      color: { color: '#ccc', highlight: '#409eff' },
+      width: 2, color: { color: '#ccc', highlight: '#409eff' },
       smooth: { type: 'continuous' }
     },
-    // 物理引擎：配置模式下通常关闭物理模拟，方便手动摆放位置
-    physics: {
-      enabled: false 
-    },
-    // 交互设置
+    physics: { enabled: false }, 
     interaction: {
-      dragNodes: true, // 允许拖拽
-      dragView: true,  // 允许平移画布
-      zoomView: true,  // 允许缩放
-      hover: true,
-      selectConnectedEdges: false
+      dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false
     }
   }
 
-  // 3. 创建实例
   network = new Network(container.value, data, options)
 
-  // 4. 绑定事件：点击选中
   network.on('click', (params) => {
     if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      store.selectNode(nodeId)
-      Log.debug(`[2D] 选中节点: ${nodeId}`)
+      store.selectNode(params.nodes[0])
     } else {
       store.selectNode(null)
     }
   })
 
-  // 5. 绑定事件：拖拽结束 (更新坐标)
   network.on('dragEnd', (params) => {
     if (params.nodes.length > 0) {
       const positions = network?.getPositions(params.nodes)
@@ -87,11 +99,10 @@ const initNetwork = () => {
         params.nodes.forEach((id: string) => {
           const pos = positions[id]
           const node = store.nodes.find(n => n.id === id)
-          if (node) {
-            // 更新 Store 中的数据 (注意：这里我们把 Canvas 坐标直接存入，后续可能需要转为米)
+          if (node && node.isPlaced) {
+            if (!node.position) node.position = { x: 0, y: 0, z: 0 }
             node.position.x = pos.x
             node.position.y = pos.y
-            Log.debug(`[2D] 节点 ${id} 移动到 (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})`)
           }
         })
       }
@@ -99,88 +110,104 @@ const initNetwork = () => {
   })
 }
 
-// 将 Store 数据同步到 Vis.js DataSet
-const updateVisData = () => {
-  // 转换节点
-  const newNodes = store.nodes.map(node => ({
-    id: node.id,
-    label: node.label, // 显示名字
-    color: getNodeColor(node.role),
-    x: node.position.x,
-    y: node.position.y
-  }))
-  
-  // 简单粗暴的全量更新 (生产环境可以做 Diff 优化)
-  visNodes.clear()
-  visNodes.add(newNodes)
+const handleDrop = (e: DragEvent) => {
+  e.preventDefault()
+  if (store.buildings.length === 0) { ElMessage.warning('请先配置建筑信息'); return }
+  if (!currentFloorId.value) { ElMessage.warning('请先选择楼层'); return }
+  if (!network) return
 
-  // 转换连线 (暂时留空，后续对接)
-  visEdges.clear()
-}
+  const jsonStr = e.dataTransfer?.getData('application/json')
+  if (!jsonStr) return
 
-// 监听 Store 变化，自动重绘
-// deep: true 确保如果节点位置变了也能感知到
-watch(() => store.nodes, () => {
-  updateVisData()
-}, { deep: true })
+  try {
+    const nodeIds = JSON.parse(jsonStr)
+    if (!Array.isArray(nodeIds)) return
 
-// 监听外部传来的 Resize 事件 (比如拖拽侧边栏)
-const handleResize = () => {
-  if (network) {
-    network.fit() // 自动适应窗口
+    const rect = container.value!.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const canvasPos = network.DOMtoCanvas({ x, y })
+    
+    store.batchPlaceNodes(nodeIds, canvasPos.x, canvasPos.y, currentFloorId.value, currentBuildingId.value)
+    Log.info(`Batch placed ${nodeIds.length} devices`)
+  } catch (error) {
+    Log.error('Drag error', error)
   }
 }
 
-onMounted(() => {
-  initNetwork()
-  window.addEventListener('resize', handleResize)
-  
-  // 打印一条日志证明组件加载了
-  Log.info('2D 组态编辑器已加载 (Vis.js Core)')
-})
+const handleDragOver = (e: DragEvent) => { e.preventDefault() }
 
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (network) network.destroy()
+const updateVisData = () => {
+  if (!currentFloorId.value) return
+
+  const visibleNodes = store.nodes.filter(
+    n => n.isPlaced && n.floorId === currentFloorId.value
+  )
+
+  const newNodes = visibleNodes.map(node => {
+    let safeX = 0; let safeY = 0
+    if (node.position) { safeX = node.position.x || 0; safeY = node.position.y || 0 }
+
+    const isMissing = node.diffStatus === 'missing'
+    // [使用] 直接从资产库获取字符串
+    const iconData = getIconData(node.role, node.type)
+
+    return {
+      id: node.id,
+      label: node.label,
+      image: iconData, 
+      x: safeX,
+      y: safeY,
+      opacity: isMissing ? 0.6 : 1,
+      shape: 'image', 
+    }
+  })
+
+  visNodes.clear()
+  visNodes.add(newNodes)
+  visEdges.clear() 
+}
+
+watch(() => store.nodes, () => { updateVisData() }, { deep: true })
+watch(currentFloorId, () => { updateVisData() })
+
+watch(currentFloor, (floor) => {
+  if (container.value && floor && floor.mapPath) {
+    container.value.style.backgroundImage = `url(${floor.mapPath})`
+    container.value.style.backgroundSize = 'contain' 
+    container.value.style.backgroundRepeat = 'no-repeat'
+    container.value.style.backgroundPosition = 'center'
+  } else if (container.value) {
+    container.value.style.backgroundImage = 'none'
+  }
+}, { deep: true, immediate: true })
+
+const handleResize = () => { network?.fit() }
+
+onMounted(() => { 
+  initNetwork()
+  // 移除 preloadAllIcons，因为现在图标是同步常量的
+  window.addEventListener('resize', handleResize) 
 })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (network) network.destroy() })
 </script>
 
 <template>
-  <div class="twod-container">
-    <!-- 工具栏悬浮层 (后续可以加放缩按钮、背景图上传按钮) -->
+  <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     <div class="overlay-tools">
-      <span class="view-label">2D 视图模式</span>
+      <el-select v-model="currentBuildingId" placeholder="Select Building" size="small" style="width: 100px">
+        <el-option v-for="b in store.buildings" :key="b.id" :label="b.name" :value="b.id" />
+      </el-select>
+      <el-select v-model="currentFloorId" placeholder="Select Floor" size="small" style="width: 100px; margin-left: 5px">
+        <el-option v-for="f in availableFloors" :key="f.id" :label="f.name" :value="f.id" />
+      </el-select>
     </div>
-
-    <!-- 绘图核心区 -->
     <div ref="container" class="vis-network-container"></div>
   </div>
 </template>
 
 <style scoped>
-.twod-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  background-color: #f0f2f5; /* 画布背景色 */
-}
-
-.vis-network-container {
-  width: 100%;
-  height: 100%;
-  outline: none;
-}
-
-.overlay-tools {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 5;
-  background: rgba(255, 255, 255, 0.8);
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  pointer-events: none; /* 让鼠标穿透，不影响下方操作 */
-  border: 1px solid #ccc;
-}
+.twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; }
+.vis-network-container { width: 100%; height: 100%; outline: none; }
+.overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.9); padding: 5px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; }
 </style>
