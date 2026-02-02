@@ -1,18 +1,19 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia' // 关键：必须引入 createPinia
+import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import App from './App.vue'
 
-// 1. 创建 Vue 应用实例
-const app = createApp(App)
+// [新增] 1. 引入 Element Plus 暗黑模式专用变量
+import 'element-plus/theme-chalk/dark/css-vars.css'
 
-// 2. 创建 Pinia 实例
+// [新增] 2. 引入我们自定义的全局样式 (用于控制背景板颜色)
+import './assets/main.css'
+
+const app = createApp(App)
 const pinia = createPinia()
 
-// 3. 关键步骤：必须在 mount 之前注册 Pinia
 app.use(pinia)
 app.use(ElementPlus)
 
-// 4. 最后一步才是挂载
 app.mount('#app')

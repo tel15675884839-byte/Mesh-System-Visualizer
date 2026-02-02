@@ -1,0 +1,25 @@
+/* 默认 (Light) 变量 */
+    :root {
+      --bg-color: #f0f2f5;
+      --panel-bg: #ffffff;
+      --border-color: #dcdfe6;
+      --text-color: #303133;
+      --header-bg: #fff;
+      --viewport-bg: #eef1f5;
+    }
+
+    /* Dark 模式变量覆盖 */
+    html.dark {
+      --bg-color: #1a1a1a;
+      --panel-bg: #252526; /* VS Code 风格深色 */
+      --border-color: #4c4d4f;
+      --text-color: #cfd3dc;
+      --header-bg: #1e1e1e;
+      --viewport-bg: #1e1e1e;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
