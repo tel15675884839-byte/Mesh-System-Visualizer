@@ -1,11 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { IProject, INode, IEdge, IFloor } from '../types'
+import type { IProject, INode, IEdge, IBuilding } from '../types'
 
 export const useProjectStore = defineStore('project', () => {
-  // --- State (数据状态) ---
-  
-  // [新增] 项目加载状态：默认为 false，显示启动页
+  // --- State ---
   const isProjectLoaded = ref(false)
 
   const projectInfo = ref<{ name: string; version: string }>({
@@ -15,15 +13,14 @@ export const useProjectStore = defineStore('project', () => {
 
   const nodes = ref<INode[]>([])
   const edges = ref<IEdge[]>([])
-  const floors = ref<IFloor[]>([])
+  
+  // [新增] 建筑列表 (树状结构)
+  const buildings = ref<IBuilding[]>([])
+  
   const selectedNodeId = ref<string | null>(null)
   const isDark = ref(false)
 
-  // --- Getters (计算属性) ---
-  const getNodesByFloor = (floorId: string) => {
-    return nodes.value.filter(node => node.floorId === floorId)
-  }
-
+  // --- Getters ---
   const selectedNode = computed(() => {
     return nodes.value.find(n => n.id === selectedNodeId.value) || null
   })
@@ -36,33 +33,33 @@ export const useProjectStore = defineStore('project', () => {
     }
   })
 
-  // --- Actions (业务操作) ---
+  // --- Actions ---
 
   function clearProject() {
     nodes.value = []
     edges.value = []
-    floors.value = []
+    buildings.value = []
     selectedNodeId.value = null
   }
 
-  // [新增] 新建项目动作
-  function createProject() {
+  // [修改] 创建项目：现在接收初始化数据
+  function createProject(name: string, initBuildings: IBuilding[]) {
     clearProject()
-    projectInfo.value.name = 'Untitled Project'
-    isProjectLoaded.value = true // 进入工作区
+    projectInfo.value.name = name
+    buildings.value = initBuildings
+    isProjectLoaded.value = true
   }
 
-  // [新增] 关闭项目动作
   function closeProject() {
-    isProjectLoaded.value = false // 回到启动页
+    isProjectLoaded.value = false
   }
 
   function loadProject(projectData: IProject) {
     projectInfo.value.name = projectData.name
     nodes.value = projectData.nodes
     edges.value = projectData.edges
-    floors.value = projectData.floors
-    isProjectLoaded.value = true // 加载数据后自动进入工作区
+    buildings.value = projectData.buildings // [修改] 加载建筑数据
+    isProjectLoaded.value = true
   }
 
   function upsertNode(node: INode) {
@@ -89,18 +86,17 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   return {
-    isProjectLoaded, // 导出新状态
+    isProjectLoaded,
     projectInfo,
     nodes,
     edges,
-    floors,
+    buildings, // 导出
     selectedNodeId,
     selectedNode,
     isDark,
-    getNodesByFloor,
     deviceCounts,
-    createProject,   // 导出新建动作
-    closeProject,    // 导出关闭动作
+    createProject,
+    closeProject,
     loadProject,
     upsertNode,
     clearProject,
