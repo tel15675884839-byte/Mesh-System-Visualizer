@@ -2,27 +2,26 @@
 import { ref } from 'vue'
 import { useProjectStore } from '../stores/projectStore'
 import { DocumentAdd, FolderOpened } from '@element-plus/icons-vue'
-import ProjectWizard from './ProjectWizard.vue' // [新增] 引入向导
+import ProjectWizard from './ProjectWizard.vue'
 import { Log } from '../utils/logger'
 
 const store = useProjectStore()
-const showWizard = ref(false) // 控制向导显示
+const showWizard = ref(false)
 
-// 点击新建 -> 显示向导
 const onNewProject = () => {
   showWizard.value = true
 }
 
-// 向导完成 -> 创建项目并进入
 const onWizardFinish = (data: any) => {
-  Log.info('向导完成，创建项目', data)
-  store.createProject(data.name, data.buildings)
+  Log.info('向导完成，初始化数据...', { deviceCount: data.nodes.length })
+  store.createProject(data.name, data.buildings, data.loops, data.nodes, data.edges)
   showWizard.value = false
+  Log.success('项目初始化完成')
 }
 
-// 打开项目 (暂未实现逻辑)
-const onOpenProject = () => {
-  Log.info('打开项目功能待接入')
+// [修改] 绑定真实的打开逻辑
+const onOpenProject = async () => {
+  await store.loadFromDisk()
 }
 </script>
 
@@ -48,7 +47,6 @@ const onOpenProject = () => {
       </div>
     </div>
 
-    <!-- 向导弹窗 -->
     <ProjectWizard 
       v-if="showWizard" 
       @finish="onWizardFinish" 
@@ -67,16 +65,9 @@ const onOpenProject = () => {
   background-color: var(--bg-color);
   color: var(--text-color);
 }
-
-.content-box {
-  text-align: center;
-  max-width: 500px;
-  width: 100%;
-  padding: 40px;
-}
-
+.content-box { text-align: center; max-width: 500px; padding: 40px; }
 .logo-placeholder { font-size: 80px; margin-bottom: 20px; user-select: none; }
-.app-title { font-size: 28px; font-weight: 600; margin-bottom: 10px; color: var(--text-color); }
+.app-title { font-size: 28px; font-weight: 600; margin-bottom: 10px; }
 .app-version { color: #909399; font-size: 14px; margin-bottom: 40px; }
 .action-buttons { display: flex; flex-direction: column; gap: 15px; margin-bottom: 40px; align-items: center; }
 .welcome-btn { width: 200px; height: 45px; font-size: 16px; }

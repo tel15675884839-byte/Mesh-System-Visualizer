@@ -1,21 +1,21 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { IProject, INode, IEdge, IBuilding } from '../types'
+import type { IProject, INode, IEdge, IBuilding, ILoop } from '../types'
+import { Log } from '../utils/logger'
+import { ElMessage } from 'element-plus'
 
 export const useProjectStore = defineStore('project', () => {
   // --- State ---
   const isProjectLoaded = ref(false)
-
-  const projectInfo = ref<{ name: string; version: string }>({
+  const projectInfo = ref<{ name: string; version: string; filePath?: string }>({
     name: 'Untitled Project',
     version: '1.0.0'
   })
 
   const nodes = ref<INode[]>([])
   const edges = ref<IEdge[]>([])
-  
-  // [新增] 建筑列表 (树状结构)
   const buildings = ref<IBuilding[]>([])
+  const loops = ref<ILoop[]>([])
   
   const selectedNodeId = ref<string | null>(null)
   const isDark = ref(false)
@@ -39,27 +39,90 @@ export const useProjectStore = defineStore('project', () => {
     nodes.value = []
     edges.value = []
     buildings.value = []
+    loops.value = []
     selectedNodeId.value = null
+    projectInfo.value.filePath = undefined
   }
 
-  // [修改] 创建项目：现在接收初始化数据
-  function createProject(name: string, initBuildings: IBuilding[]) {
+  function createProject(
+    name: string, 
+    initBuildings: IBuilding[],
+    initLoops: ILoop[],
+    initNodes: INode[],
+    initEdges: IEdge[]
+  ) {
     clearProject()
     projectInfo.value.name = name
     buildings.value = initBuildings
+    loops.value = initLoops
+    nodes.value = initNodes
+    edges.value = initEdges
     isProjectLoaded.value = true
   }
 
   function closeProject() {
     isProjectLoaded.value = false
+    clearProject()
   }
 
   function loadProject(projectData: IProject) {
     projectInfo.value.name = projectData.name
     nodes.value = projectData.nodes
     edges.value = projectData.edges
-    buildings.value = projectData.buildings // [修改] 加载建筑数据
+    buildings.value = projectData.buildings
+    loops.value = projectData.loops || []
     isProjectLoaded.value = true
+  }
+
+  // [新增] 保存到硬盘
+  async function saveToDisk() {
+    const data: IProject = {
+      version: '1.0.0',
+      name: projectInfo.value.name,
+      created: Date.now(),
+      updated: Date.now(),
+      nodes: nodes.value,
+      edges: edges.value,
+      buildings: buildings.value,
+      loops: loops.value,
+      settings: { theme: isDark.value ? 'dark' : 'light', coordSystem: 'cartesian' }
+    }
+
+    const jsonString = JSON.stringify(data, null, 2)
+    
+    // @ts-ignore
+    const result = await window.api.saveProject(jsonString)
+    
+    if (result && result.success) {
+      projectInfo.value.filePath = result.filePath
+      ElMessage.success('保存成功')
+    }
+  }
+
+  // [新增] 从硬盘读取
+  async function loadFromDisk() {
+    // @ts-ignore
+    const result = await window.api.openProject()
+    
+    if (result && result.content) {
+      try {
+        const data = JSON.parse(result.content) as IProject
+        // 简单校验
+        if (!data.nodes || !data.buildings) {
+          throw new Error('无效的项目文件格式')
+        }
+        
+        loadProject(data)
+        projectInfo.value.filePath = result.filePath
+        ElMessage.success(`成功加载: ${data.name}`)
+        return true
+      } catch (e: any) {
+        Log.error('文件解析失败', e)
+        ElMessage.error('文件损坏或格式错误')
+        return false
+      }
+    }
+    return false
   }
 
   function upsertNode(node: INode) {
@@ -90,7 +153,8 @@ export const useProjectStore = defineStore('project', () => {
     projectInfo,
     nodes,
     edges,
-    buildings, // 导出
+    buildings,
+    loops,
     selectedNodeId,
     selectedNode,
     isDark,
@@ -98,6 +162,8 @@ export const useProjectStore = defineStore('project', () => {
     createProject,
     closeProject,
     loadProject,
+    saveToDisk,   // 导出
+    loadFromDisk, // 导出
     upsertNode,
     clearProject,
     selectNode,
