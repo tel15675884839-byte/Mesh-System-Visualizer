@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import type { IProject, INode, IEdge, IBuilding, ILoop, IViewSettings } from '../types'
 import { Log } from '../utils/logger'
 import { ElMessage } from 'element-plus'
-import { extractMac, extractRssi } from '../utils/htmlParser' // [修改] 引入 extractRssi
+import { extractMac, extractRssi } from '../utils/htmlParser' 
 import { DeviceRole, DeviceType } from '../types'
 
 export const useProjectStore = defineStore('project', () => {
@@ -16,7 +16,6 @@ export const useProjectStore = defineStore('project', () => {
     version: '1.0.0'
   })
 
-  // showAllLinks 默认为 false
   const viewSettings = ref<IViewSettings>({
     iconScale: 100,      
     labelColor: '#000000', 
@@ -59,7 +58,6 @@ export const useProjectStore = defineStore('project', () => {
     return floor ? floor.name : floorId
   }
 
-  // 获取设备显示ID (优先短地址，其次 MAC 后四位)
   const getDisplayId = (nodeId: string) => {
     const node = nodes.value.find(n => n.id === nodeId)
     if (!node) return 'Unknown'
@@ -75,6 +73,29 @@ export const useProjectStore = defineStore('project', () => {
 
   function updateViewSettings(settings: Partial<IViewSettings>) {
     Object.assign(viewSettings.value, settings)
+  }
+
+  // [新增] 添加 Loop
+  function addLoop(name: string, rawNodes: any[], processedEdges: IEdge[], fileName: string) {
+    const newLoopId = `loop-${Date.now()}`
+    
+    // 1. 创建 Loop 对象
+    const newLoop: ILoop = {
+      id: newLoopId,
+      name: name,
+      htmlSource: fileName,
+      deviceCount: rawNodes.length
+    }
+    
+    // 2. 处理节点 (设为 normal 状态)
+    const newNodes = processRawNodes(rawNodes, newLoopId, 'normal')
+    
+    // 3. 写入数据
+    loops.value.push(newLoop)
+    nodes.value.push(...newNodes)
+    edges.value.push(...processedEdges) // Edges 已经在组件层处理好了 ID 映射
+    
+    ElMessage.success(`成功添加 ${name}，包含 ${newNodes.length} 个设备`)
   }
 
   function deleteLoop(loopId: string) {
@@ -203,23 +224,7 @@ export const useProjectStore = defineStore('project', () => {
       return node
     })
   }
-  
-  // [核心修改] 统一在这里做 RSSI 提取，确保 updateLoop 也能拿到数据
-  function processRawEdges(rawEdges: any[], validNodes: INode[]) { 
-    // 注意：Store 内的 processRawEdges 接收的是 raw object
-    // 我们将其映射为 IEdge 结构
-    return rawEdges.map(raw => {
-      // 这里的 raw.from/to 是 HTML 里的 ID。
-      // 我们在 LoopManager 的 convertEdges 里已经做了 ID -> MAC 的映射。
-      // 如果 LoopManager 传递的是已经 convert 过的对象，那这里直接返回即可。
-      // 如果 Store 这里的 rawEdges 确实是 raw data，我们需要重新映射。
-      
-      // 鉴于之前 LoopManager 调用 updateLoop 时传递的是 convertEdges 的结果 (即 IEdge[])，
-      // 所以这里已经是处理好的数据了。我们只需要类型断言。
-      return raw as IEdge;
-    }) as IEdge[] 
-  }
-  
+  function processRawEdges(rawEdges: any[], validNodes: INode[]) { return rawEdges as IEdge[] }
   function parseRole(roleStr: string): DeviceRole {
     const r = (roleStr || '').toLowerCase()
     if (r.includes('leader')) return DeviceRole.LEADER
@@ -253,7 +258,6 @@ export const useProjectStore = defineStore('project', () => {
   
   function toggleBuildingEditor(show: boolean) { isBuildingEditorVisible.value = show; }
   function closeProject() { isProjectLoaded.value = false; clearProject(); }
-  
   function loadProject(projectData: IProject) {
     projectInfo.value.name = projectData.name;
     nodes.value = projectData.nodes.map(n => ({...n, isPlaced: n.isPlaced !== undefined ? n.isPlaced : true}));
@@ -261,7 +265,6 @@ export const useProjectStore = defineStore('project', () => {
     if (projectData.viewSettings) viewSettings.value = projectData.viewSettings;
     isProjectLoaded.value = true;
   }
-  
   function batchPlaceNodes(nodeIds: string[], startX: number, startY: number, floorId: string, buildingId: string) {
     const COLS = 5; const SPACING = 30;
     nodeIds.forEach((id, index) => {
@@ -274,25 +277,17 @@ export const useProjectStore = defineStore('project', () => {
     });
     if(nodeIds.length > 0) selectNode(nodeIds[nodeIds.length - 1]);
   }
-  
   function unplaceNode(nodeId: string) {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node) { node.isPlaced = false; node.position = null; }
   }
-  
   async function saveToDisk() {
-    const data: IProject = { 
-      version: '1.0.0', name: projectInfo.value.name, created: Date.now(), updated: Date.now(), 
-      nodes: nodes.value, edges: edges.value, buildings: buildings.value, loops: loops.value, 
-      viewSettings: viewSettings.value,
-      settings: { theme: isDark.value ? 'dark' : 'light', coordSystem: 'cartesian' } 
-    };
+    const data: IProject = { version: '1.0.0', name: projectInfo.value.name, created: Date.now(), updated: Date.now(), nodes: nodes.value, edges: edges.value, buildings: buildings.value, loops: loops.value, viewSettings: viewSettings.value, settings: { theme: isDark.value ? 'dark' : 'light', coordSystem: 'cartesian' } };
     const jsonString = JSON.stringify(data, null, 2);
     // @ts-ignore
     const result = await window.api.saveProject(jsonString);
     if (result && result.success) { projectInfo.value.filePath = result.filePath; ElMessage.success('保存成功'); }
   }
-  
   async function loadFromDisk() {
     // @ts-ignore
     const result = await window.api.openProject();
@@ -302,7 +297,6 @@ export const useProjectStore = defineStore('project', () => {
       } catch (e: any) { Log.error('文件解析失败', e); ElMessage.error('文件损坏或格式错误'); return false; }
     } return false;
   }
-  
   function upsertNode(node: INode) { const index = nodes.value.findIndex(n => n.id === node.id); if (index > -1) nodes.value[index] = node; else nodes.value.push(node); }
   function selectNode(id: string | null) { selectedNodeId.value = id; }
   function toggleTheme() { isDark.value = !isDark.value; const html = document.documentElement; if (isDark.value) html.classList.add('dark'); else html.classList.remove('dark'); }
@@ -315,6 +309,7 @@ export const useProjectStore = defineStore('project', () => {
     createProject, updateBuildings, toggleBuildingEditor, closeProject, loadProject, saveToDisk, loadFromDisk,
     upsertNode, clearProject, selectNode, toggleTheme, batchPlaceNodes, unplaceNode,
     deleteLoop, replaceLoop, updateLoop, purgeMissingNodes, confirmLoopChanges, deleteNode,
-    triggerFocus 
+    triggerFocus,
+    addLoop // [关键] 导出新动作
   }
 })

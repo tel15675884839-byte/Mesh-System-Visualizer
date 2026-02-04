@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { computed } from 'vue'
-import { Delete, Refresh, Upload, Check, Brush } from '@element-plus/icons-vue'
+import { Delete, Refresh, Upload, Check, Brush, Plus } from '@element-plus/icons-vue' // [新增] Plus
 import { useProjectStore } from '../stores/projectStore'
-// [修改] 引入 extractRssi
 import { parseOpenThreadHtml, extractMac, extractRssi } from '../utils/htmlParser'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ILoop, IEdge } from '../types'
 
 const store = useProjectStore()
+const MAX_LOOPS = 16
 
 const getLoopStats = (loopId: string) => {
   const nodes = store.nodes.filter(n => n.loopId === loopId)
@@ -31,7 +32,6 @@ const processFile = (file: File, callback: (nodes: any[], edges: any[], name: st
   reader.readAsText(file)
 }
 
-// [修改] 使用 extractRssi 提取信号值
 const convertEdges = (rawEdges: any[], rawNodes: any[]) => {
   const finalEdges: IEdge[] = []
   rawEdges.forEach(raw => {
@@ -43,7 +43,7 @@ const convertEdges = (rawEdges: any[], rawNodes: any[]) => {
         sourceId: extractMac(fromNode),
         targetId: extractMac(toNode),
         lqi: raw.lqi,
-        rssi: extractRssi(raw), // [核心修改] 调用提取函数
+        rssi: extractRssi(raw), 
         isParentChild: false
       })
     }
@@ -75,6 +75,41 @@ const handleUpdate = (file: any, loop: ILoop) => {
   processFile(file.raw, (nodes, edges, name) => {
     const finalEdges = convertEdges(edges, nodes)
     store.updateLoop(loop, nodes, finalEdges, name)
+  })
+}
+
+// [新增] 处理添加 Loop
+const handleAddLoopFile = (file: any) => {
+  if (store.loops.length >= MAX_LOOPS) {
+    ElMessage.warning(`最多只能添加 ${MAX_LOOPS} 个回路`)
+    return
+  }
+
+  processFile(file.raw, (nodes, edges, name) => {
+    // 1. 全局重复性检查 (不允许添加已存在的设备)
+    const existingMacs = new Set(store.nodes.map(n => n.mac))
+    const duplicates: string[] = []
+    
+    nodes.forEach(n => {
+      const mac = extractMac(n)
+      if (existingMacs.has(mac)) duplicates.push(mac)
+    })
+
+    if (duplicates.length > 0) {
+      ElMessage.error(`无法添加：发现 ${duplicates.length} 个设备已在其他 Loop 中存在`)
+      return
+    }
+
+    // 2. 生成默认名称
+    let loopIndex = 1
+    while (store.loops.some(l => l.name === `Loop ${loopIndex}`)) {
+      loopIndex++
+    }
+    const loopName = `Loop ${loopIndex}`
+
+    // 3. 调用 Store 添加
+    const finalEdges = convertEdges(edges, nodes)
+    store.addLoop(loopName, nodes, finalEdges, name)
   })
 }
 
@@ -139,8 +174,25 @@ const handleConfirm = (loop: ILoop) => {
       </div>
     </div>
     
+    <!-- [新增] 添加 Loop 卡片 -->
+    <div class="loop-card add-card" v-if="store.loops.length < MAX_LOOPS">
+      <el-upload 
+        action="#" 
+        :auto-upload="false" 
+        :show-file-list="false" 
+        accept=".html" 
+        @change="handleAddLoopFile"
+        class="add-uploader"
+      >
+        <div class="add-content">
+          <el-icon :size="24"><Plus /></el-icon>
+          <span>添加回路 (上传拓扑图)</span>
+        </div>
+      </el-upload>
+    </div>
+    
     <div class="empty-tip" v-if="store.loops.length === 0">
-      暂无回路，请新建项目添加。
+      暂无回路，请点击上方添加。
     </div>
   </div>
 </template>
@@ -170,4 +222,33 @@ const handleConfirm = (loop: ILoop) => {
 .quick-actions { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; gap: 15px; }
 
 .empty-tip { text-align: center; color: #909399; padding: 40px; }
+
+/* Add Card Style */
+.add-card {
+  border-style: dashed;
+  transition: all 0.2s;
+}
+.add-card:hover {
+  border-color: #409eff;
+  background-color: rgba(64, 158, 255, 0.05);
+}
+.add-uploader {
+  width: 100%;
+}
+.add-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  cursor: pointer;
+  color: #909399;
+}
+.add-content span {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.add-card:hover .add-content {
+  color: #409eff;
+}
 </style>
