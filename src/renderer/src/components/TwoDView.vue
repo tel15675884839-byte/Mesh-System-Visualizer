@@ -18,7 +18,8 @@ let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-let floorImage: HTMLImageElement | null = null
+const floorImageCache = new Map<string, HTMLImageElement>()
+let currentFloorImage: HTMLImageElement | null = null
 
 const initDefaultFloor = () => {
   if (store.buildings.length > 0) {
@@ -39,6 +40,19 @@ const availableFloors = computed(() => {
   return bld ? bld.floors : []
 })
 
+// [修复] 监听建筑切换，自动重置楼层 ID
+// 防止切换建筑时，旧的 floorId 在新建筑里找不到，导致 currentFloor 为 undefined 从而清空画布
+watch(currentBuildingId, (newVal) => {
+  if (!newVal) return
+  const bld = store.buildings.find(b => b.id === newVal)
+  if (bld && bld.floors.length > 0) {
+    // 自动选中第一个楼层
+    currentFloorId.value = bld.floors[0].id
+  } else {
+    currentFloorId.value = ''
+  }
+})
+
 const getIconData = (role: string, type: string) => {
   if (role === DeviceRole.LEADER) return IconRegistry.LEADER
   if (role === DeviceRole.ROUTER) return IconRegistry.ROUTER
@@ -53,22 +67,34 @@ const getIconData = (role: string, type: string) => {
   }
 }
 
-const loadFloorImage = (src: string | undefined) => {
+const loadFloorImage = (floorId: string, src: string | undefined) => {
   if (!src) {
-    floorImage = null
+    currentFloorImage = null
     network?.redraw()
     return
   }
+
+  if (floorImageCache.has(floorId)) {
+    currentFloorImage = floorImageCache.get(floorId)!
+    network?.redraw()
+    return
+  }
+  
   const img = new Image()
   img.src = src
   img.onload = () => {
-    floorImage = img
-    network?.redraw()
-    network?.fit() 
+    floorImageCache.set(floorId, img)
+    if (currentFloorId.value === floorId) {
+      currentFloorImage = img
+      network?.redraw()
+      network?.fit() 
+    }
   }
   img.onerror = () => {
     Log.error('Failed to load floor map image')
-    floorImage = null
+    if (currentFloorId.value === floorId) {
+      currentFloorImage = null
+    }
   }
 }
 
@@ -81,7 +107,7 @@ const initNetwork = () => {
   const options = {
     nodes: {
       shape: 'image', 
-      size: 30, // 初始基准
+      size: 30,
       font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff', face: 'arial' },
       borderWidth: 0, 
       shadow: false,
@@ -99,17 +125,13 @@ const initNetwork = () => {
 
   network = new Network(container.value, data, options)
 
-  // 绘制底图
   network.on('beforeDrawing', (ctx) => {
-    if (floorImage) {
+    if (currentFloorImage) {
       ctx.save()
-      
-      // [核心] 应用图纸透明度
       ctx.globalAlpha = store.viewSettings.mapOpacity
-      
-      const width = floorImage.width
-      const height = floorImage.height
-      ctx.drawImage(floorImage, 0, 0, width, height)
+      const width = currentFloorImage.width
+      const height = currentFloorImage.height
+      ctx.drawImage(currentFloorImage, 0, 0, width, height)
       ctx.strokeStyle = '#999'
       ctx.lineWidth = 10
       ctx.strokeRect(0, 0, width, height)
@@ -197,7 +219,6 @@ const updateVisData = () => {
     n => n.isPlaced && n.floorId === currentFloorId.value
   )
 
-  // [核心] 计算基础尺寸
   const baseSize = 30
   const currentSize = baseSize * (store.viewSettings.iconScale / 100)
 
@@ -216,12 +237,11 @@ const updateVisData = () => {
       y: safeY,
       opacity: isMissing ? 0.6 : 1,
       shape: 'image',
-      // [核心] 应用动态尺寸和颜色
       size: currentSize,
       font: { 
         color: store.viewSettings.labelColor,
         strokeWidth: 2, 
-        strokeColor: '#fff' // 保持白色描边，增强对比
+        strokeColor: '#fff' 
       }
     }
   })
@@ -231,22 +251,20 @@ const updateVisData = () => {
   visEdges.clear() 
 }
 
-// 监听数据变化
 watch(() => store.nodes, () => { updateVisData() }, { deep: true })
 watch(currentFloorId, () => { updateVisData() })
 
-// 监听视图设置变化 -> 刷新画布
 watch(() => store.viewSettings, () => {
-  updateVisData() // 更新节点 (尺寸/颜色)
-  network?.redraw() // 触发重绘 (背景透明度)
+  updateVisData() 
+  network?.redraw() 
 }, { deep: true })
 
 watch(currentFloor, (floor) => {
-  floorImage = null
-  if (floor && floor.mapPath) {
-    loadFloorImage(floor.mapPath)
+  if (!floor || !floor.mapPath) {
+    currentFloorImage = null
+    network?.redraw()
   } else {
-    network?.redraw() 
+    loadFloorImage(floor.id, floor.mapPath)
   }
 }, { deep: true, immediate: true })
 
@@ -255,7 +273,7 @@ const handleResize = () => { network?.fit() }
 onMounted(() => { 
   initNetwork()
   if (currentFloor.value && currentFloor.value.mapPath) {
-    loadFloorImage(currentFloor.value.mapPath)
+    loadFloorImage(currentFloor.value.id, currentFloor.value.mapPath)
   }
   window.addEventListener('resize', handleResize) 
 })
@@ -265,7 +283,6 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 <template>
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     <div class="overlay-tools">
-      <!-- 1. 楼层选择 -->
       <div class="tool-group">
         <el-select v-model="currentBuildingId" placeholder="Building" size="small" style="width: 90px">
           <el-option v-for="b in store.buildings" :key="b.id" :label="b.name" :value="b.id" />
@@ -277,24 +294,22 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 
       <div class="divider"></div>
 
-      <!-- 2. 图标缩放 -->
       <div class="tool-group">
-        <span class="tool-label">图标</span>
+        <span class="tool-label">Icon</span>
         <input 
           type="range" 
           v-model.number="store.viewSettings.iconScale" 
           min="10" max="300" step="10" 
           class="custom-range"
-          title="图标大小缩放"
+          title="Icon Scale"
         >
         <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
       </div>
 
       <div class="divider"></div>
 
-      <!-- 3. 字体颜色 -->
       <div class="tool-group">
-        <span class="tool-label">字体</span>
+        <span class="tool-label">Font</span>
         <el-color-picker 
           v-model="store.viewSettings.labelColor" 
           size="small"
@@ -304,15 +319,14 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 
       <div class="divider"></div>
 
-      <!-- 4. 图纸透明度 -->
       <div class="tool-group">
-        <span class="tool-label">图纸</span>
+        <span class="tool-label">Map</span>
         <input 
           type="range" 
           v-model.number="store.viewSettings.mapOpacity" 
           min="0" max="1" step="0.1" 
           class="custom-range"
-          title="底图透明度"
+          title="Map Opacity"
         >
         <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
       </div>
@@ -338,9 +352,5 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 .divider { width: 1px; height: 16px; background-color: #dcdfe6; }
 .value-tip { font-size: 11px; color: #909399; min-width: 30px; }
 
-/* 自定义滑块样式 (简单版) */
-.custom-range {
-  width: 80px;
-  cursor: pointer;
-}
+.custom-range { width: 80px; cursor: pointer; }
 </style>
