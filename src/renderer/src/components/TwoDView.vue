@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount, computed, reactive } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount, computed, reactive, nextTick } from 'vue'
 import { DataSet } from 'vis-data'
 import { Network } from 'vis-network'
 import { useProjectStore } from '../stores/projectStore'
@@ -13,6 +13,8 @@ const store = useProjectStore()
 
 const currentBuildingId = ref<string>('')
 const currentFloorId = ref<string>('')
+
+const highlightedNodeId = ref<string | null>(null)
 
 let network: Network | null = null
 let visNodes = new DataSet<any>([])
@@ -40,17 +42,41 @@ const availableFloors = computed(() => {
   return bld ? bld.floors : []
 })
 
-// [修复] 监听建筑切换，自动重置楼层 ID
-// 防止切换建筑时，旧的 floorId 在新建筑里找不到，导致 currentFloor 为 undefined 从而清空画布
 watch(currentBuildingId, (newVal) => {
   if (!newVal) return
   const bld = store.buildings.find(b => b.id === newVal)
   if (bld && bld.floors.length > 0) {
-    // 自动选中第一个楼层
     currentFloorId.value = bld.floors[0].id
   } else {
     currentFloorId.value = ''
   }
+})
+
+watch(() => store.focusRequest, async (req) => {
+  if (!req || !network) return
+  const node = store.nodes.find(n => n.id === req.nodeId)
+  if (!node || !node.isPlaced) {
+    ElMessage.warning('该设备未布点，无法定位')
+    return
+  }
+
+  if (node.buildingId !== currentBuildingId.value || node.floorId !== currentFloorId.value) {
+    currentBuildingId.value = node.buildingId
+    currentFloorId.value = node.floorId
+    await nextTick()
+    await new Promise(r => setTimeout(r, 100))
+  }
+
+  highlightedNodeId.value = node.id
+  updateVisData() 
+  network.selectNodes([node.id])
+  network.focus(node.id, {
+    scale: 1.5,
+    animation: {
+      duration: 700, 
+      easingFunction: 'easeInOutQuad'
+    }
+  })
 })
 
 const getIconData = (role: string, type: string) => {
@@ -110,12 +136,18 @@ const initNetwork = () => {
       size: 30,
       font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff', face: 'arial' },
       borderWidth: 0, 
-      shadow: false,
+      shadow: false, 
       brokenImage: IconRegistry.SMOKE
     },
     edges: {
-      width: 2, color: { color: '#ccc', highlight: '#409eff' },
-      smooth: { type: 'continuous' }
+      width: 2, // 统一线宽
+      color: { 
+        color: '#409eff', // 统一高亮蓝
+        highlight: '#409eff',
+        opacity: 0.8 
+      },
+      smooth: false, // [性能关键] 必须关闭平滑
+      arrows: { to: { enabled: true, scaleFactor: 0.5 } }
     },
     physics: { enabled: false }, 
     interaction: {
@@ -128,10 +160,14 @@ const initNetwork = () => {
   network.on('beforeDrawing', (ctx) => {
     if (currentFloorImage) {
       ctx.save()
+      // [性能关键] 关闭平滑处理，解决拖拽卡顿
+      ctx.imageSmoothingEnabled = false
+      
       ctx.globalAlpha = store.viewSettings.mapOpacity
       const width = currentFloorImage.width
       const height = currentFloorImage.height
-      ctx.drawImage(currentFloorImage, 0, 0, width, height)
+      // [性能关键] 坐标取整
+      ctx.drawImage(currentFloorImage, 0, 0, Math.floor(width), Math.floor(height))
       ctx.strokeStyle = '#999'
       ctx.lineWidth = 10
       ctx.strokeRect(0, 0, width, height)
@@ -142,6 +178,11 @@ const initNetwork = () => {
   })
 
   network.on('click', (params) => {
+    if (highlightedNodeId.value) {
+      highlightedNodeId.value = null
+      updateVisData()
+    }
+
     if (params.nodes.length > 0) {
       store.selectNode(params.nodes[0])
     } else {
@@ -218,6 +259,7 @@ const updateVisData = () => {
   const visibleNodes = store.nodes.filter(
     n => n.isPlaced && n.floorId === currentFloorId.value
   )
+  const visibleNodeIds = new Set(visibleNodes.map(n => n.id))
 
   const baseSize = 30
   const currentSize = baseSize * (store.viewSettings.iconScale / 100)
@@ -228,6 +270,8 @@ const updateVisData = () => {
 
     const isMissing = node.diffStatus === 'missing'
     const iconData = getIconData(node.role, node.type)
+    
+    const isHighlighted = highlightedNodeId.value === node.id
 
     return {
       id: node.id,
@@ -242,17 +286,62 @@ const updateVisData = () => {
         color: store.viewSettings.labelColor,
         strokeWidth: 2, 
         strokeColor: '#fff' 
-      }
+      },
+      shadow: isHighlighted ? {
+        enabled: true,
+        color: 'rgba(30, 144, 255, 0.8)', 
+        size: 25, 
+        x: 0,
+        y: 0
+      } : false
     }
   })
+
+  // [修改] 连线数据构造
+  const newEdges: any[] = []
+  
+  if (store.viewSettings.showAllLinks || store.selectedNodeId) {
+    store.edges.forEach(edge => {
+      if (visibleNodeIds.has(edge.sourceId) && visibleNodeIds.has(edge.targetId)) {
+        
+        const isRelated = store.selectedNodeId === edge.sourceId || store.selectedNodeId === edge.targetId
+        if (!store.viewSettings.showAllLinks && !isRelated) return
+
+        // [核心修改] Tooltip 格式: Device(0411) -> Node(0400) [RSSI: -37 dBm]
+        const srcDisplay = store.getDisplayId(edge.sourceId)
+        const tgtDisplay = store.getDisplayId(edge.targetId)
+        
+        // 格式化 RSSI
+        let rssiStr = ''
+        if (typeof edge.rssi === 'number') {
+          rssiStr = ` [RSSI: ${edge.rssi} dBm]`
+        } else {
+          // 如果没有 RSSI，不显示 N/A，或者你可以选择显示 [RSSI: N/A]
+          rssiStr = ' [RSSI: N/A]' 
+        }
+
+        const title = `${srcDisplay} → ${tgtDisplay}${rssiStr}`
+
+        newEdges.push({
+          id: edge.id,
+          from: edge.sourceId,
+          to: edge.targetId,
+          title: title,
+          // 样式继承 options.edges，无需特殊覆盖，保证统一
+        })
+      }
+    })
+  }
 
   visNodes.clear()
   visNodes.add(newNodes)
   visEdges.clear() 
+  visEdges.add(newEdges) 
 }
 
 watch(() => store.nodes, () => { updateVisData() }, { deep: true })
 watch(currentFloorId, () => { updateVisData() })
+watch(() => store.selectedNodeId, () => { updateVisData() }) 
 
 watch(() => store.viewSettings, () => {
   updateVisData() 
@@ -260,6 +349,7 @@ watch(() => store.viewSettings, () => {
 }, { deep: true })
 
 watch(currentFloor, (floor) => {
+  if (container.value) { container.value.style.backgroundImage = 'none' }
   if (!floor || !floor.mapPath) {
     currentFloorImage = null
     network?.redraw()
@@ -330,6 +420,12 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
         >
         <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
       </div>
+
+      <div class="divider"></div>
+
+      <div class="tool-group">
+        <el-checkbox v-model="store.viewSettings.showAllLinks" label="Links" size="small" border />
+      </div>
     </div>
 
     <div ref="container" class="vis-network-container"></div>
@@ -339,18 +435,10 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 <style scoped>
 .twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; }
 .vis-network-container { width: 100%; height: 100%; outline: none; }
-
-.overlay-tools { 
-  position: absolute; top: 10px; left: 10px; z-index: 5; 
-  background: rgba(255, 255, 255, 0.95); padding: 5px 10px; 
-  border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
-  display: flex; align-items: center; gap: 10px;
-}
-
+.overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; }
 .tool-group { display: flex; align-items: center; gap: 5px; }
 .tool-label { font-size: 12px; color: #606266; font-weight: bold; }
 .divider { width: 1px; height: 16px; background-color: #dcdfe6; }
 .value-tip { font-size: 11px; color: #909399; min-width: 30px; }
-
 .custom-range { width: 80px; cursor: pointer; }
 </style>

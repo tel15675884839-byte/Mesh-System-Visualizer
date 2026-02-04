@@ -26,18 +26,12 @@ export enum DeviceType {
   REMOVED = 'Removed'
 }
 
-/**
- * 3D 空间坐标 (米)
- */
 export interface Vector3 {
   x: number;
   y: number;
   z: number;
 }
 
-/**
- * 回路接口
- */
 export interface ILoop {
   id: string;
   name: string;
@@ -46,17 +40,16 @@ export interface ILoop {
 }
 
 /**
- * 视图显示设置 (持久化)
+ * 视图显示设置
  */
 export interface IViewSettings {
-  iconScale: number;   // 10 - 300 (%)
-  labelColor: string;  // Hex color
-  mapOpacity: number;  // 0 - 1
+  iconScale: number;   
+  labelColor: string;  
+  mapOpacity: number;  
+  // [新增] 是否全局显示所有连线
+  showAllLinks: boolean;
 }
 
-/**
- * 核心设备节点接口
- */
 export interface INode {
   id: string;
   mac: string;
@@ -78,6 +71,8 @@ export interface IEdge {
   sourceId: string;
   targetId: string;
   lqi?: number;
+  // [新增] 信号强度
+  rssi?: number;
   isParentChild: boolean;
 }
 
@@ -102,15 +97,11 @@ export interface IProject {
   name: string;
   created: number;
   updated: number;
-  
   nodes: INode[];
   edges: IEdge[];
   buildings: IBuilding[];
   loops: ILoop[];
-  
-  // [新增] 视图设置
   viewSettings?: IViewSettings;
-  
   settings: {
     theme: 'light' | 'dark';
     coordSystem: 'cartesian' | 'geographic';

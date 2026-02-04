@@ -2,13 +2,13 @@
 import { computed } from 'vue'
 import { Delete, Refresh, Upload, Check, Brush } from '@element-plus/icons-vue'
 import { useProjectStore } from '../stores/projectStore'
-import { parseOpenThreadHtml, extractMac } from '../utils/htmlParser'
+// [修改] 引入 extractRssi
+import { parseOpenThreadHtml, extractMac, extractRssi } from '../utils/htmlParser'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ILoop, IEdge } from '../types'
 
 const store = useProjectStore()
 
-// 计算每个 Loop 的统计信息
 const getLoopStats = (loopId: string) => {
   const nodes = store.nodes.filter(n => n.loopId === loopId)
   return {
@@ -18,7 +18,6 @@ const getLoopStats = (loopId: string) => {
   }
 }
 
-// 通用文件处理
 const processFile = (file: File, callback: (nodes: any[], edges: any[], name: string) => void) => {
   const reader = new FileReader()
   reader.onload = (e) => {
@@ -32,8 +31,7 @@ const processFile = (file: File, callback: (nodes: any[], edges: any[], name: st
   reader.readAsText(file)
 }
 
-// 辅助：将 raw edges 转换为 IEdge[] (需要 node 映射逻辑)
-// 这是一个简化版本，假设 rawNodes 里的 id 还没转 MAC，需要 finishWizard 里的那种匹配
+// [修改] 使用 extractRssi 提取信号值
 const convertEdges = (rawEdges: any[], rawNodes: any[]) => {
   const finalEdges: IEdge[] = []
   rawEdges.forEach(raw => {
@@ -45,6 +43,7 @@ const convertEdges = (rawEdges: any[], rawNodes: any[]) => {
         sourceId: extractMac(fromNode),
         targetId: extractMac(toNode),
         lqi: raw.lqi,
+        rssi: extractRssi(raw), // [核心修改] 调用提取函数
         isParentChild: false
       })
     }
@@ -113,21 +112,17 @@ const handleConfirm = (loop: ILoop) => {
         </div>
 
         <div class="actions-row">
-          <!-- 更新按钮 -->
           <el-upload action="#" :auto-upload="false" :show-file-list="false" accept=".html" @change="(f) => handleUpdate(f, loop)">
             <el-button size="small" type="primary" plain :icon="Upload">更新 (Diff)</el-button>
           </el-upload>
 
-          <!-- 替换按钮 -->
           <el-upload action="#" :auto-upload="false" :show-file-list="false" accept=".html" @change="(f) => handleReplace(f, loop)">
             <el-button size="small" type="warning" plain :icon="Refresh">替换</el-button>
           </el-upload>
 
-          <!-- 删除按钮 -->
           <el-button size="small" type="danger" plain :icon="Delete" @click="handleDelete(loop)">删除</el-button>
         </div>
 
-        <!-- 快捷操作行 -->
         <div class="quick-actions" v-if="getLoopStats(loop.id).new > 0 || getLoopStats(loop.id).missing > 0">
           <el-button 
             v-if="getLoopStats(loop.id).new > 0"

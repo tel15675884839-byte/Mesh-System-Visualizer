@@ -1,21 +1,12 @@
 import { Log } from './logger'
 
-/**
- * 解析结果接口
- */
 export interface IParsedData {
   nodes: any[]
   edges: any[]
 }
 
-/**
- * 从 OpenThread 导出的 HTML 文件内容中提取拓扑数据
- * @param htmlContent 文件文本内容
- */
 export function parseOpenThreadHtml(htmlContent: string): IParsedData {
   try {
-    // 1. 使用正则提取 nodes 和 edges 的定义部分
-    // 兼容 var/let/const，兼容 new vis.DataSet([...]) 或直接 = [...]
     const nodesMatch = 
       htmlContent.match(/(?:var|let|const)?\s*nodes\s*=\s*new\s+vis\.DataSet\s*\(\s*(\[[\s\S]*?\])\s*\)/) || 
       htmlContent.match(/(?:var|let|const)?\s*nodes\s*=\s*(\[[\s\S]*?\])\s*;?/)
@@ -28,8 +19,6 @@ export function parseOpenThreadHtml(htmlContent: string): IParsedData {
       throw new Error('无法在 HTML 中找到 nodes 或 edges 数据定义')
     }
 
-    // 2. 安全地执行提取到的 JS 代码片段以获取数组对象
-    // 注意：这里假设 HTML 来源是受信任的 OpenThread 工具
     const nodesRaw = new Function("return " + nodesMatch[1])()
     const edgesRaw = new Function("return " + edgesMatch[1])()
 
@@ -49,17 +38,29 @@ export function parseOpenThreadHtml(htmlContent: string): IParsedData {
   }
 }
 
-/**
- * 标准化 MAC 地址
- * 尝试从 id, label, mac 字段中提取 16 位 hex 字符串
- */
 export function extractMac(node: any): string {
   if (node.mac) return node.mac.toLowerCase()
-  
   const macRegex = /([0-9a-fA-F]{16})/
   if (typeof node.id === 'string' && node.id.match(macRegex)) return node.id.match(macRegex)[0].toLowerCase()
   if (typeof node.label === 'string' && node.label.match(macRegex)) return node.label.match(macRegex)[0].toLowerCase()
-  
-  // 如果都找不到，返回原始 ID (可能是短地址或自定义ID)
+  if (node.title && typeof node.title === 'string' && node.title.match(macRegex)) return node.title.match(macRegex)[0].toLowerCase()
   return String(node.id).toLowerCase()
+}
+
+// [核心修复] 从 title 中提取 RSSI
+export function extractRssi(edge: any): number | undefined {
+  // 1. 如果有直接字段，优先使用
+  if (typeof edge.rssi === 'number') return edge.rssi
+  if (typeof edge.averageRssi === 'number') return edge.averageRssi
+  if (typeof edge.lastRssi === 'number') return edge.lastRssi
+
+  // 2. 从 title 字符串提取 (例如: "3000 -> 3010: -49 dBm")
+  if (edge.title && typeof edge.title === 'string') {
+    // 匹配 "-数字 dBm"
+    const matches = edge.title.match(/(-?\d+)\s*dBm/)
+    if (matches && matches[1]) {
+      return parseInt(matches[1], 10)
+    }
+  }
+  return undefined
 }
