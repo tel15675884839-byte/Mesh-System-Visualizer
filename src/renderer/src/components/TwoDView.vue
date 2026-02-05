@@ -7,7 +7,6 @@ import { Log } from '../utils/logger'
 import { DeviceRole, DeviceType } from '../types' 
 import { ElMessage } from 'element-plus'
 import { IconRegistry } from '../utils/iconAssets'
-// [新增] 引入图标用于切换按钮
 import { VideoCamera, MapLocation } from '@element-plus/icons-vue'
 
 const container = ref<HTMLElement | null>(null)
@@ -15,19 +14,35 @@ const store = useProjectStore()
 
 const currentBuildingId = ref<string>('')
 const currentFloorId = ref<string>('')
-// Zoom 状态仅用于内部逻辑，不再显示 UI
+
+// [状态] 缩放倍率
 const currentScale = ref<number>(1.0) 
 
+// [状态] 高亮节点ID
 const highlightedNodeId = ref<string | null>(null)
 
 let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-const floorImageCache = new Map<string, HTMLImageElement>()
-let currentFloorImage: HTMLImageElement | null = null
+const backgroundImage = ref<HTMLImageElement | null>(null)
+const backgroundSize = reactive({ width: 0, height: 0 })
 
+// [修改] 初始化时尝试从 Store 恢复上次所在的楼层
 const initDefaultFloor = () => {
+  // 1. 优先使用记忆的楼层
+  if (store.viewSettings.lastBuildingId && store.viewSettings.lastFloorId) {
+    // 验证一下该楼层是否还存在
+    const bld = store.buildings.find(b => b.id === store.viewSettings.lastBuildingId)
+    const flr = bld?.floors.find(f => f.id === store.viewSettings.lastFloorId)
+    if (bld && flr) {
+      currentBuildingId.value = bld.id
+      currentFloorId.value = flr.id
+      return
+    }
+  }
+
+  // 2. 如果没有记忆或无效，回退到默认
   if (store.buildings.length > 0) {
     currentBuildingId.value = store.buildings[0].id
     if (store.buildings[0].floors.length > 0) {
@@ -95,14 +110,8 @@ const getIconData = (role: string, type: string) => {
 }
 
 const loadFloorImage = (floorId: string, src: string | undefined) => {
+  backgroundImage.value = null
   if (!src) {
-    currentFloorImage = null
-    network?.redraw()
-    return
-  }
-
-  if (floorImageCache.has(floorId)) {
-    currentFloorImage = floorImageCache.get(floorId)!
     network?.redraw()
     return
   }
@@ -110,26 +119,18 @@ const loadFloorImage = (floorId: string, src: string | undefined) => {
   const img = new Image()
   img.src = src
   img.onload = () => {
-    floorImageCache.set(floorId, img)
     if (currentFloorId.value === floorId) {
-      currentFloorImage = img
+      backgroundImage.value = img
+      backgroundSize.width = img.width
+      backgroundSize.height = img.height
+      
       network?.redraw()
-      network?.fit() 
+      // [关键] 恢复视角
+      if (!restoreViewState()) {
+        setTimeout(() => network?.fit(), 50)
+      }
     }
   }
-  img.onerror = () => {
-    Log.error('Failed to load floor map image')
-    if (currentFloorId.value === floorId) {
-      currentFloorImage = null
-    }
-  }
-}
-
-let syncFrameId: number | null = null
-
-const syncMapLayer = () => {
-  // 即使现在改回了 Canvas 绘制，保留这个空函数结构也没问题
-  // 实际上现在的渲染都在 beforeDrawing 里，不需要 requestAnimationFrame 同步 CSS 了
 }
 
 const initNetwork = () => {
@@ -163,27 +164,27 @@ const initNetwork = () => {
 
   network = new Network(container.value, data, options)
 
-  // 全 Canvas 渲染
-  network.on('beforeDrawing', (ctx) => {
-    if (currentFloorImage) {
+  network.on('beforeDrawing', (ctx: CanvasRenderingContext2D) => {
+    if (backgroundImage.value) {
       ctx.save()
       ctx.imageSmoothingEnabled = false
       
       ctx.globalAlpha = store.viewSettings.mapOpacity
-      const width = currentFloorImage.width
-      const height = currentFloorImage.height
+      const width = backgroundImage.value.width
+      const height = backgroundImage.value.height
       
-      ctx.drawImage(currentFloorImage, 0, 0, Math.floor(width), Math.floor(height))
+      ctx.drawImage(backgroundImage.value, 0, 0, width, height)
+      
       ctx.strokeStyle = '#999'
       ctx.lineWidth = 10
       ctx.strokeRect(0, 0, width, height)
+      
       ctx.restore()
     } else {
       drawGrid(ctx)
     }
   })
-
-  // 监听缩放 (仅更新内部状态，UI不再显示)
+  
   network.on('zoom', () => {
     currentScale.value = network?.getScale() || 1
   })
@@ -216,6 +217,40 @@ const initNetwork = () => {
       }
     }
   })
+
+  // 如果没有背景图，立即尝试恢复视角 (有图的情况在 onload 里处理)
+  if (!currentFloor.value?.mapPath) {
+    restoreViewState()
+  }
+}
+
+// 恢复视角逻辑
+const restoreViewState = () => {
+  if (network && store.viewSettings.camera2D) {
+    const { x, y, scale } = store.viewSettings.camera2D
+    network.moveTo({
+      position: { x, y },
+      scale: scale,
+      animation: false 
+    })
+    return true
+  }
+  return false
+}
+
+// 保存当前所有状态
+const saveCurrentState = () => {
+  if (network) {
+    const pos = network.getViewPosition()
+    const scale = network.getScale()
+    
+    store.saveViewState(
+      currentBuildingId.value,
+      currentFloorId.value,
+      { x: pos.x, y: pos.y, scale },
+      undefined // 不更新 3D
+    )
+  }
 }
 
 const drawGrid = (ctx: CanvasRenderingContext2D) => {
@@ -291,7 +326,7 @@ const updateVisData = () => {
       shadow: isHighlighted ? {
         enabled: true,
         color: 'rgba(30, 144, 255, 0.8)', 
-        size: 25, 
+        size: 30, 
         x: 0,
         y: 0
       } : false
@@ -345,7 +380,7 @@ watch(currentFloor, (floor) => {
   }
 }, { deep: true, immediate: true })
 
-const handleResize = () => { network?.fit() }
+const handleResize = () => { network?.redraw() }
 
 onMounted(() => { 
   initNetwork()
@@ -354,7 +389,9 @@ onMounted(() => {
   }
   window.addEventListener('resize', handleResize) 
 })
+
 onBeforeUnmount(() => { 
+  saveCurrentState() // [关键] 离开前保存
   window.removeEventListener('resize', handleResize)
   if (network) network.destroy() 
 })
@@ -364,7 +401,6 @@ onBeforeUnmount(() => {
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     
     <div class="overlay-tools">
-      <!-- 楼层选择 -->
       <div class="tool-group">
         <el-select v-model="currentBuildingId" placeholder="Building" size="small" style="width: 90px">
           <el-option v-for="b in store.buildings" :key="b.id" :label="b.name" :value="b.id" />
@@ -376,7 +412,6 @@ onBeforeUnmount(() => {
 
       <div class="divider"></div>
 
-      <!-- Icon Scale -->
       <div class="tool-group">
         <span class="tool-label">Icon</span>
         <input 
@@ -386,11 +421,11 @@ onBeforeUnmount(() => {
           class="custom-range"
           title="Icon Scale"
         >
+        <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
       </div>
 
       <div class="divider"></div>
 
-      <!-- Font Color -->
       <div class="tool-group">
         <span class="tool-label">Font</span>
         <el-color-picker 
@@ -402,7 +437,6 @@ onBeforeUnmount(() => {
 
       <div class="divider"></div>
 
-      <!-- Map Opacity -->
       <div class="tool-group">
         <span class="tool-label">Map</span>
         <input 
@@ -412,21 +446,11 @@ onBeforeUnmount(() => {
           class="custom-range"
           title="Map Opacity"
         >
+        <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
       </div>
 
       <div class="divider"></div>
 
-      <!-- View Switcher (Moved here) -->
-      <div class="tool-group">
-        <el-radio-group v-model="store.currentViewMode" size="small">
-          <el-radio-button label="2D"><el-icon><MapLocation /></el-icon> 2D</el-radio-button>
-          <el-radio-button label="3D"><el-icon><VideoCamera /></el-icon> 3D</el-radio-button>
-        </el-radio-group>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Link Toggle -->
       <div class="tool-group">
         <el-checkbox v-model="store.viewSettings.showAllLinks" label="Links" size="small" border />
       </div>
@@ -440,15 +464,10 @@ onBeforeUnmount(() => {
 .twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; overflow: hidden; }
 .vis-network-container { width: 100%; height: 100%; outline: none; position: relative; z-index: 1; background: transparent; }
 
-.overlay-tools { 
-  position: absolute; top: 10px; left: 10px; z-index: 5; 
-  background: rgba(255, 255, 255, 0.95); padding: 5px 10px; 
-  border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; /* 允许换行防止溢出 */
-}
-
+.overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tool-group { display: flex; align-items: center; gap: 5px; }
 .tool-label { font-size: 12px; color: #606266; font-weight: bold; }
 .divider { width: 1px; height: 16px; background-color: #dcdfe6; }
-.custom-range { width: 60px; cursor: pointer; } /* 稍微调窄一点滑块 */
+.value-tip { font-size: 11px; color: #909399; min-width: 30px; }
+.custom-range { width: 60px; cursor: pointer; }
 </style>

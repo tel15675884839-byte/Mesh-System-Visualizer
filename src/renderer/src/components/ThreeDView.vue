@@ -6,7 +6,6 @@ import { useProjectStore } from '../stores/projectStore'
 import { IconRegistry } from '../utils/iconAssets'
 import { DeviceRole, DeviceType } from '../types'
 import { Log } from '../utils/logger'
-import { VideoCamera, MapLocation } from '@element-plus/icons-vue' // [新增]
 
 const containerRef = ref<HTMLElement | null>(null)
 const store = useProjectStore()
@@ -124,24 +123,47 @@ const buildEdges = () => {
 
 const init = () => {
   if (!containerRef.value) return
+  
   const width = containerRef.value.clientWidth
   const height = containerRef.value.clientHeight
+
   scene = new THREE.Scene()
   scene.background = new THREE.Color(0xf0f2f5) 
+
   camera = new THREE.PerspectiveCamera(45, width / height, 1, 50000)
-  camera.position.set(1000, 1000, 1000)
+  
+  // [新增] 恢复相机状态
+  if (store.viewSettings.camera3D) {
+    const { position, target } = store.viewSettings.camera3D
+    camera.position.set(position.x, position.y, position.z)
+  } else {
+    camera.position.set(1000, 1000, 1000)
+  }
+
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setSize(width, height)
   renderer.setPixelRatio(window.devicePixelRatio)
   containerRef.value.appendChild(renderer.domElement)
+
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
+  
+  // [新增] 恢复注视点
+  if (store.viewSettings.camera3D) {
+    const { target } = store.viewSettings.camera3D
+    controls.target.set(target.x, target.y, target.z)
+  }
+
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.8)
   scene.add(ambientLight)
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
   dirLight.position.set(0, 1000, 0)
   scene.add(dirLight)
-  scene.add(buildingGroup); scene.add(nodesGroup); scene.add(edgesGroup)
+
+  scene.add(buildingGroup)
+  scene.add(nodesGroup)
+  scene.add(edgesGroup)
+
   rebuildAll()
   animate()
 }
@@ -153,7 +175,24 @@ const animate = () => {
 }
 
 const rebuildAll = () => {
-  buildFloors(); buildNodes(); buildEdges()
+  buildFloors()
+  buildNodes()
+  buildEdges()
+}
+
+// [新增] 保存相机状态
+const saveViewState = () => {
+  if (camera && controls) {
+    store.saveViewState(
+      undefined, 
+      undefined, 
+      undefined,
+      {
+        position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+        target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+      }
+    )
+  }
 }
 
 watch(floorGap, () => { rebuildAll() })
@@ -169,8 +208,13 @@ const handleResize = () => {
   renderer.setSize(w, h)
 }
 
-onMounted(() => { init(); window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { 
+onMounted(() => {
+  init()
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  saveViewState() // 离开时保存
   cancelAnimationFrame(animationId)
   window.removeEventListener('resize', handleResize)
   if(renderer) { renderer.dispose(); renderer.forceContextLoss() }
@@ -185,16 +229,6 @@ const resetView = () => {
 <template>
   <div class="threed-container">
     <div class="overlay-controls">
-      <!-- [新增] 视图切换器 -->
-      <div class="control-item">
-        <el-radio-group v-model="store.currentViewMode" size="small">
-          <el-radio-button label="2D"><el-icon><MapLocation /></el-icon> 2D</el-radio-button>
-          <el-radio-button label="3D"><el-icon><VideoCamera /></el-icon> 3D</el-radio-button>
-        </el-radio-group>
-      </div>
-
-      <div class="divider"></div>
-
       <div class="control-item">
         <span class="label">Floor Gap</span>
         <input type="range" v-model.number="floorGap" min="0" max="500" step="10">
@@ -202,12 +236,20 @@ const resetView = () => {
       
       <div class="control-item">
         <span class="label">Icon Size</span>
-        <input type="range" v-model.number="store.viewSettings.iconScale" min="10" max="300" step="10">
+        <input 
+          type="range" 
+          v-model.number="store.viewSettings.iconScale" 
+          min="10" max="300" step="10"
+        >
       </div>
       
       <div class="control-item">
         <span class="label">Opacity</span>
-        <input type="range" v-model.number="store.viewSettings.mapOpacity" min="0" max="1" step="0.1">
+        <input 
+          type="range" 
+          v-model.number="store.viewSettings.mapOpacity" 
+          min="0" max="1" step="0.1"
+        >
       </div>
 
       <div class="control-item">
@@ -222,16 +264,45 @@ const resetView = () => {
 </template>
 
 <style scoped>
-.threed-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
-.scene-container { width: 100%; height: 100%; }
-
-.overlay-controls { 
-  position: absolute; top: 10px; right: 10px; background: rgba(255, 255, 255, 0.9); 
-  padding: 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-  z-index: 10; display: flex; flex-direction: column; gap: 12px; width: 180px; 
+.threed-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
 }
-.control-item { display: flex; flex-direction: column; gap: 4px; }
-.control-item .label { font-size: 12px; color: #606266; font-weight: bold; }
-.control-item input[type=range] { width: 100%; cursor: pointer; }
-.divider { height: 1px; background-color: #eee; width: 100%; }
+
+.scene-container {
+  width: 100%;
+  height: 100%;
+}
+
+.overlay-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px; /* [修改] 移到左侧 */
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 180px;
+}
+
+.control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.control-item .label {
+  font-size: 12px;
+  color: #606266;
+  font-weight: bold;
+}
+.control-item input[type=range] {
+  width: 100%;
+  cursor: pointer;
+}
 </style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useProjectStore } from '../stores/projectStore'
-import { Moon, Sunny, FolderOpened, RefreshRight, Rank, Operation } from '@element-plus/icons-vue'
+import { Moon, Sunny, FolderOpened, RefreshRight, Rank, Operation, VideoCamera, MapLocation } from '@element-plus/icons-vue' // [新增] 图标
 
 const store = useProjectStore()
 
@@ -19,7 +19,7 @@ const handleMenuCommand = async (command: string) => {
     case 'new':
       store.closeProject() 
       break
-    case 'config-building': // [新增]
+    case 'config-building':
       store.toggleBuildingEditor(true)
       break
   }
@@ -93,11 +93,20 @@ const handleMenuCommand = async (command: string) => {
           <el-button size="small" @click="store.saveToDisk">💾</el-button>
         </el-tooltip>
         
-        <!-- [新增] 快速入口 -->
         <el-tooltip content="配置建筑与图纸" placement="bottom">
           <el-button size="small" @click="store.toggleBuildingEditor(true)" :icon="Operation"></el-button>
         </el-tooltip>
       </el-button-group>
+
+      <el-divider direction="vertical" />
+
+      <!-- [新增] 视图切换器移动到这里 -->
+      <div class="tool-group">
+        <el-radio-group v-model="store.currentViewMode" size="small">
+          <el-radio-button label="2D"><el-icon><MapLocation /></el-icon> 2D</el-radio-button>
+          <el-radio-button label="3D"><el-icon><VideoCamera /></el-icon> 3D</el-radio-button>
+        </el-radio-group>
+      </div>
 
       <el-divider direction="vertical" />
 
@@ -122,4 +131,5 @@ const handleMenuCommand = async (command: string) => {
 .menu-item:hover { background-color: rgba(128, 128, 128, 0.1); }
 .window-controls { display: flex; align-items: center; margin-left: auto; }
 .toolbar-row { height: 40px; display: flex; align-items: center; padding: 0 10px; gap: 10px; background-color: var(--panel-bg); }
+.tool-group { display: flex; align-items: center; }
 </style>

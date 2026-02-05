@@ -15,10 +15,11 @@ import BuildingEditorModal from './components/BuildingEditorModal.vue'
 
 const store = useProjectStore()
 
+// --- 布局状态 ---
 const leftWidth = ref(280)
-const rightWidth = ref(300)
+// rightWidth 现在直接使用 store.viewSettings.rightPanelWidth
 const minWidth = 200
-const maxWidth = 500
+const maxWidth = 800 // 允许拉得更宽一点
 const isRightPanelOpen = ref(true) 
 
 let isResizingLeft = false
@@ -35,7 +36,10 @@ const handleMouseMove = (e: MouseEvent) => {
   }
   if (isResizingRight) {
     const newWidth = window.innerWidth - e.clientX
-    if (newWidth >= minWidth && newWidth <= maxWidth) rightWidth.value = newWidth
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      // [修改] 更新 Store 中的宽度
+      store.viewSettings.rightPanelWidth = newWidth
+    }
   }
 }
 
@@ -50,9 +54,6 @@ const stopResize = () => {
 
 const toggleRightPanel = (show: boolean) => {
   isRightPanelOpen.value = show
-  setTimeout(() => {
-    window.dispatchEvent(new Event('resize'))
-  }, 100)
 }
 
 onMounted(() => {
@@ -74,22 +75,35 @@ onBeforeUnmount(() => {
     <WelcomeScreen v-if="!store.isProjectLoaded" />
 
     <div v-else class="workspace">
+      <!-- 左侧栏 -->
       <aside class="sidebar left" :style="{ width: leftWidth + 'px' }">
         <DeviceList />
       </aside>
 
       <div class="resizer left-resizer" @mousedown.prevent="startResizeLeft"></div>
 
+      <!-- 中间视口 -->
       <main class="viewport">
-         <!-- [修改] 移除了悬浮的 view-switcher div -->
          <TwoDView v-if="store.currentViewMode === '2D'" />
          <ThreeDView v-else />
          
-         <div v-if="!isRightPanelOpen" class="expand-btn" @click="toggleRightPanel(true)" title="展开属性面板">
+         <!-- [修改] 展开按钮：仅在 2D 模式且面板隐藏时显示 -->
+         <div 
+            v-if="!isRightPanelOpen && store.currentViewMode === '2D'" 
+            class="expand-btn" 
+            @click="toggleRightPanel(true)" 
+            title="展开属性面板"
+         >
            <el-icon><DArrowLeft /></el-icon>
          </div>
 
-         <div v-if="isRightPanelOpen" class="floating-right-panel" :style="{ width: rightWidth + 'px' }">
+         <!-- [修改] 右侧面板：仅在 2D 模式且面板开启时显示 -->
+         <!-- 绑定宽度为 store.viewSettings.rightPanelWidth -->
+         <div 
+            v-if="isRightPanelOpen && store.currentViewMode === '2D'" 
+            class="floating-right-panel" 
+            :style="{ width: store.viewSettings.rightPanelWidth + 'px' }"
+         >
             <div class="resizer right-resizer" @mousedown.prevent="startResizeRight"></div>
             <PropertyPanel @close="toggleRightPanel(false)" />
          </div>

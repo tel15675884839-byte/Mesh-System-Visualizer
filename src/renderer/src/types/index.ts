@@ -39,15 +39,34 @@ export interface ILoop {
   deviceCount: number;
 }
 
+// [新增] 2D 摄像机状态
+export interface ICamera2D {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+// [新增] 3D 摄像机状态
+export interface ICamera3D {
+  position: Vector3;
+  target: Vector3;
+}
+
 /**
- * 视图显示设置
+ * 视图显示设置 (持久化)
  */
 export interface IViewSettings {
   iconScale: number;   
   labelColor: string;  
   mapOpacity: number;  
-  // [新增] 是否全局显示所有连线
   showAllLinks: boolean;
+  rightPanelWidth: number;
+  
+  // [新增] 状态记忆
+  lastBuildingId?: string;
+  lastFloorId?: string;
+  camera2D?: ICamera2D;
+  camera3D?: ICamera3D;
 }
 
 export interface INode {
@@ -71,7 +90,6 @@ export interface IEdge {
   sourceId: string;
   targetId: string;
   lqi?: number;
-  // [新增] 信号强度
   rssi?: number;
   isParentChild: boolean;
 }
@@ -97,11 +115,14 @@ export interface IProject {
   name: string;
   created: number;
   updated: number;
+  
   nodes: INode[];
   edges: IEdge[];
   buildings: IBuilding[];
   loops: ILoop[];
+  
   viewSettings?: IViewSettings;
+  
   settings: {
     theme: 'light' | 'dark';
     coordSystem: 'cartesian' | 'geographic';
