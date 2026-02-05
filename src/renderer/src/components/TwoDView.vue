@@ -15,6 +15,9 @@ const store = useProjectStore()
 const currentBuildingId = ref<string>('')
 const currentFloorId = ref<string>('')
 
+// [新增] 恢复状态标志位：防止在恢复楼层时触发 watch 导致楼层被重置
+const isRestoring = ref(false)
+
 // [状态] 缩放倍率
 const currentScale = ref<number>(1.0) 
 
@@ -36,8 +39,16 @@ const initDefaultFloor = () => {
     const bld = store.buildings.find(b => b.id === store.viewSettings.lastBuildingId)
     const flr = bld?.floors.find(f => f.id === store.viewSettings.lastFloorId)
     if (bld && flr) {
+      // [关键修复] 标记为正在恢复，阻断 watch 的副作用
+      isRestoring.value = true
+      
       currentBuildingId.value = bld.id
       currentFloorId.value = flr.id
+      
+      // 在下一个 tick 恢复标记，允许后续的用户手动操作触发正常逻辑
+      nextTick(() => {
+        isRestoring.value = false
+      })
       return
     }
   }
@@ -62,6 +73,9 @@ const availableFloors = computed(() => {
 })
 
 watch(currentBuildingId, (newVal) => {
+  // [关键修复] 如果正在恢复状态，直接跳过自动重置楼层的逻辑
+  if (isRestoring.value) return
+
   if (!newVal) return
   const bld = store.buildings.find(b => b.id === newVal)
   if (bld && bld.floors.length > 0) {
@@ -341,16 +355,14 @@ const updateVisData = () => {
         const isRelated = store.selectedNodeId === edge.sourceId || store.selectedNodeId === edge.targetId
         if (!store.viewSettings.showAllLinks && !isRelated) return
 
-        const srcDisplay = store.getDisplayId(edge.sourceId)
-        const tgtDisplay = store.getDisplayId(edge.targetId)
-        const rssiText = edge.rssi !== undefined ? ` [RSSI: ${edge.rssi} dBm]` : ''
-        const title = `${srcDisplay} → ${tgtDisplay}${rssiText}`
+        // [修改] 简化 RSSI 显示，只显示 dBm 值，用于鼠标悬停 (Vis.js 'title' 属性)
+        const rssiTooltip = edge.rssi !== undefined ? `${edge.rssi} dBm` : undefined
 
         newEdges.push({
           id: edge.id,
           from: edge.sourceId,
           to: edge.targetId,
-          title: title,
+          title: rssiTooltip, // 悬停显示内容
         })
       }
     })

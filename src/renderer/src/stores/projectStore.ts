@@ -23,6 +23,11 @@ export const useProjectStore = defineStore('project', () => {
     mapOpacity: 1.0,
     showAllLinks: false,
     rightPanelWidth: 300,
+    
+    // [新增] 3D 持久化默认值
+    floorHeight3D: 200, 
+    iconScale3D: 100,
+
     // 初始化为空
     lastBuildingId: undefined,
     lastFloorId: undefined,
@@ -174,7 +179,12 @@ export const useProjectStore = defineStore('project', () => {
 
   function clearProject() {
     nodes.value = []; edges.value = []; buildings.value = []; loops.value = []; selectedNodeId.value = null; projectInfo.value.filePath = undefined;
-    viewSettings.value = { iconScale: 100, labelColor: '#000000', mapOpacity: 1.0, showAllLinks: false, rightPanelWidth: 300, lastBuildingId: undefined, lastFloorId: undefined, camera2D: undefined, camera3D: undefined }
+    // 重置时保留默认值
+    viewSettings.value = { 
+      iconScale: 100, labelColor: '#000000', mapOpacity: 1.0, showAllLinks: false, rightPanelWidth: 300, 
+      floorHeight3D: 200, iconScale3D: 100,
+      lastBuildingId: undefined, lastFloorId: undefined, camera2D: undefined, camera3D: undefined 
+    }
     structureVersion.value++
   }
   
@@ -209,6 +219,9 @@ export const useProjectStore = defineStore('project', () => {
             ...viewSettings.value,
             ...projectData.viewSettings 
         };
+        // 兼容处理：如果旧文件没有 3D 设置，给默认值
+        if (viewSettings.value.floorHeight3D === undefined) viewSettings.value.floorHeight3D = 200
+        if (viewSettings.value.iconScale3D === undefined) viewSettings.value.iconScale3D = 100
     }
     isProjectLoaded.value = true;
     structureVersion.value++
@@ -259,6 +272,6 @@ export const useProjectStore = defineStore('project', () => {
     upsertNode, clearProject, selectNode, toggleTheme, batchPlaceNodes, unplaceNode,
     deleteLoop, replaceLoop, updateLoop, purgeMissingNodes, confirmLoopChanges, deleteNode,
     triggerFocus, addLoop,
-    saveViewState // [关键] 导出新动作
+    saveViewState 
   }
 })

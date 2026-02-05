@@ -56,11 +56,15 @@ export interface ICamera3D {
  * 视图显示设置 (持久化)
  */
 export interface IViewSettings {
-  iconScale: number;   
+  iconScale: number;   // 2D 图标大小
   labelColor: string;  
   mapOpacity: number;  
   showAllLinks: boolean;
   rightPanelWidth: number;
+
+  // [新增] 3D 视图专属持久化设置
+  floorHeight3D: number; // 3D 层高
+  iconScale3D: number;   // 3D 独立图标大小
   
   // [新增] 状态记忆
   lastBuildingId?: string;
