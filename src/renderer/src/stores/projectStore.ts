@@ -11,8 +11,9 @@ export const useProjectStore = defineStore('project', () => {
   const isProjectLoaded = ref(false)
   const isBuildingEditorVisible = ref(false)
   
-  // [新增] 结构版本号：仅当网络拓扑结构发生变化时递增
-  // 用于通知 DeviceTree 重新构建树，避免因 isPlaced/position 变化导致不必要的重绘
+  // [新增] 视图模式状态
+  const currentViewMode = ref<'2D' | '3D'>('2D')
+
   const structureVersion = ref(0)
 
   const projectInfo = ref<{ name: string; version: string; filePath?: string }>({
@@ -71,6 +72,11 @@ export const useProjectStore = defineStore('project', () => {
 
   // --- Actions ---
 
+  // [新增] 切换视图模式
+  function switchViewMode(mode: '2D' | '3D') {
+    currentViewMode.value = mode
+  }
+
   function triggerFocus(nodeId: string) {
     focusRequest.value = { nodeId, timestamp: Date.now() }
   }
@@ -93,7 +99,7 @@ export const useProjectStore = defineStore('project', () => {
     nodes.value.push(...newNodes)
     edges.value.push(...processedEdges)
     
-    structureVersion.value++ // [触发重绘]
+    structureVersion.value++
     ElMessage.success(`成功添加 ${name}`)
   }
 
@@ -105,7 +111,7 @@ export const useProjectStore = defineStore('project', () => {
     if (selectedNodeId.value && !validNodeIds.has(selectedNodeId.value)) {
       selectedNodeId.value = null
     }
-    structureVersion.value++ // [触发重绘]
+    structureVersion.value++ 
     ElMessage.success('Loop 已删除')
   }
 
@@ -121,7 +127,7 @@ export const useProjectStore = defineStore('project', () => {
       targetLoop.htmlSource = fileName
       targetLoop.deviceCount = newNodes.length
     }
-    structureVersion.value++ // [触发重绘]
+    structureVersion.value++
     ElMessage.success(`Loop 替换成功`)
   }
 
@@ -176,8 +182,8 @@ export const useProjectStore = defineStore('project', () => {
 
     const newCount = processedNewNodes.filter(n => n.diffStatus === 'new').length
     const missingCount = missingNodes.length
-    structureVersion.value++ // [触发重绘]
-    ElMessage.success(`Loop 更新完成：新增 ${newCount}，缺失 ${missingCount}`)
+    structureVersion.value++
+    ElMessage.success(`Loop 更新完成`)
   }
 
   function purgeMissingNodes(loopId: string) {
@@ -188,7 +194,7 @@ export const useProjectStore = defineStore('project', () => {
     if (targetLoop) {
       targetLoop.deviceCount = nodes.value.filter(n => n.loopId === loopId).length
     }
-    structureVersion.value++ // [触发重绘]
+    structureVersion.value++
     ElMessage.success(`已清理 ${deletedCount} 个缺失设备`)
   }
 
@@ -200,10 +206,6 @@ export const useProjectStore = defineStore('project', () => {
         count++
       }
     })
-    // 状态变更不需要重绘树结构，因为 diffStatus 只是属性
-    // 但为了刷新绿点显示，建议还是触发一下，或者依赖 Vue 深度响应
-    // 考虑到性能，这里不触发 structureVersion++，因为列表结构没变
-    // 设备树组件的 UI 会自动响应 diffStatus 的变化
     ElMessage.success(`已确认 ${count} 个新增设备`)
   }
 
@@ -211,9 +213,10 @@ export const useProjectStore = defineStore('project', () => {
     nodes.value = nodes.value.filter(n => n.id !== nodeId)
     cleanInvalidEdges()
     selectedNodeId.value = null
-    structureVersion.value++ // [触发重绘]
+    structureVersion.value++ 
   }
 
+  // --- Helpers ---
   function createNodeFromRaw(raw: any, loopId: string): INode {
     const mac = extractMac(raw)
     const defaultBld = buildings.value.length > 0 ? buildings.value[0].id : '1'
@@ -231,7 +234,9 @@ export const useProjectStore = defineStore('project', () => {
       return node
     })
   }
-  function processRawEdges(rawEdges: any[], validNodes: INode[]) { return rawEdges as IEdge[] }
+  function processRawEdges(rawEdges: any[], validNodes: INode[]) { 
+    return rawEdges as IEdge[] 
+  }
   function parseRole(roleStr: string): DeviceRole {
     const r = (roleStr || '').toLowerCase()
     if (r.includes('leader')) return DeviceRole.LEADER
@@ -263,7 +268,6 @@ export const useProjectStore = defineStore('project', () => {
     buildings.value = newBuildings;
     if (recoveredCount > 0) ElMessage.warning(`${recoveredCount} 个设备因楼层删除已自动回收到列表`);
     else ElMessage.success('建筑配置已更新');
-    // 建筑变化可能影响树的显示内容吗？不影响，树是按Loop组织的。
   }
   
   function toggleBuildingEditor(show: boolean) { isBuildingEditorVisible.value = show; }
@@ -276,8 +280,6 @@ export const useProjectStore = defineStore('project', () => {
     isProjectLoaded.value = true;
     structureVersion.value++
   }
-  
-  // [重点优化] 批量布点操作：不增加 structureVersion
   function batchPlaceNodes(nodeIds: string[], startX: number, startY: number, floorId: string, buildingId: string) {
     const COLS = 5; const SPACING = 30;
     nodeIds.forEach((id, index) => {
@@ -289,15 +291,11 @@ export const useProjectStore = defineStore('project', () => {
       }
     });
     if(nodeIds.length > 0) selectNode(nodeIds[nodeIds.length - 1]);
-    // 注意：这里没有 structureVersion++，所以 DeviceTree 不会重绘！
   }
-  
   function unplaceNode(nodeId: string) {
     const node = nodes.value.find(n => n.id === nodeId);
     if (node) { node.isPlaced = false; node.position = null; }
-    // 注意：这里也没有 structureVersion++
   }
-  
   async function saveToDisk() {
     const data: IProject = { version: '1.0.0', name: projectInfo.value.name, created: Date.now(), updated: Date.now(), nodes: nodes.value, edges: edges.value, buildings: buildings.value, loops: loops.value, viewSettings: viewSettings.value, settings: { theme: isDark.value ? 'dark' : 'light', coordSystem: 'cartesian' } };
     const jsonString = JSON.stringify(data, null, 2);
@@ -320,12 +318,14 @@ export const useProjectStore = defineStore('project', () => {
 
   return {
     isProjectLoaded, isBuildingEditorVisible, projectInfo, nodes, edges, buildings, loops, selectedNodeId, selectedNode, isDark, deviceCounts,
-    viewSettings, updateViewSettings, structureVersion, // 导出版本号
+    viewSettings, updateViewSettings, structureVersion,
+    currentViewMode, // [导出]
     focusRequest, 
     getBuildingName, getFloorName, getDisplayId, 
     createProject, updateBuildings, toggleBuildingEditor, closeProject, loadProject, saveToDisk, loadFromDisk,
     upsertNode, clearProject, selectNode, toggleTheme, batchPlaceNodes, unplaceNode,
     deleteLoop, replaceLoop, updateLoop, purgeMissingNodes, confirmLoopChanges, deleteNode,
-    triggerFocus, addLoop 
+    triggerFocus, addLoop,
+    switchViewMode // [导出]
   }
 })

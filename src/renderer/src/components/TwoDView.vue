@@ -7,12 +7,15 @@ import { Log } from '../utils/logger'
 import { DeviceRole, DeviceType } from '../types' 
 import { ElMessage } from 'element-plus'
 import { IconRegistry } from '../utils/iconAssets'
+// [新增] 引入图标用于切换按钮
+import { VideoCamera, MapLocation } from '@element-plus/icons-vue'
 
 const container = ref<HTMLElement | null>(null)
 const store = useProjectStore()
 
 const currentBuildingId = ref<string>('')
 const currentFloorId = ref<string>('')
+// Zoom 状态仅用于内部逻辑，不再显示 UI
 const currentScale = ref<number>(1.0) 
 
 const highlightedNodeId = ref<string | null>(null)
@@ -21,16 +24,8 @@ let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-const backgroundImage = ref<HTMLImageElement | null>(null)
-const backgroundSize = reactive({ width: 0, height: 0 })
-
-// [新增] 预加载图标，防止首次渲染空白
-const preloadIcons = () => {
-  Object.values(IconRegistry).forEach(url => {
-    const img = new Image()
-    img.src = url
-  })
-}
+const floorImageCache = new Map<string, HTMLImageElement>()
+let currentFloorImage: HTMLImageElement | null = null
 
 const initDefaultFloor = () => {
   if (store.buildings.length > 0) {
@@ -100,8 +95,14 @@ const getIconData = (role: string, type: string) => {
 }
 
 const loadFloorImage = (floorId: string, src: string | undefined) => {
-  backgroundImage.value = null
   if (!src) {
+    currentFloorImage = null
+    network?.redraw()
+    return
+  }
+
+  if (floorImageCache.has(floorId)) {
+    currentFloorImage = floorImageCache.get(floorId)!
     network?.redraw()
     return
   }
@@ -109,25 +110,26 @@ const loadFloorImage = (floorId: string, src: string | undefined) => {
   const img = new Image()
   img.src = src
   img.onload = () => {
+    floorImageCache.set(floorId, img)
     if (currentFloorId.value === floorId) {
-      // 智能降采样逻辑
-      const MAX_SIZE = 2048 
-      let width = img.width
-      let height = img.height
-      
-      // 如果图片过大，仅在内存中缩小它，用于 Canvas 绘制
-      // 注意：这不会改变图片的物理宽高比，只会让绘制变快
-      // 我们创建一个 Image 对象即可，不需要 OffscreenCanvas 复杂化，
-      // 因为 drawImage 自身支持缩放绘制
-      
-      backgroundImage.value = img
-      backgroundSize.width = width
-      backgroundSize.height = height
-      
+      currentFloorImage = img
       network?.redraw()
-      setTimeout(() => network?.fit(), 50) 
+      network?.fit() 
     }
   }
+  img.onerror = () => {
+    Log.error('Failed to load floor map image')
+    if (currentFloorId.value === floorId) {
+      currentFloorImage = null
+    }
+  }
+}
+
+let syncFrameId: number | null = null
+
+const syncMapLayer = () => {
+  // 即使现在改回了 Canvas 绘制，保留这个空函数结构也没问题
+  // 实际上现在的渲染都在 beforeDrawing 里，不需要 requestAnimationFrame 同步 CSS 了
 }
 
 const initNetwork = () => {
@@ -143,8 +145,7 @@ const initNetwork = () => {
       font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff', face: 'arial' },
       borderWidth: 0, 
       shadow: false, 
-      // 这里的 brokenImage 也可以指向一个本地的 error.svg
-      brokenImage: undefined 
+      brokenImage: IconRegistry.SMOKE
     },
     edges: {
       width: 2, 
@@ -154,35 +155,35 @@ const initNetwork = () => {
     },
     physics: { enabled: false }, 
     interaction: {
-      dragNodes: true, dragView: true, zoomView: true, hover: true, 
-      selectConnectedEdges: false, hideEdgesOnDrag: true, hideNodesOnDrag: false
+      dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false,
+      hideEdgesOnDrag: true, 
+      hideNodesOnDrag: false
     }
   }
 
   network = new Network(container.value, data, options)
 
-  network.on('beforeDrawing', (ctx: CanvasRenderingContext2D) => {
-    if (backgroundImage.value) {
-      // 绘制底图
-      ctx.drawImage(
-        backgroundImage.value, 
-        0, 
-        0, 
-        backgroundSize.width, 
-        backgroundSize.height
-      )
-      
+  // 全 Canvas 渲染
+  network.on('beforeDrawing', (ctx) => {
+    if (currentFloorImage) {
       ctx.save()
+      ctx.imageSmoothingEnabled = false
+      
+      ctx.globalAlpha = store.viewSettings.mapOpacity
+      const width = currentFloorImage.width
+      const height = currentFloorImage.height
+      
+      ctx.drawImage(currentFloorImage, 0, 0, Math.floor(width), Math.floor(height))
       ctx.strokeStyle = '#999'
-      ctx.lineWidth = 10 / (network?.getScale() || 1) // 保持边框视觉宽度一致
-      ctx.strokeRect(0, 0, backgroundSize.width, backgroundSize.height)
+      ctx.lineWidth = 10
+      ctx.strokeRect(0, 0, width, height)
       ctx.restore()
-    } 
-    else {
+    } else {
       drawGrid(ctx)
     }
   })
-  
+
+  // 监听缩放 (仅更新内部状态，UI不再显示)
   network.on('zoom', () => {
     currentScale.value = network?.getScale() || 1
   })
@@ -336,6 +337,7 @@ watch(() => store.viewSettings, () => {
 }, { deep: true })
 
 watch(currentFloor, (floor) => {
+  if (container.value) { container.value.style.backgroundImage = 'none' }
   if (!floor || !floor.mapPath) {
     loadFloorImage('', undefined)
   } else {
@@ -347,13 +349,11 @@ const handleResize = () => { network?.fit() }
 
 onMounted(() => { 
   initNetwork()
-  preloadIcons() // [关键] 预加载所有图标
   if (currentFloor.value && currentFloor.value.mapPath) {
     loadFloorImage(currentFloor.value.id, currentFloor.value.mapPath)
   }
   window.addEventListener('resize', handleResize) 
 })
-
 onBeforeUnmount(() => { 
   window.removeEventListener('resize', handleResize)
   if (network) network.destroy() 
@@ -364,6 +364,7 @@ onBeforeUnmount(() => {
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     
     <div class="overlay-tools">
+      <!-- 楼层选择 -->
       <div class="tool-group">
         <el-select v-model="currentBuildingId" placeholder="Building" size="small" style="width: 90px">
           <el-option v-for="b in store.buildings" :key="b.id" :label="b.name" :value="b.id" />
@@ -375,13 +376,7 @@ onBeforeUnmount(() => {
 
       <div class="divider"></div>
 
-      <div class="tool-group zoom-indicator">
-        <span class="tool-label">Zoom:</span>
-        <span class="value-tip">{{ Math.round(currentScale * 100) }}%</span>
-      </div>
-
-      <div class="divider"></div>
-
+      <!-- Icon Scale -->
       <div class="tool-group">
         <span class="tool-label">Icon</span>
         <input 
@@ -391,11 +386,11 @@ onBeforeUnmount(() => {
           class="custom-range"
           title="Icon Scale"
         >
-        <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
       </div>
 
       <div class="divider"></div>
 
+      <!-- Font Color -->
       <div class="tool-group">
         <span class="tool-label">Font</span>
         <el-color-picker 
@@ -407,6 +402,7 @@ onBeforeUnmount(() => {
 
       <div class="divider"></div>
 
+      <!-- Map Opacity -->
       <div class="tool-group">
         <span class="tool-label">Map</span>
         <input 
@@ -416,59 +412,43 @@ onBeforeUnmount(() => {
           class="custom-range"
           title="Map Opacity"
         >
-        <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
       </div>
 
       <div class="divider"></div>
 
+      <!-- View Switcher (Moved here) -->
+      <div class="tool-group">
+        <el-radio-group v-model="store.currentViewMode" size="small">
+          <el-radio-button label="2D"><el-icon><MapLocation /></el-icon> 2D</el-radio-button>
+          <el-radio-button label="3D"><el-icon><VideoCamera /></el-icon> 3D</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Link Toggle -->
       <div class="tool-group">
         <el-checkbox v-model="store.viewSettings.showAllLinks" label="Links" size="small" border />
       </div>
     </div>
 
-    <!-- Vis.js Layer (Top) -->
     <div ref="container" class="vis-network-container"></div>
   </div>
 </template>
 
 <style scoped>
-.twod-container { 
-  width: 100%; height: 100%; position: relative; background-color: #eef1f5; 
-  overflow: hidden; 
+.twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; overflow: hidden; }
+.vis-network-container { width: 100%; height: 100%; outline: none; position: relative; z-index: 1; background: transparent; }
+
+.overlay-tools { 
+  position: absolute; top: 10px; left: 10px; z-index: 5; 
+  background: rgba(255, 255, 255, 0.95); padding: 5px 10px; 
+  border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; /* 允许换行防止溢出 */
 }
 
-.vis-network-container { 
-  width: 100%; height: 100%; outline: none; 
-  position: relative;
-  z-index: 1; 
-  background: transparent; 
-}
-
-.overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; }
 .tool-group { display: flex; align-items: center; gap: 5px; }
 .tool-label { font-size: 12px; color: #606266; font-weight: bold; }
 .divider { width: 1px; height: 16px; background-color: #dcdfe6; }
-.value-tip { font-size: 11px; color: #909399; min-width: 30px; }
-.custom-range { width: 80px; cursor: pointer; }
-.zoom-indicator .value-tip { font-weight: bold; color: #409eff; }
+.custom-range { width: 60px; cursor: pointer; } /* 稍微调窄一点滑块 */
 </style>
-```
-
-### 第四步：检查 `vite-env.d.ts` (可选)
-
-如果编辑器报错说找不到 `.svg?url` 模块，你需要确认你的类型定义文件支持这种写法。通常 vite 项目自带，如果没有，请在 `src/renderer/src/env.d.ts` (或 `vite-env.d.ts`) 中添加：
-
-```typescript
-/// <reference types="vite/client" />
-
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
-  export default component
-}
-
-// [新增] 支持 svg import
-declare module '*.svg?url' {
-  const content: string
-  export default content
-}
