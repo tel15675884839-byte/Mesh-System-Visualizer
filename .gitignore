@@ -1,6 +1,9 @@
 node_modules
-dist
-out
 .DS_Store
-.eslintcache
-*.log*
+dist
+dist-electron
+release
+*.local
+.vscode
+.idea
+*.log
