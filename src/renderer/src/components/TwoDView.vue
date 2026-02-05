@@ -13,6 +13,7 @@ const store = useProjectStore()
 
 const currentBuildingId = ref<string>('')
 const currentFloorId = ref<string>('')
+const currentScale = ref<number>(1.0) 
 
 const highlightedNodeId = ref<string | null>(null)
 
@@ -20,8 +21,11 @@ let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-const floorImageCache = new Map<string, HTMLImageElement>()
-let currentFloorImage: HTMLImageElement | null = null
+// [修改] 不再缓存 Canvas 对象，而是直接存图片 URL 和尺寸
+// 用于 CSS 渲染层
+const currentMapSrc = ref<string>('')
+const currentMapSize = reactive({ width: 0, height: 0 })
+const mapTransform = ref({ x: 0, y: 0, scale: 1 })
 
 const initDefaultFloor = () => {
   if (store.buildings.length > 0) {
@@ -72,10 +76,7 @@ watch(() => store.focusRequest, async (req) => {
   network.selectNodes([node.id])
   network.focus(node.id, {
     scale: 1.5,
-    animation: {
-      duration: 700, 
-      easingFunction: 'easeInOutQuad'
-    }
+    animation: { duration: 700, easingFunction: 'easeInOutQuad' }
   })
 })
 
@@ -93,35 +94,45 @@ const getIconData = (role: string, type: string) => {
   }
 }
 
+// [核心优化] 仅负责加载图片 URL 和获取尺寸，不进行 Canvas 预处理
 const loadFloorImage = (floorId: string, src: string | undefined) => {
   if (!src) {
-    currentFloorImage = null
-    network?.redraw()
-    return
-  }
-
-  if (floorImageCache.has(floorId)) {
-    currentFloorImage = floorImageCache.get(floorId)!
-    network?.redraw()
+    currentMapSrc.value = ''
     return
   }
   
+  // 预加载以获取尺寸
   const img = new Image()
   img.src = src
   img.onload = () => {
-    floorImageCache.set(floorId, img)
+    // 只有当加载完成且楼层未变时才应用
     if (currentFloorId.value === floorId) {
-      currentFloorImage = img
+      currentMapSrc.value = src
+      currentMapSize.width = img.width
+      currentMapSize.height = img.height
+      
+      // 触发一次视图重算
       network?.redraw()
-      network?.fit() 
+      // 初次加载适应屏幕
+      setTimeout(() => network?.fit(), 50) 
     }
   }
-  img.onerror = () => {
-    Log.error('Failed to load floor map image')
-    if (currentFloorId.value === floorId) {
-      currentFloorImage = null
-    }
+}
+
+// [新增] 同步 CSS 层的位置
+const syncMapLayer = () => {
+  if (!network) return
+  
+  // 获取 Vis.js 逻辑坐标系原点 (0,0) 对应在 DOM 中的像素位置
+  const domPos = network.canvasToDOM({ x: 0, y: 0 })
+  const scale = network.getScale()
+  
+  mapTransform.value = {
+    x: domPos.x,
+    y: domPos.y,
+    scale: scale
   }
+  currentScale.value = scale
 }
 
 const initNetwork = () => {
@@ -140,49 +151,50 @@ const initNetwork = () => {
       brokenImage: IconRegistry.SMOKE
     },
     edges: {
-      width: 2, // 统一线宽
-      color: { 
-        color: '#409eff', // 统一高亮蓝
-        highlight: '#409eff',
-        opacity: 0.8 
-      },
-      smooth: false, // [性能关键] 必须关闭平滑
+      width: 2, 
+      color: { color: '#409eff', highlight: '#409eff', opacity: 0.8 },
+      smooth: false, 
       arrows: { to: { enabled: true, scaleFactor: 0.5 } }
     },
     physics: { enabled: false }, 
     interaction: {
-      dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false
+      dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false,
+      hideEdgesOnDrag: true, 
+      hideNodesOnDrag: false
     }
   }
 
   network = new Network(container.value, data, options)
 
-  network.on('beforeDrawing', (ctx) => {
-    if (currentFloorImage) {
+  // [关键] 在每次重绘后，同步底层 CSS 图片的位置
+  // afterDrawing 是最平滑的时机，因为它代表物理引擎和摄像机位置已计算完毕
+  network.on('afterDrawing', (ctx) => {
+    syncMapLayer()
+    
+    // 如果没有图，我们在 Canvas 层画个网格做参考
+    if (!currentMapSrc.value) {
+      drawGrid(ctx)
+    } else {
+      // 如果有图，我们在 Canvas 层画个边框，增强边界感
+      // 注意：这里只画框，不画图
       ctx.save()
-      // [性能关键] 关闭平滑处理，解决拖拽卡顿
-      ctx.imageSmoothingEnabled = false
-      
-      ctx.globalAlpha = store.viewSettings.mapOpacity
-      const width = currentFloorImage.width
-      const height = currentFloorImage.height
-      // [性能关键] 坐标取整
-      ctx.drawImage(currentFloorImage, 0, 0, Math.floor(width), Math.floor(height))
       ctx.strokeStyle = '#999'
       ctx.lineWidth = 10
-      ctx.strokeRect(0, 0, width, height)
+      // 0,0 到 width,height 是逻辑坐标
+      ctx.strokeRect(0, 0, currentMapSize.width, currentMapSize.height)
       ctx.restore()
-    } else {
-      drawGrid(ctx)
     }
   })
+  
+  // 额外监听，保证拖拽时也能跟手
+  network.on('drag', syncMapLayer)
+  network.on('zoom', syncMapLayer)
 
   network.on('click', (params) => {
     if (highlightedNodeId.value) {
       highlightedNodeId.value = null
       updateVisData()
     }
-
     if (params.nodes.length > 0) {
       store.selectNode(params.nodes[0])
     } else {
@@ -209,21 +221,13 @@ const initNetwork = () => {
 }
 
 const drawGrid = (ctx: CanvasRenderingContext2D) => {
-  const width = 2000
-  const height = 2000
-  const step = 100
+  const width = 2000; const height = 2000; const step = 100
   ctx.save()
-  ctx.strokeStyle = '#e0e0e0'
-  ctx.lineWidth = 1
+  ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1
   ctx.beginPath()
-  for (let x = 0; x <= width; x += step) {
-    ctx.moveTo(x, 0); ctx.lineTo(x, height)
-  }
-  for (let y = 0; y <= height; y += step) {
-    ctx.moveTo(0, y); ctx.lineTo(width, y)
-  }
-  ctx.stroke()
-  ctx.restore()
+  for (let x = 0; x <= width; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, height) }
+  for (let y = 0; y <= height; y += step) { ctx.moveTo(0, y); ctx.lineTo(width, y) }
+  ctx.stroke(); ctx.restore()
 }
 
 const handleDrop = (e: DragEvent) => {
@@ -297,37 +301,24 @@ const updateVisData = () => {
     }
   })
 
-  // [修改] 连线数据构造
   const newEdges: any[] = []
   
   if (store.viewSettings.showAllLinks || store.selectedNodeId) {
     store.edges.forEach(edge => {
       if (visibleNodeIds.has(edge.sourceId) && visibleNodeIds.has(edge.targetId)) {
-        
         const isRelated = store.selectedNodeId === edge.sourceId || store.selectedNodeId === edge.targetId
         if (!store.viewSettings.showAllLinks && !isRelated) return
 
-        // [核心修改] Tooltip 格式: Device(0411) -> Node(0400) [RSSI: -37 dBm]
         const srcDisplay = store.getDisplayId(edge.sourceId)
         const tgtDisplay = store.getDisplayId(edge.targetId)
-        
-        // 格式化 RSSI
-        let rssiStr = ''
-        if (typeof edge.rssi === 'number') {
-          rssiStr = ` [RSSI: ${edge.rssi} dBm]`
-        } else {
-          // 如果没有 RSSI，不显示 N/A，或者你可以选择显示 [RSSI: N/A]
-          rssiStr = ' [RSSI: N/A]' 
-        }
-
-        const title = `${srcDisplay} → ${tgtDisplay}${rssiStr}`
+        const rssiText = edge.rssi !== undefined ? ` [RSSI: ${edge.rssi} dBm]` : ''
+        const title = `${srcDisplay} → ${tgtDisplay}${rssiText}`
 
         newEdges.push({
           id: edge.id,
           from: edge.sourceId,
           to: edge.targetId,
           title: title,
-          // 样式继承 options.edges，无需特殊覆盖，保证统一
         })
       }
     })
@@ -349,9 +340,8 @@ watch(() => store.viewSettings, () => {
 }, { deep: true })
 
 watch(currentFloor, (floor) => {
-  if (container.value) { container.value.style.backgroundImage = 'none' }
   if (!floor || !floor.mapPath) {
-    currentFloorImage = null
+    currentMapSrc.value = ''
     network?.redraw()
   } else {
     loadFloorImage(floor.id, floor.mapPath)
@@ -372,6 +362,22 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 
 <template>
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
+    
+    <!-- [核心优化] 独立的 CSS 图层，由 GPU 加速渲染 -->
+    <div class="map-layer-container">
+      <img 
+        v-if="currentMapSrc"
+        :src="currentMapSrc" 
+        class="floor-map-image"
+        :style="{
+          transform: `translate(${mapTransform.x}px, ${mapTransform.y}px) scale(${mapTransform.scale})`,
+          width: `${currentMapSize.width}px`,
+          height: `${currentMapSize.height}px`,
+          opacity: store.viewSettings.mapOpacity
+        }"
+      />
+    </div>
+
     <div class="overlay-tools">
       <div class="tool-group">
         <el-select v-model="currentBuildingId" placeholder="Building" size="small" style="width: 90px">
@@ -384,41 +390,30 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 
       <div class="divider"></div>
 
+      <div class="tool-group zoom-indicator">
+        <span class="tool-label">Zoom:</span>
+        <span class="value-tip">{{ Math.round(currentScale * 100) }}%</span>
+      </div>
+
+      <div class="divider"></div>
+
       <div class="tool-group">
         <span class="tool-label">Icon</span>
-        <input 
-          type="range" 
-          v-model.number="store.viewSettings.iconScale" 
-          min="10" max="300" step="10" 
-          class="custom-range"
-          title="Icon Scale"
-        >
-        <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
+        <input type="range" v-model.number="store.viewSettings.iconScale" min="10" max="300" step="10" class="custom-range" title="Icon Scale">
       </div>
 
       <div class="divider"></div>
 
       <div class="tool-group">
         <span class="tool-label">Font</span>
-        <el-color-picker 
-          v-model="store.viewSettings.labelColor" 
-          size="small"
-          :predefine="['#000000', '#FF0000', '#0000FF', '#008000', '#FFA500', '#808080']"
-        />
+        <el-color-picker v-model="store.viewSettings.labelColor" size="small" :predefine="['#000000', '#FF0000', '#0000FF', '#008000', '#FFA500', '#808080']" />
       </div>
 
       <div class="divider"></div>
 
       <div class="tool-group">
         <span class="tool-label">Map</span>
-        <input 
-          type="range" 
-          v-model.number="store.viewSettings.mapOpacity" 
-          min="0" max="1" step="0.1" 
-          class="custom-range"
-          title="Map Opacity"
-        >
-        <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
+        <input type="range" v-model.number="store.viewSettings.mapOpacity" min="0" max="1" step="0.1" class="custom-range" title="Map Opacity">
       </div>
 
       <div class="divider"></div>
@@ -428,17 +423,45 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
       </div>
     </div>
 
+    <!-- Vis.js 容器 (透明背景，只画节点和线) -->
     <div ref="container" class="vis-network-container"></div>
   </div>
 </template>
 
 <style scoped>
-.twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; }
-.vis-network-container { width: 100%; height: 100%; outline: none; }
+.twod-container { 
+  width: 100%; height: 100%; position: relative; background-color: #eef1f5; 
+  overflow: hidden; /* 防止图片移出容器产生滚动条 */
+}
+
+/* [核心优化] 底图层绝对定位，位于 Canvas 之下 */
+.map-layer-container {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; /* 让鼠标事件穿透到底下的 Canvas */
+  z-index: 0;
+}
+
+.floor-map-image {
+  position: absolute;
+  top: 0; left: 0;
+  transform-origin: 0 0; /* 变换基点设为左上角 */
+  will-change: transform; /* 提示浏览器进行 GPU 优化 */
+  /* image-rendering: pixelated; 可选：像素风格 */
+}
+
+.vis-network-container { 
+  width: 100%; height: 100%; outline: none; 
+  position: relative;
+  z-index: 1; /* 确保 Canvas 在图片之上 */
+  background: transparent; /* 确保背景透明 */
+}
+
 .overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; }
 .tool-group { display: flex; align-items: center; gap: 5px; }
 .tool-label { font-size: 12px; color: #606266; font-weight: bold; }
 .divider { width: 1px; height: 16px; background-color: #dcdfe6; }
 .value-tip { font-size: 11px; color: #909399; min-width: 30px; }
 .custom-range { width: 80px; cursor: pointer; }
+.zoom-indicator .value-tip { font-weight: bold; color: #409eff; }
 </style>

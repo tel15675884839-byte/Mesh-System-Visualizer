@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, shallowRef } from 'vue'
 import { Search, Check } from '@element-plus/icons-vue'
 import { useProjectStore } from '../stores/projectStore'
 import { buildTopologyTree, type ITreeNode } from '../utils/treeHelper'
@@ -8,7 +8,6 @@ import { DeviceRole } from '../types'
 const store = useProjectStore()
 const filterText = ref('')
 const treeRef = ref()
-const containerRef = ref<HTMLElement | null>(null)
 
 const expandedKeySet = ref<Set<string>>(new Set())
 const expandedKeysArray = computed(() => Array.from(expandedKeySet.value))
@@ -16,13 +15,27 @@ const expandedKeysArray = computed(() => Array.from(expandedKeySet.value))
 const selectedIds = ref<Set<string>>(new Set())
 const lastFocusedId = ref<string | null>(null) 
 
-const treeData = computed(() => {
-  return buildTopologyTree(store.nodes, store.edges, store.loops)
+// [优化] 使用 shallowRef，避免 Vue 对巨大的树结构进行深度代理
+// 并且取消 computed，改为手动控制更新时机
+const treeData = shallowRef<ITreeNode[]>([])
+
+// [核心优化] 仅当结构版本号变化时，才重构树
+// 拖拽设备(isPlaced变更) 不会改变版本号，因此不会触发重构 -> 解决卡顿
+watch(() => store.structureVersion, () => {
+  treeData.value = buildTopologyTree(store.nodes, store.edges, store.loops)
+}, { immediate: true })
+
+onMounted(() => {
+  store.loops.forEach(l => expandedKeySet.value.add(`loop-root-${l.id}`))
 })
 
-watch(() => store.loops, (loops) => {
-  loops.forEach(l => expandedKeySet.value.add(`loop-root-${l.id}`))
-}, { immediate: true, deep: true })
+// 监听新增 Loop (辅助逻辑，确保新Loop自动展开)
+watch(() => store.loops.length, (newLen, oldLen) => {
+  if (newLen > oldLen) {
+    const newLoops = store.loops.slice(oldLen)
+    newLoops.forEach(l => expandedKeySet.value.add(`loop-root-${l.id}`))
+  }
+})
 
 watch(filterText, (val) => {
   treeRef.value!.filter(val)
@@ -63,7 +76,11 @@ const handleNodeClick = (data: any, node: any, prop: any, e: MouseEvent) => {
     if (startIndex !== -1 && endIndex !== -1) {
       const min = Math.min(startIndex, endIndex)
       const max = Math.max(startIndex, endIndex)
-      selectedIds.value.clear() 
+      
+      if (!e.ctrlKey) {
+        selectedIds.value.clear()
+      }
+
       for (let i = min; i <= max; i++) {
         const curr = flatNodes[i]
         if (curr.type === 'device') {
@@ -78,7 +95,7 @@ const handleNodeClick = (data: any, node: any, prop: any, e: MouseEvent) => {
     } else {
       selectedIds.value.add(data.id)
     }
-    lastFocusedId.value = data.id
+    lastFocusedId.value = data.id 
   } 
   else {
     selectedIds.value.clear()
@@ -108,7 +125,7 @@ const handleDragStart = (node: any, e: DragEvent) => {
 }
 
 const getIconColor = (role: string, isPlaced: boolean, diffStatus: string) => {
-  if (diffStatus === 'missing') return '#909399' // 缺失变灰
+  if (diffStatus === 'missing') return '#909399'
   if (isPlaced) return '#909399'
   switch (role) {
     case DeviceRole.LEADER: return '#ff4d4f'
@@ -116,8 +133,6 @@ const getIconColor = (role: string, isPlaced: boolean, diffStatus: string) => {
     default: return '#52c41a'
   }
 }
-
-onMounted(() => {})
 </script>
 
 <template>
@@ -163,7 +178,6 @@ onMounted(() => {})
                 {{ node.label }}
               </span>
               
-              <!-- [新增] 绿色圆点提示新增设备 -->
               <span v-if="data.data?.diffStatus === 'new'" class="new-dot"></span>
             </span>
           </div>
@@ -188,13 +202,13 @@ onMounted(() => {})
   display: flex; align-items: center; font-size: 13px; width: 100%; overflow: hidden;
   padding: 0 5px; cursor: pointer; border-radius: 3px; height: 26px;
 }
-.custom-tree-node.is-selected { background-color: #d9ecff; }
-html.dark .custom-tree-node.is-selected { background-color: #264f78; }
+.custom-tree-node.is-selected { background-color: #d9ecff !important; }
+html.dark .custom-tree-node.is-selected { background-color: #264f78 !important; }
 
 .loop-label { font-weight: bold; color: var(--text-color); }
 .orphan-label { color: #909399; font-style: italic; }
 .device-item { display: flex; align-items: center; width: 100%; }
-.device-item.is-missing { opacity: 0.6; text-decoration: line-through; } /* 缺失设备样式 */
+.device-item.is-missing { opacity: 0.6; text-decoration: line-through; }
 
 .status-dot { margin-right: 6px; font-size: 12px; line-height: 1; }
 .device-label { margin-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
