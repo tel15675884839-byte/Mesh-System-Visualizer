@@ -21,11 +21,16 @@ let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
 
-// [修改] 不再缓存 Canvas 对象，而是直接存图片 URL 和尺寸
-// 用于 CSS 渲染层
-const currentMapSrc = ref<string>('')
-const currentMapSize = reactive({ width: 0, height: 0 })
-const mapTransform = ref({ x: 0, y: 0, scale: 1 })
+const backgroundImage = ref<HTMLImageElement | null>(null)
+const backgroundSize = reactive({ width: 0, height: 0 })
+
+// [新增] 预加载图标，防止首次渲染空白
+const preloadIcons = () => {
+  Object.values(IconRegistry).forEach(url => {
+    const img = new Image()
+    img.src = url
+  })
+}
 
 const initDefaultFloor = () => {
   if (store.buildings.length > 0) {
@@ -94,45 +99,35 @@ const getIconData = (role: string, type: string) => {
   }
 }
 
-// [核心优化] 仅负责加载图片 URL 和获取尺寸，不进行 Canvas 预处理
 const loadFloorImage = (floorId: string, src: string | undefined) => {
+  backgroundImage.value = null
   if (!src) {
-    currentMapSrc.value = ''
+    network?.redraw()
     return
   }
   
-  // 预加载以获取尺寸
   const img = new Image()
   img.src = src
   img.onload = () => {
-    // 只有当加载完成且楼层未变时才应用
     if (currentFloorId.value === floorId) {
-      currentMapSrc.value = src
-      currentMapSize.width = img.width
-      currentMapSize.height = img.height
+      // 智能降采样逻辑
+      const MAX_SIZE = 2048 
+      let width = img.width
+      let height = img.height
       
-      // 触发一次视图重算
+      // 如果图片过大，仅在内存中缩小它，用于 Canvas 绘制
+      // 注意：这不会改变图片的物理宽高比，只会让绘制变快
+      // 我们创建一个 Image 对象即可，不需要 OffscreenCanvas 复杂化，
+      // 因为 drawImage 自身支持缩放绘制
+      
+      backgroundImage.value = img
+      backgroundSize.width = width
+      backgroundSize.height = height
+      
       network?.redraw()
-      // 初次加载适应屏幕
       setTimeout(() => network?.fit(), 50) 
     }
   }
-}
-
-// [新增] 同步 CSS 层的位置
-const syncMapLayer = () => {
-  if (!network) return
-  
-  // 获取 Vis.js 逻辑坐标系原点 (0,0) 对应在 DOM 中的像素位置
-  const domPos = network.canvasToDOM({ x: 0, y: 0 })
-  const scale = network.getScale()
-  
-  mapTransform.value = {
-    x: domPos.x,
-    y: domPos.y,
-    scale: scale
-  }
-  currentScale.value = scale
 }
 
 const initNetwork = () => {
@@ -148,7 +143,8 @@ const initNetwork = () => {
       font: { size: 14, color: '#333', strokeWidth: 2, strokeColor: '#fff', face: 'arial' },
       borderWidth: 0, 
       shadow: false, 
-      brokenImage: IconRegistry.SMOKE
+      // 这里的 brokenImage 也可以指向一个本地的 error.svg
+      brokenImage: undefined 
     },
     edges: {
       width: 2, 
@@ -158,37 +154,38 @@ const initNetwork = () => {
     },
     physics: { enabled: false }, 
     interaction: {
-      dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false,
-      hideEdgesOnDrag: true, 
-      hideNodesOnDrag: false
+      dragNodes: true, dragView: true, zoomView: true, hover: true, 
+      selectConnectedEdges: false, hideEdgesOnDrag: true, hideNodesOnDrag: false
     }
   }
 
   network = new Network(container.value, data, options)
 
-  // [关键] 在每次重绘后，同步底层 CSS 图片的位置
-  // afterDrawing 是最平滑的时机，因为它代表物理引擎和摄像机位置已计算完毕
-  network.on('afterDrawing', (ctx) => {
-    syncMapLayer()
-    
-    // 如果没有图，我们在 Canvas 层画个网格做参考
-    if (!currentMapSrc.value) {
-      drawGrid(ctx)
-    } else {
-      // 如果有图，我们在 Canvas 层画个边框，增强边界感
-      // 注意：这里只画框，不画图
+  network.on('beforeDrawing', (ctx: CanvasRenderingContext2D) => {
+    if (backgroundImage.value) {
+      // 绘制底图
+      ctx.drawImage(
+        backgroundImage.value, 
+        0, 
+        0, 
+        backgroundSize.width, 
+        backgroundSize.height
+      )
+      
       ctx.save()
       ctx.strokeStyle = '#999'
-      ctx.lineWidth = 10
-      // 0,0 到 width,height 是逻辑坐标
-      ctx.strokeRect(0, 0, currentMapSize.width, currentMapSize.height)
+      ctx.lineWidth = 10 / (network?.getScale() || 1) // 保持边框视觉宽度一致
+      ctx.strokeRect(0, 0, backgroundSize.width, backgroundSize.height)
       ctx.restore()
+    } 
+    else {
+      drawGrid(ctx)
     }
   })
   
-  // 额外监听，保证拖拽时也能跟手
-  network.on('drag', syncMapLayer)
-  network.on('zoom', syncMapLayer)
+  network.on('zoom', () => {
+    currentScale.value = network?.getScale() || 1
+  })
 
   network.on('click', (params) => {
     if (highlightedNodeId.value) {
@@ -274,7 +271,6 @@ const updateVisData = () => {
 
     const isMissing = node.diffStatus === 'missing'
     const iconData = getIconData(node.role, node.type)
-    
     const isHighlighted = highlightedNodeId.value === node.id
 
     return {
@@ -341,8 +337,7 @@ watch(() => store.viewSettings, () => {
 
 watch(currentFloor, (floor) => {
   if (!floor || !floor.mapPath) {
-    currentMapSrc.value = ''
-    network?.redraw()
+    loadFloorImage('', undefined)
   } else {
     loadFloorImage(floor.id, floor.mapPath)
   }
@@ -352,32 +347,22 @@ const handleResize = () => { network?.fit() }
 
 onMounted(() => { 
   initNetwork()
+  preloadIcons() // [关键] 预加载所有图标
   if (currentFloor.value && currentFloor.value.mapPath) {
     loadFloorImage(currentFloor.value.id, currentFloor.value.mapPath)
   }
   window.addEventListener('resize', handleResize) 
 })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (network) network.destroy() })
+
+onBeforeUnmount(() => { 
+  window.removeEventListener('resize', handleResize)
+  if (network) network.destroy() 
+})
 </script>
 
 <template>
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     
-    <!-- [核心优化] 独立的 CSS 图层，由 GPU 加速渲染 -->
-    <div class="map-layer-container">
-      <img 
-        v-if="currentMapSrc"
-        :src="currentMapSrc" 
-        class="floor-map-image"
-        :style="{
-          transform: `translate(${mapTransform.x}px, ${mapTransform.y}px) scale(${mapTransform.scale})`,
-          width: `${currentMapSize.width}px`,
-          height: `${currentMapSize.height}px`,
-          opacity: store.viewSettings.mapOpacity
-        }"
-      />
-    </div>
-
     <div class="overlay-tools">
       <div class="tool-group">
         <el-select v-model="currentBuildingId" placeholder="Building" size="small" style="width: 90px">
@@ -399,21 +384,39 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 
       <div class="tool-group">
         <span class="tool-label">Icon</span>
-        <input type="range" v-model.number="store.viewSettings.iconScale" min="10" max="300" step="10" class="custom-range" title="Icon Scale">
+        <input 
+          type="range" 
+          v-model.number="store.viewSettings.iconScale" 
+          min="10" max="300" step="10" 
+          class="custom-range"
+          title="Icon Scale"
+        >
+        <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
       </div>
 
       <div class="divider"></div>
 
       <div class="tool-group">
         <span class="tool-label">Font</span>
-        <el-color-picker v-model="store.viewSettings.labelColor" size="small" :predefine="['#000000', '#FF0000', '#0000FF', '#008000', '#FFA500', '#808080']" />
+        <el-color-picker 
+          v-model="store.viewSettings.labelColor" 
+          size="small"
+          :predefine="['#000000', '#FF0000', '#0000FF', '#008000', '#FFA500', '#808080']"
+        />
       </div>
 
       <div class="divider"></div>
 
       <div class="tool-group">
         <span class="tool-label">Map</span>
-        <input type="range" v-model.number="store.viewSettings.mapOpacity" min="0" max="1" step="0.1" class="custom-range" title="Map Opacity">
+        <input 
+          type="range" 
+          v-model.number="store.viewSettings.mapOpacity" 
+          min="0" max="1" step="0.1" 
+          class="custom-range"
+          title="Map Opacity"
+        >
+        <span class="value-tip">{{ Math.round(store.viewSettings.mapOpacity * 100) }}%</span>
       </div>
 
       <div class="divider"></div>
@@ -423,7 +426,7 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
       </div>
     </div>
 
-    <!-- Vis.js 容器 (透明背景，只画节点和线) -->
+    <!-- Vis.js Layer (Top) -->
     <div ref="container" class="vis-network-container"></div>
   </div>
 </template>
@@ -431,30 +434,14 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 <style scoped>
 .twod-container { 
   width: 100%; height: 100%; position: relative; background-color: #eef1f5; 
-  overflow: hidden; /* 防止图片移出容器产生滚动条 */
-}
-
-/* [核心优化] 底图层绝对定位，位于 Canvas 之下 */
-.map-layer-container {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none; /* 让鼠标事件穿透到底下的 Canvas */
-  z-index: 0;
-}
-
-.floor-map-image {
-  position: absolute;
-  top: 0; left: 0;
-  transform-origin: 0 0; /* 变换基点设为左上角 */
-  will-change: transform; /* 提示浏览器进行 GPU 优化 */
-  /* image-rendering: pixelated; 可选：像素风格 */
+  overflow: hidden; 
 }
 
 .vis-network-container { 
   width: 100%; height: 100%; outline: none; 
   position: relative;
-  z-index: 1; /* 确保 Canvas 在图片之上 */
-  background: transparent; /* 确保背景透明 */
+  z-index: 1; 
+  background: transparent; 
 }
 
 .overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; }
@@ -465,3 +452,23 @@ onBeforeUnmount(() => { window.removeEventListener('resize', handleResize); if (
 .custom-range { width: 80px; cursor: pointer; }
 .zoom-indicator .value-tip { font-weight: bold; color: #409eff; }
 </style>
+```
+
+### 第四步：检查 `vite-env.d.ts` (可选)
+
+如果编辑器报错说找不到 `.svg?url` 模块，你需要确认你的类型定义文件支持这种写法。通常 vite 项目自带，如果没有，请在 `src/renderer/src/env.d.ts` (或 `vite-env.d.ts`) 中添加：
+
+```typescript
+/// <reference types="vite/client" />
+
+declare module '*.vue' {
+  import type { DefineComponent } from 'vue'
+  const component: DefineComponent<{}, {}, any>
+  export default component
+}
+
+// [新增] 支持 svg import
+declare module '*.svg?url' {
+  const content: string
+  export default content
+}

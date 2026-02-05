@@ -9,31 +9,38 @@ const store = useProjectStore()
 const filterText = ref('')
 const treeRef = ref()
 
-const expandedKeySet = ref<Set<string>>(new Set())
-const expandedKeysArray = computed(() => Array.from(expandedKeySet.value))
+// [修复] 使用 ref<string[]> 替代 Set，确保 Vue 能正确追踪变化，防止重绘时折叠
+const expandedKeys = ref<string[]>([])
 
 const selectedIds = ref<Set<string>>(new Set())
 const lastFocusedId = ref<string | null>(null) 
 
 // [优化] 使用 shallowRef，避免 Vue 对巨大的树结构进行深度代理
-// 并且取消 computed，改为手动控制更新时机
+// 树结构本身是静态的，只有内部引用的 data (INode) 是响应式的
 const treeData = shallowRef<ITreeNode[]>([])
 
-// [核心优化] 仅当结构版本号变化时，才重构树
-// 拖拽设备(isPlaced变更) 不会改变版本号，因此不会触发重构 -> 解决卡顿
+// [核心优化] 仅当结构版本号 (structureVersion) 变化时，才重构树结构
+// 拖拽设备导致的 isPlaced 变更不改变版本号，因此不会触发 buildTopologyTree 计算
+// 也就不会导致 el-tree 销毁重建 DOM，从而消除卡顿
 watch(() => store.structureVersion, () => {
   treeData.value = buildTopologyTree(store.nodes, store.edges, store.loops)
 }, { immediate: true })
 
 onMounted(() => {
-  store.loops.forEach(l => expandedKeySet.value.add(`loop-root-${l.id}`))
+  store.loops.forEach(l => {
+    const key = `loop-root-${l.id}`
+    if (!expandedKeys.value.includes(key)) expandedKeys.value.push(key)
+  })
 })
 
-// 监听新增 Loop (辅助逻辑，确保新Loop自动展开)
+// 监听新增 Loop，自动展开
 watch(() => store.loops.length, (newLen, oldLen) => {
   if (newLen > oldLen) {
     const newLoops = store.loops.slice(oldLen)
-    newLoops.forEach(l => expandedKeySet.value.add(`loop-root-${l.id}`))
+    newLoops.forEach(l => {
+      const key = `loop-root-${l.id}`
+      if (!expandedKeys.value.includes(key)) expandedKeys.value.push(key)
+    })
   }
 })
 
@@ -48,15 +55,24 @@ const filterNode = (value: string, data: any) => {
   return matchLabel || matchId
 }
 
-const handleNodeExpand = (data: any) => { expandedKeySet.value.add(data.id) }
-const handleNodeCollapse = (data: any) => { expandedKeySet.value.delete(data.id) }
+// [修复] 正确维护展开状态数组
+const handleNodeExpand = (data: any) => { 
+  if (!expandedKeys.value.includes(data.id)) expandedKeys.value.push(data.id) 
+}
+const handleNodeCollapse = (data: any) => { 
+  const idx = expandedKeys.value.indexOf(data.id)
+  if (idx > -1) expandedKeys.value.splice(idx, 1)
+}
 
 const getVisibleFlatNodes = (): ITreeNode[] => {
   const flatList: ITreeNode[] = []
+  // 为了性能，将数组转为 Set 用于快速查找
+  const expandedSet = new Set(expandedKeys.value)
+  
   const traverse = (nodes: ITreeNode[]) => {
     for (const node of nodes) {
       flatList.push(node)
-      if (node.children && node.children.length > 0 && expandedKeySet.value.has(node.id)) {
+      if (node.children && node.children.length > 0 && expandedSet.has(node.id)) {
         traverse(node.children)
       }
     }
@@ -117,6 +133,8 @@ const handleDragStart = (node: any, e: DragEvent) => {
   if (!selectedIds.value.has(node.data.id)) {
     selectedIds.value.clear()
     selectedIds.value.add(node.data.id)
+    // 拖拽开始时，如果只是为了拖拽，可以不触发全局选中（避免右侧面板刷新）
+    // 但为了体验一致性，通常还是选中
     store.selectNode(node.data.id)
   }
   const payload = JSON.stringify([...selectedIds.value])
@@ -146,7 +164,7 @@ const getIconColor = (role: string, isPlaced: boolean, diffStatus: string) => {
         ref="treeRef"
         :data="treeData"
         node-key="id"
-        :default-expanded-keys="expandedKeysArray"
+        :default-expanded-keys="expandedKeys"
         :filter-node-method="filterNode"
         :expand-on-click-node="false"
         :highlight-current="false" 
