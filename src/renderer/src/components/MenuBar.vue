@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useProjectStore } from '../stores/projectStore'
-import { Moon, Sunny, FolderOpened, RefreshRight, Rank, Operation, VideoCamera, MapLocation } from '@element-plus/icons-vue' // [新增] 图标
+import { Moon, Sunny, Operation, VideoCamera, MapLocation } from '@element-plus/icons-vue'
 
 const store = useProjectStore()
 
@@ -54,25 +54,12 @@ const handleMenuCommand = async (command: string) => {
         <el-dropdown trigger="click" @command="handleMenuCommand">
           <span class="menu-item">编辑 (Edit)</span>
           <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item>撤销 (Undo)</el-dropdown-item>
-              <el-dropdown-item>重做 (Redo)</el-dropdown-item>
               <el-dropdown-item divided command="config-building" :icon="Operation">
                 建筑与图纸配置...
               </el-dropdown-item>
-            </el-dropdown-menu>
           </template>
         </el-dropdown>
 
-        <el-dropdown trigger="click">
-          <span class="menu-item">视图 (View)</span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item>重置布局</el-dropdown-item>
-              <el-dropdown-item>显示网格</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
       </div>
       
       <div class="window-controls">
@@ -108,13 +95,6 @@ const handleMenuCommand = async (command: string) => {
         </el-radio-group>
       </div>
 
-      <el-divider direction="vertical" />
-
-      <el-button-group class="tool-group">
-        <el-tooltip content="刷新视图" placement="bottom">
-          <el-button size="small" :icon="RefreshRight" />
-        </el-tooltip>
-      </el-button-group>
     </div>
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
+import { } from 'vue'
 import { Plus, Delete, Upload } from '@element-plus/icons-vue'
 import type { IBuilding, IFloor } from '../types'
 
@@ -8,7 +8,16 @@ const props = defineProps<{
   modelValue: IBuilding[]
 }>()
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: IBuilding[]): void
+  (e: 'mapResolutionChange', payload: {
+    floorId: string,
+    oldWidth: number,
+    oldHeight: number,
+    newWidth: number,
+    newHeight: number
+  }): void
+}>()
 
 // 获取数据的副本引用 (Vue 3 props 是只读的，但数组内部对象可变，这里直接操作数组元素是可行的，
 // 但为了规范，增删操作触发 emit 更新)
@@ -66,6 +75,10 @@ const removeFloor = (building: IBuilding, index: number) => {
 // 处理图片上传
 const handleMapUpload = (file: any, floor: IFloor) => {
   const reader = new FileReader()
+  // 记录旧的分辨率
+  const oldWidth = floor.mapWidth
+  const oldHeight = floor.mapHeight
+
   reader.onload = (e) => {
     if (e.target?.result) {
       floor.mapPath = e.target.result as string
@@ -73,6 +86,17 @@ const handleMapUpload = (file: any, floor: IFloor) => {
       img.onload = () => {
         floor.mapWidth = img.width
         floor.mapHeight = img.height
+        
+        // 如果旧的分辨率存在且不等于新的，触发事件
+        if (oldWidth && oldHeight && (oldWidth !== img.width || oldHeight !== img.height)) {
+          emit('mapResolutionChange', {
+            floorId: floor.id,
+            oldWidth,
+            oldHeight,
+            newWidth: img.width,
+            newHeight: img.height
+          })
+        }
       }
       img.src = floor.mapPath
     }

@@ -105,13 +105,18 @@ export interface IFloor {
   mapPath?: string;
   mapWidth?: number;
   mapHeight?: number;
-  pixelPerMeter?: number;
+  iconScale?: number; // [新增] 每层楼独立的图标缩放比例
+  cameraState?: ICamera2D; // [新增] 每层楼独立的 2D 视角记忆
 }
 
 export interface IBuilding {
   id: string;
   name: string;
   floors: IFloor[];
+  // [新增] 2D 布局属性
+  position?: { x: number; y: number }; 
+  size?: { width: number; depth: number }; 
+  rotation?: number; 
 }
 
 export interface IProject {

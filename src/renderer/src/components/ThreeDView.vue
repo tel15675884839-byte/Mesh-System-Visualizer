@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { useProjectStore } from '../stores/projectStore'
 import { IconRegistry } from '../utils/iconAssets'
 import { DeviceRole, DeviceType } from '../types'
 import { Log } from '../utils/logger'
-import { Setting, Hide, View, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { Setting, Hide, View, ArrowDown, ArrowRight, Place } from '@element-plus/icons-vue'
 
 const containerRef = ref<HTMLElement | null>(null)
 const store = useProjectStore()
@@ -72,16 +73,10 @@ let animationId: number
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 
-// 拖拽相关状态
-let isDraggingBuilding = false
-let draggedBuildingId: string | null = null
-const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-
 // 缓存与组
 const textureCache: Record<string, THREE.Texture> = {}
 const edgesGroup = new THREE.Group()
 const buildingGroups = new Map<string, THREE.Group>() 
-const anchorMeshes: THREE.Mesh[] = []
 
 // --- 计算属性 ---
 const selectedNodeInfo = computed(() => {
@@ -165,45 +160,49 @@ const createTextTexture = (text: string) => {
 const initBuildingGroups = () => {
   buildingGroups.forEach(g => scene.remove(g))
   buildingGroups.clear()
-  anchorMeshes.length = 0
 
   store.buildings.forEach((bld, index) => {
     const group = new THREE.Group()
-    const defaultX = index * 3000
-    group.position.set(defaultX, 0, 0)
+    
+    // [修改] 使用 store 中的 position，如果没有则使用默认
+    // 3D 坐标系 (x, z) 对应 2D (x, y)，这里直接映射米
+    const posX = bld.position?.x ?? (index * 150 - 150)
+    const posZ = bld.position?.y ?? 0
+    
+    group.position.set(posX, 0, posZ)
+    group.rotation.y = -(bld.rotation ?? 0) * (Math.PI / 180) // 角度转弧度，反向以匹配 2D 坐标系转动
     group.userData = { buildingId: bld.id }
     
     scene.add(group)
     buildingGroups.set(bld.id, group)
 
-    const anchorGroup = new THREE.Group()
-    
-    const dotGeo = new THREE.SphereGeometry(60, 32, 32)
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0xff4040 })
-    const dotMesh = new THREE.Mesh(dotGeo, dotMat)
-    dotMesh.userData = { isAnchor: true, buildingId: bld.id }
-    anchorGroup.add(dotMesh)
-    anchorMeshes.push(dotMesh)
-
+    const labelGroup = new THREE.Group()
+    labelGroup.userData = { isLabel: true }
     const textData = createTextTexture(bld.name)
     if (textData) {
-      const spriteMat = new THREE.SpriteMaterial({ map: textData.texture, depthTest: false })
+      const spriteMat = new THREE.SpriteMaterial({ 
+        map: textData.texture, 
+        depthTest: false, 
+        depthWrite: false 
+      })
       const sprite = new THREE.Sprite(spriteMat)
-      const scaleY = 150
+      const scaleY = 8 // 进一步缩小字体
       sprite.scale.set(scaleY * textData.aspect, scaleY, 1)
-      sprite.position.set(0, 150, 0)
-      sprite.renderOrder = 999
-      anchorGroup.add(sprite)
+      // 放置在建筑侧方（X 轴偏移），高度略微抬升
+      sprite.position.set(-60, 5, 0)
+      sprite.renderOrder = 9999
+      labelGroup.add(sprite)
     }
 
-    anchorGroup.position.set(500, -100, 1000) 
-    group.add(anchorGroup)
+    group.add(labelGroup)
   })
 }
 
+const PIXELS_PER_METER = 10 // 10 像素 = 1 米，用于将 2D 像素映射为 3D 米
+
 const buildFloors = () => {
   buildingGroups.forEach((group, bldId) => {
-    const toRemove = group.children.filter(c => c.userData.isFloor || c.userData.isGrid)
+    const toRemove = group.children.filter(c => c.userData.isFloor)
     toRemove.forEach(c => group.remove(c))
     
     const bld = store.buildings.find(b => b.id === bldId)
@@ -213,29 +212,75 @@ const buildFloors = () => {
       const y = floor.levelIndex * store.viewSettings.floorHeight3D
       
       if (floor.mapPath) {
-        new THREE.TextureLoader().load(floor.mapPath, (tex) => {
-          const width = tex.image.width
-          const height = tex.image.height
+        const cachedTex = textureCache[floor.mapPath]
+        const onTexLoad = (tex: THREE.Texture) => {
+          // [核心逻辑] 建筑尺寸由底图像素决定，确保 3D 比例与 2D 底图完全一致
+          // 不再由用户手动调节宽度，而是使用固定比例：10px = 1m
+          const img = tex.image as any
+          const width = (floor.mapWidth ?? img?.width ?? 100) / PIXELS_PER_METER
+          const height = (floor.mapHeight ?? img?.height ?? 70) / PIXELS_PER_METER
+          
           const geometry = new THREE.PlaneGeometry(width, height)
           const material = new THREE.MeshBasicMaterial({ 
             map: tex, 
             transparent: true, 
             opacity: store.viewSettings.mapOpacity, 
             side: THREE.DoubleSide,
-            depthWrite: false 
+            depthWrite: store.viewSettings.mapOpacity > 0.8
           })
           const plane = new THREE.Mesh(geometry, material)
           plane.rotation.x = -Math.PI / 2
-          plane.position.set(width / 2, y, height / 2)
+          
+          // [自动对齐] 中心对齐
+          plane.position.set(0, y, 0)
+          
           plane.userData = { isFloor: true, buildingId: bldId, floorId: floor.id }
           group.add(plane)
-        })
-      }
 
-      const grid = new THREE.GridHelper(1000, 10, 0x888888, 0xcccccc)
-      grid.position.set(500, y, 500)
-      grid.userData = { isGrid: true, floorId: floor.id }
-      group.add(grid)
+          // [标签对齐] 将标签置于建筑左侧边缘外部
+          const labels = group.children.find(c => c.userData.isLabel)
+          if (labels) {
+            labels.position.x = -(width / 2 + 10)
+          }
+        }
+
+        if (cachedTex) {
+          onTexLoad(cachedTex)
+        } else {
+          new THREE.TextureLoader().load(floor.mapPath, onTexLoad)
+        }
+      }
+    })
+  })
+}
+
+// --- 动态更新方法 (无闪烁) ---
+
+const updateMapOpacity = () => {
+  const opacity = store.viewSettings.mapOpacity
+  buildingGroups.forEach(group => {
+    group.children.forEach(child => {
+      if (child.userData.isFloor && child instanceof THREE.Mesh) {
+        const mat = child.material as THREE.MeshBasicMaterial
+        mat.opacity = opacity
+        mat.depthWrite = opacity > 0.8
+        mat.needsUpdate = true
+      }
+    })
+  })
+}
+
+const BASE_ICON_SIZE = 1.5
+
+const updateIconScale = () => {
+  const baseSize = BASE_ICON_SIZE * (store.viewSettings.iconScale3D / 100)
+  buildingGroups.forEach(group => {
+    group.children.forEach(child => {
+      if (child.userData.isNode && child instanceof THREE.Sprite) {
+        const isSelected = child.userData.id === store.selectedNodeId
+        const s = isSelected ? baseSize * 1.5 : baseSize
+        child.scale.set(s, s, 1)
+      }
     })
   })
 }
@@ -247,8 +292,7 @@ const buildNodes = () => {
   })
 
   const placedNodes = store.nodes.filter(n => n.isPlaced)
-  const baseSize = 30
-  const nodeSize = baseSize * (store.viewSettings.iconScale3D / 100)
+  const nodeSize = BASE_ICON_SIZE * (store.viewSettings.iconScale3D / 100)
   
   placedNodes.forEach(node => {
     const group = buildingGroups.get(node.buildingId)
@@ -256,22 +300,30 @@ const buildNodes = () => {
 
     const bld = store.buildings.find(b => b.id === node.buildingId)
     const floor = bld?.floors.find(f => f.id === node.floorId)
-    const levelIndex = floor ? floor.levelIndex : 0
+    if (!floor || !floor.mapWidth || !floor.mapHeight) return
+
+    const levelIndex = floor.levelIndex
     const floorY = levelIndex * store.viewSettings.floorHeight3D
     
-    const x = node.position?.x || 0
-    const z = node.position?.y || 0
+    // [坐标映射] 2D (px) -> 3D (m)
+    // 假设 2D 图纸宽度为 W 像素，3D 宽度为 DEFAULT_FLOOR_WIDTH 米
+    // 3D X = (2D_X / W - 0.5) * DEFAULT_FLOOR_WIDTH  (减0.5是因为3D中图片中心在0)
+    // 3D Z = (2D_Y / H - 0.5) * (DEFAULT_FLOOR_WIDTH * Aspect)
+    
+    const worldWidth = floor.mapWidth / PIXELS_PER_METER
+    const worldHeight = floor.mapHeight / PIXELS_PER_METER
+    
+    // 中点对齐运算: (像素坐标 / 总像素 - 0.5) * 3D长度
+    const x = (node.position!.x / floor.mapWidth - 0.5) * worldWidth
+    const z = (node.position!.y / floor.mapHeight - 0.5) * worldHeight
 
     const map = getIconTexture(node.role, node.type)
     const material = new THREE.SpriteMaterial({ map: map, color: 0xffffff })
     const sprite = new THREE.Sprite(material)
     
-    sprite.position.set(x, floorY + 20, z) 
+    sprite.position.set(x, floorY + 0.5, z) 
     sprite.scale.set(nodeSize, nodeSize, 1)
-    
-    // 绑定 ID 用于后续查找
     sprite.userData = { id: node.id, isNode: true }
-    
     group.add(sprite)
   })
   
@@ -364,7 +416,7 @@ const updateEdgesGeometry = () => {
 
 const updateNodeVisuals = () => {
   const selectedId = store.selectedNodeId
-  const baseSize = 30 * (store.viewSettings.iconScale3D / 100)
+  const baseSize = BASE_ICON_SIZE * (store.viewSettings.iconScale3D / 100)
 
   buildingGroups.forEach(group => {
     group.children.forEach((obj) => {
@@ -386,6 +438,26 @@ const updateNodeVisuals = () => {
   })
 }
 
+// [新增] 监听建筑位置变化，实时更新 3D 视图
+watch(() => store.buildings, (newVal) => {
+  newVal.forEach(bld => {
+    const group = buildingGroups.get(bld.id)
+    if (group && bld.position) {
+      group.position.set(bld.position.x, 0, bld.position.y)
+      // 同步旋转 (Degrees -> Radians)
+      // 注意：2D 的 Y 对应 3D 的 Z，旋转轴是 3D 的 Y 轴
+      group.rotation.y = -(bld.rotation ?? 0) * (Math.PI / 180)
+    }
+  })
+  updateEdgesGeometry() // 同步更新连线位置
+}, { deep: true })
+
+// [新增] 打开布局编辑器前校验
+const openLayoutEditor = () => {
+  console.log('Opening Layout Editor...')
+  store.toggleLayoutEditor(true)
+}
+
 // --- 交互事件处理 ---
 
 const onPointerDown = (event: MouseEvent) => {
@@ -395,18 +467,6 @@ const onPointerDown = (event: MouseEvent) => {
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
   
   raycaster.setFromCamera(mouse, camera)
-
-  const anchorIntersects = raycaster.intersectObjects(anchorMeshes, false)
-  if (anchorIntersects.length > 0) {
-    const hit = anchorIntersects[0].object
-    if (hit.userData.isAnchor) {
-      isDraggingBuilding = true
-      draggedBuildingId = hit.userData.buildingId
-      controls.enabled = false 
-      document.body.style.cursor = 'move'
-      return 
-    }
-  }
 
   // 点击选择节点 (只检测可见的)
   const visibleNodes: THREE.Object3D[] = []
@@ -426,35 +486,11 @@ const onPointerDown = (event: MouseEvent) => {
   }
 }
 
-const onPointerMove = (event: MouseEvent) => {
-  if (!isDraggingBuilding || !draggedBuildingId || !containerRef.value) return
-
-  const rect = containerRef.value.getBoundingClientRect()
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-  
-  raycaster.setFromCamera(mouse, camera)
-  const intersectPoint = new THREE.Vector3()
-  
-  raycaster.ray.intersectPlane(dragPlane, intersectPoint)
-  
-  if (intersectPoint) {
-    const group = buildingGroups.get(draggedBuildingId)
-    if (group) {
-      group.position.x = intersectPoint.x - 500
-      group.position.z = intersectPoint.z - 1000
-      updateEdgesGeometry()
-    }
-  }
+const onPointerMove = () => {
+  // 3D 拖拽已移除，功能转移至 2D 布局配置
 }
 
 const onPointerUp = () => {
-  if (isDraggingBuilding) {
-    isDraggingBuilding = false
-    draggedBuildingId = null
-    controls.enabled = true
-    document.body.style.cursor = 'default'
-  }
 }
 
 // --- 初始化与生命周期 ---
@@ -470,13 +506,11 @@ const init = () => {
   // [修改] 4. 彻底移除 Fog 以保证远距离清晰度
   scene.fog = null
 
-  camera = new THREE.PerspectiveCamera(15, width / height, 100, 100000)
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 20000)
   
   if (store.viewSettings.camera3D) {
     const { position } = store.viewSettings.camera3D
-    camera.position.set(position.x, position.y, position.z)
-  } else {
-    camera.position.set(5000, 8000, 5000)
+    camera.position.set(150, 300, 400)
   }
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -498,7 +532,7 @@ const init = () => {
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
   scene.add(ambientLight)
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.6)
-  dirLight.position.set(5000, 10000, 5000)
+  dirLight.position.set(200, 500, 200)
   scene.add(dirLight)
 
   scene.add(edgesGroup)
@@ -545,17 +579,18 @@ const saveViewState = () => {
 // 深度监听 visibilityState 变化
 watch(visibilityState, () => { updateVisibility() }, { deep: true })
 
-watch(
-  [() => store.viewSettings.floorHeight3D, () => store.viewSettings.iconScale3D], 
-  () => { rebuildAll() }
-)
+// 楼层高度变化仍需重建（涉及坐标计算）
+watch(() => store.viewSettings.floorHeight3D, () => { rebuildAll() })
 
-watch(() => store.viewSettings.mapOpacity, () => { rebuildAll() })
+// 图标缩放与透明度采用增量更新，防止重建导致的闪烁
+watch(() => store.viewSettings.iconScale3D, () => { updateIconScale() })
+watch(() => store.viewSettings.mapOpacity, () => { updateMapOpacity() })
+
 watch(() => store.viewSettings.showAllLinks, () => { updateEdgesGeometry() })
 watch(() => store.structureVersion, () => { rebuildAll() })
 
 watch(() => store.selectedNodeId, () => { 
-  updateNodeVisuals() 
+  updateNodeVisuals() // 内部已处理缩放
   updateEdgesGeometry()
 })
 
@@ -586,7 +621,7 @@ onBeforeUnmount(() => {
 })
 
 const resetView = () => {
-  camera.position.set(5000, 8000, 5000)
+  camera.position.set(150, 300, 400)
   controls.target.set(0, 0, 0)
 }
 </script>
@@ -596,6 +631,7 @@ const resetView = () => {
     
     <!-- Info Panel -->
     <div v-if="selectedNodeInfo" class="info-panel">
+
       <div class="panel-header">Device Details</div>
       <div class="info-row"><span class="label">设备名称:</span><span class="value highlight">{{ selectedNodeInfo.name }}</span></div>
       <div class="info-row top-align"><span class="label">RSSI:</span><span class="value multiline">{{ selectedNodeInfo.rssi }}</span></div>
@@ -612,6 +648,12 @@ const resetView = () => {
     <!-- Controls Panel -->
     <div class="overlay-controls" v-show="showControls">
       
+      <!-- Layout Config Button -->
+      <div style="margin-bottom: 5px;">
+        <el-button type="primary" plain size="small" :icon="Place" @click="openLayoutEditor" style="width: 100%">
+          布局配置 (2D)
+        </el-button>
+      </div>
       <!-- Loops Section -->
       <div class="control-group-box">
         <div class="box-title" @click="expandedSections.loops = !expandedSections.loops">

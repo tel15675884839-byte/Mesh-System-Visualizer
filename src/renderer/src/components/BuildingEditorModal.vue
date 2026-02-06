@@ -25,6 +25,25 @@ const handleSave = () => {
   store.updateBuildings(localBuildings.value)
   handleClose()
 }
+
+const handleResolutionChange = (payload: {
+  floorId: string,
+  oldWidth: number,
+  oldHeight: number,
+  newWidth: number,
+  newHeight: number
+}) => {
+  const scaleX = payload.newWidth / payload.oldWidth
+  const scaleY = payload.newHeight / payload.oldHeight
+  
+  // 遍历全局节点库，对该楼层的节点进行位移缩放
+  store.nodes.forEach(node => {
+    if (node.floorId === payload.floorId && node.position) {
+      node.position.x *= scaleX
+      node.position.y *= scaleY
+    }
+  })
+}
 </script>
 
 <template>
@@ -38,7 +57,10 @@ const handleSave = () => {
     <el-tabs v-model="activeTab">
       <el-tab-pane label="建筑与图纸" name="building">
         <div class="editor-content">
-          <BuildingManager v-model="localBuildings" />
+          <BuildingManager 
+            v-model="localBuildings" 
+            @map-resolution-change="handleResolutionChange"
+          />
         </div>
       </el-tab-pane>
       

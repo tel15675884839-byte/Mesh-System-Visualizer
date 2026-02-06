@@ -7,11 +7,11 @@ import { DArrowLeft } from '@element-plus/icons-vue'
 import MenuBar from './components/MenuBar.vue'
 import DeviceList from './components/DeviceList.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
-import DebugConsole from './components/DebugConsole.vue'
 import TwoDView from './components/TwoDView.vue'
 import ThreeDView from './components/ThreeDView.vue'
 import WelcomeScreen from './components/WelcomeScreen.vue'
 import BuildingEditorModal from './components/BuildingEditorModal.vue'
+import BuildingLayoutModal from './components/BuildingLayoutModal.vue' // [新增]
 
 const store = useProjectStore()
 
@@ -76,11 +76,11 @@ onBeforeUnmount(() => {
 
     <div v-else class="workspace">
       <!-- 左侧栏 -->
-      <aside class="sidebar left" :style="{ width: leftWidth + 'px' }">
+      <aside v-if="store.currentViewMode === '2D'" class="sidebar left" :style="{ width: leftWidth + 'px' }">
         <DeviceList />
       </aside>
 
-      <div class="resizer left-resizer" @mousedown.prevent="startResizeLeft"></div>
+      <div v-if="store.currentViewMode === '2D'" class="resizer left-resizer" @mousedown.prevent="startResizeLeft"></div>
 
       <!-- 中间视口 -->
       <main class="viewport">
@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
     </div>
 
     <BuildingEditorModal />
-    <DebugConsole />
+    <BuildingLayoutModal />
   </div>
 </template>
 

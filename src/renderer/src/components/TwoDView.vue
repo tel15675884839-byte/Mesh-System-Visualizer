@@ -24,6 +24,9 @@ const currentScale = ref<number>(1.0)
 // [状态] 高亮节点ID
 const highlightedNodeId = ref<string | null>(null)
 
+// [新增] 本地楼层缩放 (优先于全局)
+const localIconScale = ref<number>(100)
+
 let network: Network | null = null
 let visNodes = new DataSet<any>([])
 let visEdges = new DataSet<any>([])
@@ -85,6 +88,42 @@ watch(currentBuildingId, (newVal) => {
   }
 })
 
+// [修改] 视角恢复逻辑优化：优先使用楼层自带的 cameraState
+const restoreViewState = () => {
+  if (!network) return false
+  
+  // 1. 优先尝试楼层级别的记忆
+  if (currentFloor.value?.cameraState) {
+    const { x, y, scale } = currentFloor.value.cameraState
+    network.moveTo({ position: { x, y }, scale, animation: false })
+    return true
+  }
+  
+  // 2. 兜底使用全局记忆
+  if (store.viewSettings.camera2D) {
+    const { x, y, scale } = store.viewSettings.camera2D
+    network.moveTo({ position: { x, y }, scale, animation: false })
+    return true
+  }
+  return false
+}
+
+// [新增] 切换楼层前的保存逻辑
+const prepareFloorSwitch = (floorId: string) => {
+  if (!network) return
+  // 查找对应的楼层对象进行保存
+  for (const bld of store.buildings) {
+    const floor = bld.floors.find(f => f.id === floorId)
+    if (floor) {
+      const pos = network.getViewPosition()
+      const scale = network.getScale()
+      floor.cameraState = { x: pos.x, y: pos.y, scale }
+      break
+    }
+  }
+}
+
+// [恢复] 意外丢失的设备定位监听
 watch(() => store.focusRequest, async (req) => {
   if (!req || !network) return
   const node = store.nodes.find(n => n.id === req.nodeId)
@@ -124,6 +163,11 @@ const getIconData = (role: string, type: string) => {
 }
 
 const loadFloorImage = (floorId: string, src: string | undefined) => {
+  // 如果路径没变，不要清空背景，防止闪烁
+  if (backgroundImage.value && backgroundImage.value.src === src) {
+    return
+  }
+
   backgroundImage.value = null
   if (!src) {
     network?.redraw()
@@ -139,8 +183,10 @@ const loadFloorImage = (floorId: string, src: string | undefined) => {
       backgroundSize.height = img.height
       
       network?.redraw()
-      // [关键] 恢复视角
+      
+      // [关键] 尝试恢复该楼层的视角，如果没有则执行 fit()
       if (!restoreViewState()) {
+        // 使用 fit 而不是回到原点，保证用户能看到图纸
         setTimeout(() => network?.fit(), 50)
       }
     }
@@ -164,6 +210,8 @@ const initNetwork = () => {
     },
     edges: {
       width: 2, 
+      selectionWidth: 4, // 选中时加粗
+      hoverWidth: 4,     // 悬停时加粗，更容易触发 Tooltip
       color: { color: '#409eff', highlight: '#409eff', opacity: 0.8 },
       smooth: false, 
       arrows: { to: { enabled: true, scaleFactor: 0.5 } }
@@ -172,7 +220,8 @@ const initNetwork = () => {
     interaction: {
       dragNodes: true, dragView: true, zoomView: true, hover: true, selectConnectedEdges: false,
       hideEdgesOnDrag: true, 
-      hideNodesOnDrag: false
+      hideNodesOnDrag: false,
+      tooltipDelay: 50 // 近乎立即显示，提升交互感
     }
   }
 
@@ -238,26 +287,14 @@ const initNetwork = () => {
   }
 }
 
-// 恢复视角逻辑
-const restoreViewState = () => {
-  if (network && store.viewSettings.camera2D) {
-    const { x, y, scale } = store.viewSettings.camera2D
-    network.moveTo({
-      position: { x, y },
-      scale: scale,
-      animation: false 
-    })
-    return true
-  }
-  return false
-}
 
 // 保存当前所有状态
 const saveCurrentState = () => {
+  if (currentFloorId.value) prepareFloorSwitch(currentFloorId.value)
   if (network) {
     const pos = network.getViewPosition()
     const scale = network.getScale()
-    
+
     store.saveViewState(
       currentBuildingId.value,
       currentFloorId.value,
@@ -313,7 +350,11 @@ const updateVisData = () => {
   const visibleNodeIds = new Set(visibleNodes.map(n => n.id))
 
   const baseSize = 30
-  const currentSize = baseSize * (store.viewSettings.iconScale / 100)
+  const baseFontSize = 14
+  // [修改] 优先级：楼层独立缩放 > 全局缩放
+  const scaleRatio = (currentFloor.value?.iconScale ?? store.viewSettings.iconScale) / 100
+  const currentSize = baseSize * scaleRatio
+  const currentFontSize = Math.max(8, baseFontSize * scaleRatio) // 字体随之缩放，最小不小于 8px
 
   const newNodes = visibleNodes.map(node => {
     let safeX = 0; let safeY = 0
@@ -333,17 +374,18 @@ const updateVisData = () => {
       shape: 'image',
       size: currentSize,
       font: { 
+        size: currentFontSize,
         color: store.viewSettings.labelColor,
-        strokeWidth: 2, 
+        strokeWidth: 4, // 增加描边宽度以便在复杂背景下识读
         strokeColor: '#fff' 
       },
-      shadow: isHighlighted ? {
+      shadow: {
         enabled: true,
-        color: 'rgba(30, 144, 255, 0.8)', 
-        size: 30, 
+        color: isHighlighted ? 'rgba(64, 158, 255, 1)' : 'rgba(255, 255, 255, 1)', 
+        size: isHighlighted ? 35 : 20, 
         x: 0,
         y: 0
-      } : false
+      }
     }
   })
 
@@ -375,7 +417,17 @@ const updateVisData = () => {
 }
 
 watch(() => store.nodes, () => { updateVisData() }, { deep: true })
-watch(currentFloorId, () => { updateVisData() })
+watch(currentFloorId, (newId, oldId) => {
+  if (oldId) prepareFloorSwitch(oldId) // 切换前保存旧楼层视角
+  updateVisData()
+  
+  // [关键修复] 当切换到具有相同图纸的楼层时，loadFloorImage 不会触发或会直接返回，
+  // 我们需要在这里强制恢复新楼层的视角。
+  nextTick(() => {
+    restoreViewState()
+  })
+})
+
 watch(() => store.selectedNodeId, () => { updateVisData() }) 
 
 watch(() => store.viewSettings, () => {
@@ -383,14 +435,31 @@ watch(() => store.viewSettings, () => {
   network?.redraw() 
 }, { deep: true })
 
-watch(currentFloor, (floor) => {
+// [新增] 切换楼层时同步本地缩放滑块
+watch(currentFloorId, () => {
+  if (currentFloor.value) {
+    localIconScale.value = currentFloor.value.iconScale ?? store.viewSettings.iconScale
+  }
+}, { immediate: true })
+
+// [新增] 用户调整滑块时，同步到楼层对象中
+const handleLocalScaleInput = (val: number) => {
+  if (currentFloor.value) {
+    currentFloor.value.iconScale = val
+    updateVisData()
+  }
+}
+
+// [修改] 只在 mapPath 真正变化时才重载图片，防止调节 iconScale/opacity 时闪烁
+watch(() => currentFloor.value?.mapPath, (newPath) => {
   if (container.value) { container.value.style.backgroundImage = 'none' }
-  if (!floor || !floor.mapPath) {
+  const floor = currentFloor.value
+  if (!floor || !newPath) {
     loadFloorImage('', undefined)
   } else {
-    loadFloorImage(floor.id, floor.mapPath)
+    loadFloorImage(floor.id, newPath)
   }
-}, { deep: true, immediate: true })
+}, { immediate: true })
 
 const handleResize = () => { network?.redraw() }
 
@@ -428,12 +497,13 @@ onBeforeUnmount(() => {
         <span class="tool-label">Icon</span>
         <input 
           type="range" 
-          v-model.number="store.viewSettings.iconScale" 
+          v-model.number="localIconScale" 
           min="10" max="300" step="10" 
           class="custom-range"
-          title="Icon Scale"
+          title="Icon Scale (Floor Specific)"
+          @input="handleLocalScaleInput(localIconScale)"
         >
-        <span class="value-tip">{{ store.viewSettings.iconScale }}%</span>
+        <span class="value-tip">{{ localIconScale }}%</span>
       </div>
 
       <div class="divider"></div>
@@ -475,6 +545,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .twod-container { width: 100%; height: 100%; position: relative; background-color: #eef1f5; overflow: hidden; }
 .vis-network-container { width: 100%; height: 100%; outline: none; position: relative; z-index: 1; background: transparent; }
+
+/* [新增] Vis.js Tooltip 样式，确保 RSSI 悬停显示可见且美观 */
+:deep(.vis-tooltip) {
+  position: absolute;
+  visibility: hidden;
+  padding: 5px 10px;
+  white-space: nowrap;
+  font-family: verdana;
+  font-size: 12px;
+  color: #fff;
+  background-color: rgba(50, 50, 50, 0.9);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 100;
+  pointer-events: none;
+}
 
 .overlay-tools { position: absolute; top: 10px; left: 10px; z-index: 5; background: rgba(255, 255, 255, 0.95); padding: 5px 10px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tool-group { display: flex; align-items: center; gap: 5px; }

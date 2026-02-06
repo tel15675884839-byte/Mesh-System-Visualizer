@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, shallowRef } from 'vue'
+import { ref, watch, onMounted, shallowRef, nextTick } from 'vue'
 import { Search, Check } from '@element-plus/icons-vue'
 import { useProjectStore } from '../stores/projectStore'
 import { buildTopologyTree, type ITreeNode } from '../utils/treeHelper'
@@ -26,23 +26,8 @@ watch(() => store.structureVersion, () => {
   treeData.value = buildTopologyTree(store.nodes, store.edges, store.loops)
 }, { immediate: true })
 
-onMounted(() => {
-  store.loops.forEach(l => {
-    const key = `loop-root-${l.id}`
-    if (!expandedKeys.value.includes(key)) expandedKeys.value.push(key)
-  })
-})
-
-// 监听新增 Loop，自动展开
-watch(() => store.loops.length, (newLen, oldLen) => {
-  if (newLen > oldLen) {
-    const newLoops = store.loops.slice(oldLen)
-    newLoops.forEach(l => {
-      const key = `loop-root-${l.id}`
-      if (!expandedKeys.value.includes(key)) expandedKeys.value.push(key)
-    })
-  }
-})
+// [修改] 移除自动展开逻辑，满足“不用在LOOP列表中展开”的需求
+// 不再在挂载时或新增回路时自动展开
 
 watch(filterText, (val) => {
   treeRef.value!.filter(val)
@@ -151,6 +136,47 @@ const getIconColor = (role: string, isPlaced: boolean, diffStatus: string) => {
     default: return '#52c41a'
   }
 }
+
+// [新增] 自动展开逻辑：当外部选中节点时（如 2D 点击），在树中展开并选中
+const findPathToNode = (nodes: ITreeNode[], targetId: string, path: string[] = []): string[] | null => {
+  for (const node of nodes) {
+    if (node.id === targetId) return path
+    if (node.children) {
+      const result = findPathToNode(node.children, targetId, [...path, node.id])
+      if (result) return result
+    }
+  }
+  return null
+}
+
+watch(() => store.selectedNodeId, (nodeId) => {
+  if (!nodeId) {
+    selectedIds.value.clear()
+    return
+  }
+  
+  // 1. 同步选中状态
+  selectedIds.value.clear()
+  selectedIds.value.add(nodeId)
+  lastFocusedId.value = nodeId
+
+  // 2. 找到路径并自动展开
+  const path = findPathToNode(treeData.value, nodeId)
+  if (path) {
+    path.forEach(key => {
+      if (!expandedKeys.value.includes(key)) {
+        expandedKeys.value.push(key)
+      }
+    })
+    
+    // 3. 滚动到选中项 (nextTick 确保渲染完成)
+    nextTick(() => {
+      treeRef.value?.setCurrentKey(nodeId)
+      const el = document.querySelector('.is-selected')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+}, { immediate: true })
 </script>
 
 <template>

@@ -25,7 +25,7 @@ export const useProjectStore = defineStore('project', () => {
     rightPanelWidth: 300,
     
     // [新增] 3D 持久化默认值
-    floorHeight3D: 200, 
+    floorHeight3D: 5, 
     iconScale3D: 100,
 
     // 初始化为空
@@ -202,11 +202,29 @@ export const useProjectStore = defineStore('project', () => {
     nodes.value.forEach(node => {
       if (node.isPlaced && !validFloorIds.has(node.floorId)) { node.isPlaced = false; node.position = null; recoveredCount++; }
     });
+
+    // [新增] 确保新建筑有默认位置
+    newBuildings.forEach((b, index) => {
+      if (!b.position) {
+        // 默认按 X 轴排列，间距 80米 (映射到 3D 可能是 8000)
+        // 这里的单位假设是 米，3D 中可能乘 100
+        const defaultSpacing = 80 
+        b.position = { x: index * defaultSpacing, y: 0 }
+      }
+      if (!b.size) {
+        b.size = { width: 60, depth: 40 } // 默认 60x40 米
+      }
+    })
+
     buildings.value = newBuildings;
     if (recoveredCount > 0) ElMessage.warning(`${recoveredCount} 个设备因楼层删除已自动回收到列表`);
     else ElMessage.success('建筑配置已更新');
   }
   
+  // [新增] 布局编辑器开关
+  const isLayoutEditorVisible = ref(false)
+  function toggleLayoutEditor(show: boolean) { isLayoutEditorVisible.value = show }
+
   function toggleBuildingEditor(show: boolean) { isBuildingEditorVisible.value = show; }
   function closeProject() { isProjectLoaded.value = false; clearProject(); }
   function loadProject(projectData: IProject) {
@@ -272,6 +290,7 @@ export const useProjectStore = defineStore('project', () => {
     upsertNode, clearProject, selectNode, toggleTheme, batchPlaceNodes, unplaceNode,
     deleteLoop, replaceLoop, updateLoop, purgeMissingNodes, confirmLoopChanges, deleteNode,
     triggerFocus, addLoop,
-    saveViewState 
+    saveViewState,
+    isLayoutEditorVisible, toggleLayoutEditor // [新增]
   }
 })
