@@ -11,24 +11,23 @@ import TwoDView from './components/TwoDView.vue'
 import ThreeDView from './components/ThreeDView.vue'
 import WelcomeScreen from './components/WelcomeScreen.vue'
 import BuildingEditorModal from './components/BuildingEditorModal.vue'
-import BuildingLayoutModal from './components/BuildingLayoutModal.vue' // [新增]
+import BuildingLayoutModal from './components/BuildingLayoutModal.vue'
 
 const store = useProjectStore()
 
 // --- 布局状态 ---
 const leftWidth = ref(280)
-// rightWidth 现在直接使用 store.viewSettings.rightPanelWidth
 const minWidth = 200
-const maxWidth = 800 // 允许拉得更宽一点
+const maxWidth = 800
 const isRightPanelOpen = ref(true) 
 
 let isResizingLeft = false
 let isResizingRight = false
 
-const startResizeLeft = () => { isResizingLeft = true; document.body.style.cursor = 'col-resize' }
-const startResizeRight = () => { isResizingRight = true; document.body.style.cursor = 'col-resize' }
+const startResizeLeft = (): void => { isResizingLeft = true; document.body.style.cursor = 'col-resize' }
+const startResizeRight = (): void => { isResizingRight = true; document.body.style.cursor = 'col-resize' }
 
-const handleMouseMove = (e: MouseEvent) => {
+const handleMouseMove = (e: MouseEvent): void => {
   if (!store.isProjectLoaded) return 
   if (isResizingLeft) {
     const newWidth = e.clientX
@@ -37,13 +36,12 @@ const handleMouseMove = (e: MouseEvent) => {
   if (isResizingRight) {
     const newWidth = window.innerWidth - e.clientX
     if (newWidth >= minWidth && newWidth <= maxWidth) {
-      // [修改] 更新 Store 中的宽度
       store.viewSettings.rightPanelWidth = newWidth
     }
   }
 }
 
-const stopResize = () => {
+const stopResize = (): void => {
   if (isResizingLeft || isResizingRight) {
     isResizingLeft = false
     isResizingRight = false
@@ -52,7 +50,7 @@ const stopResize = () => {
   }
 }
 
-const toggleRightPanel = (show: boolean) => {
+const toggleRightPanel = (show: boolean): void => {
   isRightPanelOpen.value = show
 }
 
@@ -87,18 +85,15 @@ onBeforeUnmount(() => {
          <TwoDView v-if="store.currentViewMode === '2D'" />
          <ThreeDView v-else />
          
-         <!-- [修改] 展开按钮：仅在 2D 模式且面板隐藏时显示 -->
          <div 
             v-if="!isRightPanelOpen && store.currentViewMode === '2D'" 
             class="expand-btn" 
-            @click="toggleRightPanel(true)" 
             title="展开属性面板"
+            @click="toggleRightPanel(true)" 
          >
            <el-icon><DArrowLeft /></el-icon>
          </div>
 
-         <!-- [修改] 右侧面板：仅在 2D 模式且面板开启时显示 -->
-         <!-- 绑定宽度为 store.viewSettings.rightPanelWidth -->
          <div 
             v-if="isRightPanelOpen && store.currentViewMode === '2D'" 
             class="floating-right-panel" 
@@ -120,12 +115,12 @@ onBeforeUnmount(() => {
 .workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
 .sidebar.left { background-color: var(--panel-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
 .resizer { width: 5px; background-color: transparent; cursor: col-resize; z-index: 20; transition: background-color 0.2s; flex-shrink: 0; }
-.resizer:hover, .resizer:active { background-color: #409eff; }
+.resizer:hover, .resizer:active { background-color: var(--ios-blue); }
 .viewport { flex: 1; background-color: var(--viewport-bg); position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0; overflow: hidden; }
 
-.floating-right-panel { position: absolute; top: 0; right: 0; bottom: 0; background-color: var(--panel-bg); border-left: 1px solid var(--border-color); box-shadow: -2px 0 8px rgba(0,0,0,0.1); z-index: 15; display: flex; }
+.floating-right-panel { position: absolute; top: 0; right: 0; bottom: 0; background-color: var(--panel-bg); border-left: 1px solid var(--border-color); box-shadow: -4px 0 15px rgba(0,0,0,0.05); z-index: 15; display: flex; }
 .right-resizer { position: absolute; left: -5px; top: 0; bottom: 0; width: 5px; }
 
-.expand-btn { position: absolute; top: 10px; right: 0; width: 24px; height: 40px; background-color: var(--panel-bg); border: 1px solid var(--border-color); border-right: none; border-radius: 4px 0 0 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 20; box-shadow: -2px 0 5px rgba(0,0,0,0.1); color: var(--text-color); }
-.expand-btn:hover { background-color: #ecf5ff; color: #409eff; }
+.expand-btn { position: absolute; top: 16px; right: 0; width: 28px; height: 44px; background-color: var(--panel-bg); border: 1px solid var(--border-color); border-right: none; border-radius: 12px 0 0 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 20; box-shadow: -2px 0 10px rgba(0,0,0,0.1); color: var(--ios-blue); transition: all 0.2s ease; }
+.expand-btn:hover { background-color: var(--bg-color); transform: translateX(-2px); }
 </style>

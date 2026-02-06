@@ -1,25 +1,127 @@
-/* 默认 (Light) 变量 */
-    :root {
-      --bg-color: #f0f2f5;
-      --panel-bg: #ffffff;
-      --border-color: #dcdfe6;
-      --text-color: #303133;
-      --header-bg: #fff;
-      --viewport-bg: #eef1f5;
-    }
+/* --- iOS System Font Stack & Global Styles --- */
 
-    /* Dark 模式变量覆盖 */
-    html.dark {
-      --bg-color: #1a1a1a;
-      --panel-bg: #252526; /* VS Code 风格深色 */
-      --border-color: #4c4d4f;
-      --text-color: #cfd3dc;
-      --header-bg: #1e1e1e;
-      --viewport-bg: #1e1e1e;
-    }
+:root {
+  /* iOS Light Mode Colors */
+  --bg-color: #f2f2f7;
+  /* System Grouped Background */
+  --panel-bg: #ffffff;
+  /* Primary Background */
+  --border-color: rgba(0, 0, 0, 0.1);
+  --text-color: #000000;
+  --secondary-text: #8e8e93;
+  --header-bg: rgba(255, 255, 255, 0.7);
+  --viewport-bg: #ffffff;
+  --ios-blue: #007aff;
+  --ios-green: #34c759;
+  --ios-red: #ff3b30;
+  --ios-orange: #ff9500;
+  --ios-gray: #8e8e93;
+  --ios-light-gray: #f2f2f7;
+}
 
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      transition: background-color 0.3s, color 0.3s;
-    }
+html.dark {
+  /* iOS Dark Mode Colors */
+  --bg-color: #000000;
+  /* Black */
+  --panel-bg: #1c1c1e;
+  /* System Grouped Background Dark */
+  --border-color: rgba(255, 255, 255, 0.15);
+  --text-color: #ffffff;
+  --secondary-text: #98989d;
+  --header-bg: rgba(28, 28, 30, 0.7);
+  --viewport-bg: #000000;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  /* 统一使用 iOS 系统字体栈 */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  user-select: none;
+  overflow: hidden;
+  transition: background-color 0.3s, color 0.3s;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* --- Element Plus Global iOS-Style Refinements --- */
+
+/* 按钮：更圆润的 iOS 风格 */
+.el-button {
+  border-radius: 10px !important;
+  font-weight: 500;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.el-button:active {
+  transform: scale(0.97);
+}
+
+.el-button--primary {
+  background-color: var(--ios-blue) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* 输入框：背景灰色、圆角 */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 10px !important;
+}
+
+html.dark .el-input__wrapper,
+html.dark .el-select__wrapper,
+html.dark .el-textarea__inner {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 标签：更圆 */
+.el-tag {
+  border-radius: 6px !important;
+  border: none !important;
+}
+
+/* 统一滚动条样式 - iOS 风格 */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 隐藏部分 Element UI 的默认焦点边框 */
+*:focus {
+  outline: none !important;
+}
+
+/* 文字渲染优化 */
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}

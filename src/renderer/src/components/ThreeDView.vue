@@ -480,9 +480,31 @@ const onPointerDown = (event: MouseEvent) => {
   if (nodeIntersects.length > 0) {
     const nodeId = nodeIntersects[0].object.userData.id
     store.selectNode(nodeId)
-    store.triggerFocus(nodeId)
+    // store.triggerFocus(nodeId) // 点击时不自动触发 FocusReq，避免干扰连续点击
   } else {
     store.selectNode(null)
+  }
+}
+
+const onDoubleClick = (event: MouseEvent) => {
+  if (!containerRef.value) return
+  const rect = containerRef.value.getBoundingClientRect()
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+  
+  raycaster.setFromCamera(mouse, camera)
+
+  const visibleNodes: THREE.Object3D[] = []
+  buildingGroups.forEach(g => {
+    if (g.visible) {
+      g.children.forEach(c => { if (c.userData.isNode && c.visible) visibleNodes.push(c) })
+    }
+  })
+  
+  const nodeIntersects = raycaster.intersectObjects(visibleNodes, false)
+  if (nodeIntersects.length > 0) {
+    const nodeId = nodeIntersects[0].object.userData.id
+    store.triggerTreeFocus(nodeId)
   }
 }
 
@@ -540,6 +562,7 @@ const init = () => {
   rebuildAll()
   
   containerRef.value.addEventListener('mousedown', onPointerDown)
+  containerRef.value.addEventListener('dblclick', onDoubleClick)
   window.addEventListener('mousemove', onPointerMove)
   window.addEventListener('mouseup', onPointerUp)
 
@@ -594,6 +617,27 @@ watch(() => store.selectedNodeId, () => {
   updateEdgesGeometry()
 })
 
+watch(() => store.focusRequest, (req) => {
+  if (!req || !camera || !controls) return
+  const node = store.nodes.find(n => n.id === req.nodeId)
+  if (!node || !node.isPlaced) return
+
+  const group = buildingGroups.get(node.buildingId)
+  if (!group) return
+  
+  const sprite = group.children.find(c => c.userData.id === node.id)
+  if (!sprite) return
+
+  const worldPos = new THREE.Vector3()
+  sprite.getWorldPosition(worldPos)
+
+  // 中平。直接跳，以后有 TWEEN 再加过渡
+  controls.target.copy(worldPos)
+  // 固定视角高度
+  camera.position.set(worldPos.x + 50, worldPos.y + 100, worldPos.z + 50)
+  controls.update()
+})
+
 const handleResize = () => {
   if (!containerRef.value || !camera || !renderer) return
   const w = containerRef.value.clientWidth
@@ -614,6 +658,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   if (containerRef.value) {
     containerRef.value.removeEventListener('mousedown', onPointerDown)
+    containerRef.value.removeEventListener('dblclick', onDoubleClick)
   }
   window.removeEventListener('mousemove', onPointerMove)
   window.removeEventListener('mouseup', onPointerUp)

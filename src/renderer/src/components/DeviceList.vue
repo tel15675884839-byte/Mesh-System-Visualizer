@@ -24,24 +24,23 @@ const store = useProjectStore()
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-right: none; /* 由父布局控制边框 */
   background-color: var(--panel-bg);
 }
 .panel-header {
-  height: 40px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
-  background-color: var(--bg-color);
-  border-bottom: 1px solid var(--border-color);
-  font-weight: bold;
-  font-size: 13px;
+  padding: 0 16px;
+  background-color: transparent;
+  font-weight: 700;
+  font-size: 15px;
   color: var(--text-color);
   flex-shrink: 0;
 }
 .list-body {
   flex: 1;
   overflow: hidden;
+  padding: 0 8px; /* 给内部树留一点呼吸空间 */
 }
 </style>

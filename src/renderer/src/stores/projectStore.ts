@@ -36,6 +36,7 @@ export const useProjectStore = defineStore('project', () => {
   })
 
   const focusRequest = ref<{ nodeId: string; timestamp: number } | null>(null)
+  const treeFocusRequest = ref<{ nodeId: string; timestamp: number } | null>(null)
 
   const nodes = ref<INode[]>([])
   const edges = ref<IEdge[]>([])
@@ -82,6 +83,10 @@ export const useProjectStore = defineStore('project', () => {
 
   function triggerFocus(nodeId: string) {
     focusRequest.value = { nodeId, timestamp: Date.now() }
+  }
+
+  function triggerTreeFocus(nodeId: string) {
+    treeFocusRequest.value = { nodeId, timestamp: Date.now() }
   }
 
   function updateViewSettings(settings: Partial<IViewSettings>) {
@@ -284,12 +289,12 @@ export const useProjectStore = defineStore('project', () => {
     isProjectLoaded, isBuildingEditorVisible, projectInfo, nodes, edges, buildings, loops, selectedNodeId, selectedNode, isDark, deviceCounts,
     viewSettings, updateViewSettings, structureVersion,
     currentViewMode, switchViewMode,
-    focusRequest, 
+    focusRequest, treeFocusRequest,
     getBuildingName, getFloorName, getDisplayId, 
     createProject, updateBuildings, toggleBuildingEditor, closeProject, loadProject, saveToDisk, loadFromDisk,
     upsertNode, clearProject, selectNode, toggleTheme, batchPlaceNodes, unplaceNode,
     deleteLoop, replaceLoop, updateLoop, purgeMissingNodes, confirmLoopChanges, deleteNode,
-    triggerFocus, addLoop,
+    triggerFocus, triggerTreeFocus, addLoop,
     saveViewState,
     isLayoutEditorVisible, toggleLayoutEditor // [新增]
   }
