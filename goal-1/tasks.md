@@ -59,8 +59,8 @@
 - [x] Task 15: Implement Simulation Panel
   - Completion note: Added `components/fire/SimulationPanel.vue` with Simulation Mode toggle, EVACUATE, BUZZER SILENCE, SYSTEM RESET, time scale `1x/5x/10x/30x`, periodic delay ticking, Skip Delay controls, system/sound/buzzer/output status, active input/fault restore controls, delayed/active output lists, Fire Brigade and Fault I/O status, and event log. Added `setSimulationTimeScale` to the fire project store. Verification: `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 32 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
-- [ ] Review Cycle E: Broad debug/review after Tasks 13-15
-  - Completion note:
+- [x] Review Cycle E: Broad debug/review after Tasks 13-15
+  - Completion note: Ran broad checks after Tasks 13-15. `npm run test` passed with 10 files and 67 tests. `npm run typecheck` passed node typecheck and still fails only in existing out-of-scope renderer files: `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Local review confirmed the new 3D viewer, property/group panels, and simulation panel read and write the shared fire store/simulation state without reintroducing Mesh topology concepts.
 
 - [ ] Task 16: Implement Drawing Import For Images And PDF
   - Completion note:
