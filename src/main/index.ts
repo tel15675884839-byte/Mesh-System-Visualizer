@@ -1,12 +1,17 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
+import { importCpdFile } from './cpdImport'
 
 let mainWindow: BrowserWindow | null = null
 
-function sendLogToRenderer(message: string, level: 'info'|'warn'|'error' = 'info', details?: any) {
+function sendLogToRenderer(
+  message: string,
+  level: 'info' | 'warn' | 'error' | 'success' = 'info',
+  details?: any
+) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('system-log', {
       message,
@@ -23,7 +28,7 @@ function sendLogToRenderer(message: string, level: 'info'|'warn'|'error' = 'info
 ipcMain.on('log-to-terminal', (_event, { level, message, details }) => {
   const timestamp = new Date().toLocaleTimeString()
   const detailStr = details ? JSON.stringify(details) : ''
-  
+
   switch (level) {
     case 'error':
       console.error(`\x1b[31m[RENDERER-ERR] ${timestamp} ${message}\x1b[0m`, detailStr)
@@ -40,22 +45,33 @@ ipcMain.on('log-to-terminal', (_event, { level, message, details }) => {
 })
 
 // 1. Save Project
-ipcMain.handle('save-project', async (_event, content: string) => {
-  if (!mainWindow) return { success: false, message: 'Window not found' }
-  
-  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'Save Project File',
-    defaultPath: 'my-fire-project.json',
-    filters: [{ name: 'JSON Project', extensions: ['json'] }]
-  })
+ipcMain.handle('save-project', async (_event, content: string, existingPath?: string) => {
+  console.log('[Main] Received save-project request. ExistingPath:', existingPath)
 
-  if (canceled || !filePath) return { success: false, message: 'Canceled' }
+  if (!mainWindow) return { success: false, message: 'Window not found' }
+
+  let targetPath = existingPath
+
+  // 只有当路径不存在（新文件）或者传参强制要求（虽然目前逻辑没传）时才弹窗
+  if (!targetPath || targetPath === '') {
+    console.log('[Main] No target path provided, showing save dialog...')
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Project File',
+      defaultPath: 'my-fire-project.json',
+      filters: [{ name: 'JSON Project', extensions: ['json'] }]
+    })
+
+    if (canceled || !filePath) return { success: false, message: 'Canceled' }
+    targetPath = filePath
+  }
 
   try {
-    await fs.writeFile(filePath, content, 'utf-8')
-    sendLogToRenderer(`Project saved to: ${filePath}`, 'success')
-    return { success: true, filePath }
+    await fs.writeFile(targetPath, content, 'utf-8')
+    console.log('[Main] File successfully saved to:', targetPath)
+    sendLogToRenderer(`Project saved to: ${targetPath}`, 'success')
+    return { success: true, filePath: targetPath }
   } catch (error: any) {
+    console.error('[Main] Save error:', error.message)
     sendLogToRenderer(`Save failed: ${error.message}`, 'error')
     return { success: false, message: error.message }
   }
@@ -64,7 +80,7 @@ ipcMain.handle('save-project', async (_event, content: string) => {
 // 2. Open Project
 ipcMain.handle('open-project', async () => {
   if (!mainWindow) return null
-  
+
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: 'Open Project File',
     filters: [{ name: 'JSON Project', extensions: ['json'] }],
@@ -84,12 +100,61 @@ ipcMain.handle('open-project', async () => {
   }
 })
 
+function getDefaultCpdExtractorDir(): string {
+  return join(app.getAppPath(), '..', 'CpdExtractorPortable')
+}
+
+function getCpdImportTempDir(): string {
+  return join(app.getPath('temp'), 'numens-fire-alarm-simulator', 'cpd-imports')
+}
+
+// 3. Select and import CPD through the main-process extractor boundary.
+ipcMain.handle('fire:select-and-import-cpd', async () => {
+  if (!mainWindow) {
+    throw new Error('Window not found')
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import CPD File',
+    filters: [{ name: 'CPD Configuration', extensions: ['cpd'] }],
+    properties: ['openFile']
+  })
+
+  if (canceled || filePaths.length === 0) {
+    return { canceled: true }
+  }
+
+  const sourcePath = filePaths[0]
+  const result = await importCpdFile({
+    cpdPath: sourcePath,
+    extractorDir: getDefaultCpdExtractorDir(),
+    tempDir: getCpdImportTempDir()
+  })
+
+  try {
+    const data = JSON.parse(result.content)
+    sendLogToRenderer(`CPD imported: ${sourcePath}`, 'success')
+
+    return {
+      canceled: false,
+      sourcePath,
+      sourceFileName: basename(sourcePath),
+      jsonPath: result.jsonPath,
+      content: result.content,
+      data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`CPD extractor produced JSON that could not be parsed: ${message}`)
+  }
+})
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
-    autoHideMenuBar: true, 
+    autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

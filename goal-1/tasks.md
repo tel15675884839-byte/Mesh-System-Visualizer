@@ -32,8 +32,8 @@
 - [x] Task 8: Build Fire Project Store
   - Completion note: Added `useFireProjectStore` with required fire project state/actions, CPD adapter loading, default project creation, grid placement, planning-operation undo/redo snapshots, simulation mode dispatch, and focused Pinia/Vitest store tests. Manager verification: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 4 tests; full `npm run test` passed with 9 files and 61 tests; `npm run typecheck` still fails from out-of-scope `src/main/index.ts` logger level errors. Spec compliance and code quality reviews approved.
 
-- [ ] Task 9: Implement Main Process CPD Import IPC
-  - Completion note:
+- [x] Task 9: Implement Main Process CPD Import IPC
+  - Completion note: Added injectable main-process `importCpdFile`, `.cpd` selection/import IPC handler, typed preload `window.fireApi.importCpd()`, and kept existing `window.api` behavior. Spec review required running the portable extractor with `cwd: extractorDir`; fixed in `cpdImport.ts`. Manager verification: `npm run typecheck:node` passed; `npm run typecheck:web` still fails from out-of-scope existing renderer errors in `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Spec compliance and code quality reviews approved.
 
 - [ ] Review Cycle C: Broad debug/review after Tasks 7-9
   - Completion note:
