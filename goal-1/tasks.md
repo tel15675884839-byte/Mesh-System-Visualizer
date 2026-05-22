@@ -29,8 +29,8 @@
 - [x] Task 7: Implement CIE Simulation Engine
   - Completion note: Added pure simulation delay helpers, cause/effect resolver, reducer engine, and tests for delays, Programmed/Preset outputs, disabled/inhibited handling, fault I/O, buzzer silence, system reset source persistence, and manual evacuate. Spec review requested fixes for persistent delay/skip state, disabled Programmed group outputs, and disabled FaultIOGroup outputs; all were fixed with regression tests. Manager verification: `npm run test -- src/renderer/src/domain/fire/simulation` passed with 3 files and 28 tests; `npm run typecheck` still fails from out-of-scope `src/main/index.ts` logger level errors. Spec compliance and code quality reviews approved.
 
-- [ ] Task 8: Build Fire Project Store
-  - Completion note:
+- [x] Task 8: Build Fire Project Store
+  - Completion note: Added `useFireProjectStore` with required fire project state/actions, CPD adapter loading, default project creation, grid placement, planning-operation undo/redo snapshots, simulation mode dispatch, and focused Pinia/Vitest store tests. Manager verification: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 4 tests; full `npm run test` passed with 9 files and 61 tests; `npm run typecheck` still fails from out-of-scope `src/main/index.ts` logger level errors. Spec compliance and code quality reviews approved.
 
 - [ ] Task 9: Implement Main Process CPD Import IPC
   - Completion note:
