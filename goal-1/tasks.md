@@ -65,8 +65,8 @@
 - [x] Task 16: Implement Drawing Import For Images And PDF
   - Completion note: Added `src/main/drawingImport.ts` for PNG/JPG/JPEG/SVG import by copying into app-managed map assets and PDF import by rendering/capturing the requested page to PNG through a hidden Electron window. Added `window.fireApi.importDrawing({ pdfPage? })`, main IPC `fire:select-and-import-drawing`, `FireAsset.runtimePath`, store `assignFloorMapAsset`, and a Planner2D import-drawing button that assigns the imported map to the current floor. Verification: `npm run typecheck:node` passed; `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 4 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Risk: the API supports PDF page selection via `pdfPage`, while the current Planner2D toolbar uses the default first page until a fuller map configuration dialog is wired.
 
-- [ ] Task 17: Implement CPD Re-import Diff
-  - Completion note:
+- [x] Task 17: Implement CPD Re-import Diff
+  - Completion note: Added `cpdDiff.ts` with `diffCpdImport` and `applyCpdDiff`, matching devices by `panelNumber + loopId + address`, reporting added/removed/changed devices, preserving matched placement, preserving Zone visual areas and manual Loop wiring, adding new devices as unplaced, and marking removed devices as missing. Added `ImportDiffDialog.vue` and store pending re-import actions. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/cpdDiff.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 7 tests; `npm run typecheck:web` still fails only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
 - [ ] Task 18: Implement I18n
   - Completion note:

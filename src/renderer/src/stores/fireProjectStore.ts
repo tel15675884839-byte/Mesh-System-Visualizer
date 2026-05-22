@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { CpdAdapterResult } from '../domain/fire/cpdAdapter'
+import { applyCpdDiff, diffCpdImport, type CpdDiffResult } from '../domain/fire/cpdDiff'
 import type {
   DeviceStatusFilter,
   FireAsset,
@@ -45,6 +46,8 @@ export const useFireProjectStore = defineStore('fireProject', () => {
   const simulationMode = ref(false)
   const simulationState = ref<SimulationState>(createInitialSimulationState())
   const activeTool = ref<FirePlannerTool>('select')
+  const pendingCpdImport = ref<CpdAdapterResult | null>(null)
+  const pendingCpdDiff = ref<CpdDiffResult | null>(null)
   const undoStack = ref<FireProjectDocument[]>([])
   const redoStack = ref<FireProjectDocument[]>([])
 
@@ -76,6 +79,32 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     selectedDeviceId.value = null
     resetHistory()
     resetSimulation()
+  }
+
+  function prepareCpdReimport(result: CpdAdapterResult): CpdDiffResult {
+    const diff = diffCpdImport(project.value, result)
+    pendingCpdImport.value = cloneValue(result)
+    pendingCpdDiff.value = cloneValue(diff)
+    return diff
+  }
+
+  function applyPendingCpdDiff(): void {
+    if (!pendingCpdImport.value || !pendingCpdDiff.value) {
+      return
+    }
+
+    project.value = normalizeProjectDocument(
+      applyCpdDiff(project.value, pendingCpdImport.value, pendingCpdDiff.value)
+    )
+    pendingCpdImport.value = null
+    pendingCpdDiff.value = null
+    resetHistory()
+    resetSimulation()
+  }
+
+  function cancelPendingCpdDiff(): void {
+    pendingCpdImport.value = null
+    pendingCpdDiff.value = null
   }
 
   function loadFireProject(nextProject: FireProject | FireProjectDocument): void {
@@ -365,9 +394,14 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     simulationMode,
     simulationState,
     activeTool,
+    pendingCpdImport,
+    pendingCpdDiff,
     canUndo,
     canRedo,
     loadFromCpdAdapterResult,
+    prepareCpdReimport,
+    applyPendingCpdDiff,
+    cancelPendingCpdDiff,
     loadFireProject,
     selectDevice,
     placeDevices,
