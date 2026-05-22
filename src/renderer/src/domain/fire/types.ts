@@ -261,9 +261,15 @@ export interface PanelSounderConfig {
 export type FireIssueSeverity = 'info' | 'warning' | 'error'
 
 export interface FireIssue {
+  id: string
   code: string
   severity: FireIssueSeverity
   message: string
+  relatedDeviceId?: string
+  relatedPanelId?: string
+  relatedLoopId?: string
+  relatedZoneId?: string
+  relatedGroupId?: string
   targetId?: string
   raw?: Record<string, unknown>
 }

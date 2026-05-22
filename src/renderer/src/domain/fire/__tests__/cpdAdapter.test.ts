@@ -270,6 +270,7 @@ describe('adaptCpdExport', () => {
     expect(result.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          id: 'sounder-mode-unknown:network-sample-1234-panel-1',
           code: 'sounder-mode-unknown',
           severity: 'warning',
           targetId: 'network-sample-1234-panel-1'
@@ -291,6 +292,7 @@ describe('adaptCpdExport', () => {
     expect(result.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          id: 'zone.alarm-mode-unresolved:network-sample-1234-panel-1-zone-3',
           code: 'zone.alarm-mode-unresolved',
           severity: 'warning',
           targetId: 'network-sample-1234-panel-1-zone-3'

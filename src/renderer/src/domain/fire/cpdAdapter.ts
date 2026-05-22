@@ -299,9 +299,11 @@ function mapSounderMode(
 
   if (value !== undefined) {
     issues.push({
+      id: `sounder-mode-unknown:${targetId}`,
       code: 'sounder-mode-unknown',
       severity: 'warning',
       message: `Unknown SounderMode "${String(value)}"; defaulted to Programmed.`,
+      relatedPanelId: targetId,
       targetId,
       raw
     })
@@ -325,9 +327,11 @@ function mapZoneAlarmMode(
   }
 
   issues.push({
+    id: `zone.alarm-mode-unresolved:${targetId}`,
     code: 'zone.alarm-mode-unresolved',
     severity: 'warning',
     message: 'Zone alarm mode could not be resolved; defaulted to single.',
+    relatedZoneId: targetId,
     targetId,
     raw
   })
