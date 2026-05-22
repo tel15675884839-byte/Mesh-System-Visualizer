@@ -1,6 +1,18 @@
-import type { FireDevice, FireNetwork, FirePanel, FireZone, NonAddressableSounderPoint } from '../types'
+import type {
+  FireDevice,
+  FireNetwork,
+  FirePanel,
+  FireZone,
+  NonAddressableSounderPoint
+} from '../types'
 import { createDelayedActivation } from './delays'
-import type { ActiveFault, ActiveInputAlarm, OutputActivation, SoundState, SystemState } from './types'
+import type {
+  ActiveFault,
+  ActiveInputAlarm,
+  OutputActivation,
+  SoundState,
+  SystemState
+} from './types'
 
 export interface CauseEffectInput {
   network: FireNetwork
@@ -85,10 +97,18 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
   }
 
   if (input.evacuateActive) {
-    const maxDelaySeconds = Math.max(...input.network.panels.map((panel) => panel.general.evacuateDelaySeconds), 0)
+    const maxDelaySeconds = Math.max(
+      ...input.network.panels.map((panel) => panel.general.evacuateDelaySeconds),
+      0
+    )
     upsertOutput(
       outputs,
-      createDelayedActivation(`evacuate:${input.network.id}`, ['manual-evacuate'], maxDelaySeconds, 'evacuate')
+      createDelayedActivation(
+        `evacuate:${input.network.id}`,
+        ['manual-evacuate'],
+        maxDelaySeconds,
+        'evacuate'
+      )
     )
   }
 
@@ -96,7 +116,13 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
   const hasFaultSound = (input.activeFaults?.length ?? 0) > 0
   const soundState: SoundState = hasFireSound ? 'fire' : hasFaultSound ? 'fault' : 'silent'
   const systemState: SystemState =
-    effectiveAlarms.length > 0 ? 'fireAlarm' : input.evacuateActive ? 'evacuate' : hasFaultSound ? 'fault' : 'normal'
+    effectiveAlarms.length > 0
+      ? 'fireAlarm'
+      : input.evacuateActive
+        ? 'evacuate'
+        : hasFaultSound
+          ? 'fault'
+          : 'normal'
 
   return Object.assign(Array.from(outputs.values()), {
     systemState,
@@ -116,7 +142,9 @@ function addProgrammedZoneOutputs(
   }
 
   const zoneAlarmCount = effectiveAlarms.filter(
-    (candidate) => candidate.device.panelId === alarm.device.panelId && candidate.device.zoneNumber === alarm.device.zoneNumber
+    (candidate) =>
+      candidate.device.panelId === alarm.device.panelId &&
+      candidate.device.zoneNumber === alarm.device.zoneNumber
   ).length
   const useStage2 = zone.alarmMode === 'double' && zoneAlarmCount >= 2
 
@@ -228,7 +256,12 @@ function addDeviceSounderOutput(
 
   upsertOutput(
     outputs,
-    createDelayedActivation(`device:${sounder.id}`, [alarm.device.id], alarm.panel.general.sounderDelaySeconds, 'general-sounder')
+    createDelayedActivation(
+      `device:${sounder.id}`,
+      [alarm.device.id],
+      alarm.panel.general.sounderDelaySeconds,
+      'general-sounder'
+    )
   )
 }
 
@@ -266,11 +299,20 @@ function addIOGroupOutput(
 
   upsertOutput(
     outputs,
-    createDelayedActivation(`io-group:${alarm.panel.id}:${groupId}`, [alarm.device.id], alarm.panel.general.inputOutputDelaySeconds, 'io')
+    createDelayedActivation(
+      `io-group:${alarm.panel.id}:${groupId}`,
+      [alarm.device.id],
+      alarm.panel.general.inputOutputDelaySeconds,
+      'io'
+    )
   )
 }
 
-function hasOnlyDisabledSounderMembers(panel: FirePanel, devices: FireDevice[], groupId: number): boolean {
+function hasOnlyDisabledSounderMembers(
+  panel: FirePanel,
+  devices: FireDevice[],
+  groupId: number
+): boolean {
   const group = panel.sounderGroups.find((candidate) => candidate.groupId === groupId)
   if (!group || group.addressableMembers.length === 0) {
     return false
@@ -291,7 +333,11 @@ function hasOnlyDisabledSounderMembers(panel: FirePanel, devices: FireDevice[], 
   return memberDevices.length > 0 && memberDevices.every((device) => device.disabled)
 }
 
-function hasOnlyDisabledIOMembers(panel: FirePanel, devices: FireDevice[], groupId: number): boolean {
+function hasOnlyDisabledIOMembers(
+  panel: FirePanel,
+  devices: FireDevice[],
+  groupId: number
+): boolean {
   const group = panel.ioGroups.find((candidate) => candidate.groupId === groupId)
   if (!group || group.members.length === 0) {
     return false

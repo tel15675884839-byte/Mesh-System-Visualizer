@@ -4,7 +4,12 @@ import { createDelayedActivation, skipOutputDelay, tickDelayedOutputs } from '..
 
 describe('simulation delays', () => {
   it('creates a general sounder delay', () => {
-    const output = createDelayedActivation('sounder-group:panel-1:1', ['input-1'], 90, 'general-sounder')
+    const output = createDelayedActivation(
+      'sounder-group:panel-1:1',
+      ['input-1'],
+      90,
+      'general-sounder'
+    )
 
     expect(output).toMatchObject({
       outputId: 'sounder-group:panel-1:1',
@@ -35,7 +40,12 @@ describe('simulation delays', () => {
   })
 
   it('creates an Evacuate delay', () => {
-    const output = createDelayedActivation('evacuate:network-1', ['manual-evacuate'], 30, 'evacuate')
+    const output = createDelayedActivation(
+      'evacuate:network-1',
+      ['manual-evacuate'],
+      30,
+      'evacuate'
+    )
 
     expect(output).toMatchObject({
       state: 'delayActive',

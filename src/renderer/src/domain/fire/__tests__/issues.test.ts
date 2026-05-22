@@ -127,7 +127,16 @@ function makeProject(overrides: Partial<IssueFixtureProject> = {}): IssueFixture
     createdAt: 1,
     updatedAt: 1,
     language: 'en',
-    networks: [{ id: 'network-1', name: 'Network 1', sourceFileName: 'sample.cpd', sourceImportedAt: 1, sounderMode: 'Programmed', panels: [basePanel] }],
+    networks: [
+      {
+        id: 'network-1',
+        name: 'Network 1',
+        sourceFileName: 'sample.cpd',
+        sourceImportedAt: 1,
+        sounderMode: 'Programmed',
+        panels: [basePanel]
+      }
+    ],
     buildings: [],
     assets: [],
     viewSettings: {
@@ -183,10 +192,17 @@ describe('collectFireProjectIssues', () => {
 
   it('reports placed devices whose CPD source is missing', () => {
     const project = makeProject({
-      devices: [makeDevice({ id: 'removed-device', placement: { status: 'missing', buildingId: 'building-1', floorId: 'floor-1' } })]
+      devices: [
+        makeDevice({
+          id: 'removed-device',
+          placement: { status: 'missing', buildingId: 'building-1', floorId: 'floor-1' }
+        })
+      ]
     })
 
-    expect(issueByCode(collectFireProjectIssues(project), 'device.source-missing-placed')).toMatchObject({
+    expect(
+      issueByCode(collectFireProjectIssues(project), 'device.source-missing-placed')
+    ).toMatchObject({
       severity: 'warning',
       relatedDeviceId: 'removed-device',
       relatedPanelId: 'panel-1'
@@ -225,12 +241,22 @@ describe('collectFireProjectIssues', () => {
     const project = makeProject({
       networks: [{ ...makeProject().networks[0], panels: [panelWithManualOrder] }],
       devices: [
-        makeDevice({ id: 'placed-a', placement: { status: 'placed', buildingId: 'building-1', floorId: 'floor-1', position: { x: 1, y: 2, z: 0 } } }),
+        makeDevice({
+          id: 'placed-a',
+          placement: {
+            status: 'placed',
+            buildingId: 'building-1',
+            floorId: 'floor-1',
+            position: { x: 1, y: 2, z: 0 }
+          }
+        }),
         makeDevice({ id: 'unplaced-b', placement: { status: 'unplaced' } })
       ]
     })
 
-    expect(issueByCode(collectFireProjectIssues(project), 'loop.manual-order-unplaced-device')).toMatchObject({
+    expect(
+      issueByCode(collectFireProjectIssues(project), 'loop.manual-order-unplaced-device')
+    ).toMatchObject({
       severity: 'warning',
       relatedLoopId: 'loop-1',
       relatedPanelId: 'panel-1',
@@ -252,7 +278,9 @@ describe('collectFireProjectIssues', () => {
       nonAddressableSounderPoints: []
     })
 
-    expect(issueByCode(collectFireProjectIssues(project), 'sounder.non-addressable-no-point')).toMatchObject({
+    expect(
+      issueByCode(collectFireProjectIssues(project), 'sounder.non-addressable-no-point')
+    ).toMatchObject({
       severity: 'info',
       relatedPanelId: 'panel-1',
       relatedGroupId: 'panel-1-sounder-group-1'
@@ -311,11 +339,20 @@ describe('collectFireProjectIssues', () => {
           cieId: 1,
           channel: 'nonAddressable1',
           label: 'CIE 1 NAC 1',
-          placement: { status: 'placed', buildingId: 'building-1', floorId: 'floor-1', position: { x: 1, y: 2, z: 0 } }
+          placement: {
+            status: 'placed',
+            buildingId: 'building-1',
+            floorId: 'floor-1',
+            position: { x: 1, y: 2, z: 0 }
+          }
         }
       ]
     })
 
-    expect(collectFireProjectIssues(project).some((issue) => issue.code === 'sounder.non-addressable-no-point')).toBe(false)
+    expect(
+      collectFireProjectIssues(project).some(
+        (issue) => issue.code === 'sounder.non-addressable-no-point'
+      )
+    ).toBe(false)
   })
 })

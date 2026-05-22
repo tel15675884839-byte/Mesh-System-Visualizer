@@ -9,11 +9,9 @@ import { readFireProjectPackage, writeFireProjectPackage } from './fireProjectPa
 
 let mainWindow: BrowserWindow | null = null
 
-function sendLogToRenderer(
-  message: string,
-  level: 'info' | 'warn' | 'error' | 'success' = 'info',
-  details?: any
-) {
+type MainLogLevel = 'info' | 'warn' | 'error' | 'success'
+
+function sendLogToRenderer(message: string, level: MainLogLevel = 'info', details?: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('system-log', {
       message,
@@ -72,10 +70,11 @@ ipcMain.handle('save-project', async (_event, content: string, existingPath?: st
     console.log('[Main] File successfully saved to:', targetPath)
     sendLogToRenderer(`Project saved to: ${targetPath}`, 'success')
     return { success: true, filePath: targetPath }
-  } catch (error: any) {
-    console.error('[Main] Save error:', error.message)
-    sendLogToRenderer(`Save failed: ${error.message}`, 'error')
-    return { success: false, message: error.message }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Main] Save error:', message)
+    sendLogToRenderer(`Save failed: ${message}`, 'error')
+    return { success: false, message }
   }
 })
 
@@ -96,8 +95,9 @@ ipcMain.handle('open-project', async () => {
     const content = await fs.readFile(filePath, 'utf-8')
     sendLogToRenderer(`Project file loaded: ${filePath}`, 'success')
     return { content, filePath }
-  } catch (error: any) {
-    sendLogToRenderer(`Load failed: ${error.message}`, 'error')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    sendLogToRenderer(`Load failed: ${message}`, 'error')
     return null
   }
 })

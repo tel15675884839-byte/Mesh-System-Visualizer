@@ -49,7 +49,12 @@ export function reduceSimulation(
     return {
       ...state,
       outputs: skipOutputDelay(state.outputs, action.outputId),
-      eventLog: appendEvent(state.eventLog, action.at, 'skip-delay', `Skipped delay for ${action.outputId}`)
+      eventLog: appendEvent(
+        state.eventLog,
+        action.at,
+        'skip-delay',
+        `Skipped delay for ${action.outputId}`
+      )
     }
   }
 
@@ -63,7 +68,8 @@ export function reduceSimulation(
     evacuateActive: nextSources.manualEvacuateActive
   })
 
-  const buzzerSilenced = action.type === 'buzzer-silence' ? true : shouldKeepBuzzerSilenced(state, action)
+  const buzzerSilenced =
+    action.type === 'buzzer-silence' ? true : shouldKeepBuzzerSilenced(state, action)
   const soundState = buzzerSilenced ? 'silent' : resolved.soundState
 
   return {
@@ -73,11 +79,20 @@ export function reduceSimulation(
     soundState,
     buzzerSilenced,
     outputs: mergeContinuingOutputState(state.outputs, [...resolved]),
-    eventLog: appendEvent(state.eventLog, action.at, action.type, eventMessage(action), actionDeviceId(action))
+    eventLog: appendEvent(
+      state.eventLog,
+      action.at,
+      action.type,
+      eventMessage(action),
+      actionDeviceId(action)
+    )
   }
 }
 
-function mergeContinuingOutputState(previousOutputs: SimulationState['outputs'], nextOutputs: SimulationState['outputs']): SimulationState['outputs'] {
+function mergeContinuingOutputState(
+  previousOutputs: SimulationState['outputs'],
+  nextOutputs: SimulationState['outputs']
+): SimulationState['outputs'] {
   const previousById = new Map(previousOutputs.map((output) => [output.outputId, output]))
 
   return nextOutputs.map((next) => {
@@ -98,7 +113,10 @@ function mergeContinuingOutputState(previousOutputs: SimulationState['outputs'],
     if (previous.state === 'delayActive' && next.state === 'delayActive') {
       return {
         ...next,
-        remainingDelaySeconds: Math.min(previous.remainingDelaySeconds ?? 0, next.remainingDelaySeconds ?? 0)
+        remainingDelaySeconds: Math.min(
+          previous.remainingDelaySeconds ?? 0,
+          next.remainingDelaySeconds ?? 0
+        )
       }
     }
 
@@ -108,8 +126,15 @@ function mergeContinuingOutputState(previousOutputs: SimulationState['outputs'],
 
 function reduceSources(
   state: SimulationState,
-  action: Exclude<SimulationAction, { type: 'tick'; at: number; elapsedSeconds: number } | { type: 'skip-delay'; outputId: string; at: number }>
-): Pick<SimulationState, 'activeInputAlarms' | 'activeFaults' | 'manualEvacuateActive' | 'evacuatedAt'> {
+  action: Exclude<
+    SimulationAction,
+    | { type: 'tick'; at: number; elapsedSeconds: number }
+    | { type: 'skip-delay'; outputId: string; at: number }
+  >
+): Pick<
+  SimulationState,
+  'activeInputAlarms' | 'activeFaults' | 'manualEvacuateActive' | 'evacuatedAt'
+> {
   switch (action.type) {
     case 'activate-input':
       return {
@@ -120,7 +145,9 @@ function reduceSources(
       }
     case 'restore-input':
       return {
-        activeInputAlarms: state.activeInputAlarms.filter((alarm) => alarm.deviceId !== action.deviceId),
+        activeInputAlarms: state.activeInputAlarms.filter(
+          (alarm) => alarm.deviceId !== action.deviceId
+        ),
         activeFaults: state.activeFaults,
         manualEvacuateActive: state.manualEvacuateActive,
         evacuatedAt: state.evacuatedAt
@@ -163,7 +190,11 @@ function reduceSources(
   }
 }
 
-function upsertSource<T extends ActiveInputAlarm | ActiveFault>(sources: T[], deviceId: string, at: number): T[] {
+function upsertSource<T extends ActiveInputAlarm | ActiveFault>(
+  sources: T[],
+  deviceId: string,
+  at: number
+): T[] {
   if (sources.some((source) => source.deviceId === deviceId)) {
     return sources
   }
@@ -176,7 +207,11 @@ function shouldKeepBuzzerSilenced(state: SimulationState, action: SimulationActi
     return false
   }
 
-  return action.type !== 'activate-input' && action.type !== 'trigger-fault' && action.type !== 'evacuate'
+  return (
+    action.type !== 'activate-input' &&
+    action.type !== 'trigger-fault' &&
+    action.type !== 'evacuate'
+  )
 }
 
 function appendEvent(

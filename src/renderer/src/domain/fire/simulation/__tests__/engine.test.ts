@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FireDevice, FireNetwork, NonAddressableSounderPoint } from '../../types'
-import { createInitialSimulationState, reduceSimulation, type SimulationEngineInput } from '../engine'
+import {
+  createInitialSimulationState,
+  reduceSimulation,
+  type SimulationEngineInput
+} from '../engine'
 
-function network(generalOverrides: Partial<FireNetwork['panels'][number]['general']> = {}): FireNetwork {
+function network(
+  generalOverrides: Partial<FireNetwork['panels'][number]['general']> = {}
+): FireNetwork {
   return {
     id: 'network-1',
     name: 'Network 1',
@@ -171,11 +177,15 @@ describe('simulation engine reducer', () => {
       { type: 'buzzer-silence', at: 20 }
     )
 
-    const newAlarm = reduceSimulation(silenced, engineInput([device({ id: 'input-1' }), device({ id: 'input-2' })]), {
-      type: 'activate-input',
-      deviceId: 'input-2',
-      at: 30
-    })
+    const newAlarm = reduceSimulation(
+      silenced,
+      engineInput([device({ id: 'input-1' }), device({ id: 'input-2' })]),
+      {
+        type: 'activate-input',
+        deviceId: 'input-2',
+        at: 30
+      }
+    )
 
     expect(newAlarm.soundState).toBe('fire')
     expect(newAlarm.buzzerSilenced).toBe(false)

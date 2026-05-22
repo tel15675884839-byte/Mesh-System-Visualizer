@@ -33,7 +33,11 @@ describe('fire project store', () => {
     const project = makeProject()
     store.loadFireProject(project)
 
-    store.placeDevices(['device-1', 'device-2', 'device-3'], 'building-1', 'floor-1', { x: 10, y: 20, z: 0 })
+    store.placeDevices(['device-1', 'device-2', 'device-3'], 'building-1', 'floor-1', {
+      x: 10,
+      y: 20,
+      z: 0
+    })
 
     expect(store.project.devices.map((device) => device.placement.position)).toEqual([
       { x: 10, y: 20, z: 0 },
@@ -43,7 +47,9 @@ describe('fire project store', () => {
     expect(store.canUndo).toBe(true)
 
     store.undo()
-    expect(store.project.devices.every((device) => device.placement.status === 'unplaced')).toBe(true)
+    expect(store.project.devices.every((device) => device.placement.status === 'unplaced')).toBe(
+      true
+    )
     expect(store.canRedo).toBe(true)
 
     store.redo()
@@ -72,7 +78,10 @@ describe('fire project store', () => {
     store.setManualLoopOrder('loop-1', ['device-2', 'device-1'])
 
     expect(store.project.networks[0].panels[0].zones[0].visualAreas).toHaveLength(1)
-    expect(store.project.networks[0].panels[0].loops[0].manualDeviceOrder).toEqual(['device-2', 'device-1'])
+    expect(store.project.networks[0].panels[0].loops[0].manualDeviceOrder).toEqual([
+      'device-2',
+      'device-1'
+    ])
 
     store.undo()
     expect(store.project.networks[0].panels[0].loops[0].manualDeviceOrder).toEqual([])
@@ -88,7 +97,9 @@ describe('fire project store', () => {
 
     store.dispatchSimulationAction({ type: 'activate-input', deviceId: 'device-1', at: 100 })
 
-    expect(store.simulationState.activeInputAlarms).toEqual([{ deviceId: 'device-1', activatedAt: 100 }])
+    expect(store.simulationState.activeInputAlarms).toEqual([
+      { deviceId: 'device-1', activatedAt: 100 }
+    ])
     expect(store.simulationMode).toBe(true)
   })
 })

@@ -1,6 +1,11 @@
 import type { OutputActivation } from './types'
 
-export type DelayReason = 'general-sounder' | 'io' | 'fire-brigade' | 'evacuate' | 'zone-delayed-sounders'
+export type DelayReason =
+  | 'general-sounder'
+  | 'io'
+  | 'fire-brigade'
+  | 'evacuate'
+  | 'zone-delayed-sounders'
 
 export function createDelayedActivation(
   outputId: string,

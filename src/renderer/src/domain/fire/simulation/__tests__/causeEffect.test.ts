@@ -5,7 +5,11 @@ import { resolveCauseAndEffect } from '../causeEffect'
 import type { ActiveInputAlarm, OutputActivation } from '../types'
 
 function network(
-  overrides: { sounderMode?: FireNetwork['sounderMode']; withGroupMembers?: boolean; faultIOGroup?: number } = {}
+  overrides: {
+    sounderMode?: FireNetwork['sounderMode']
+    withGroupMembers?: boolean
+    faultIOGroup?: number
+  } = {}
 ): FireNetwork {
   const sounderMode = overrides.sounderMode ?? 'Programmed'
 
@@ -133,7 +137,11 @@ function device(overrides: Partial<FireDevice>): FireDevice {
   }
 }
 
-function outputsFor(activeInputAlarms: ActiveInputAlarm[], devices: FireDevice[], net = network()): OutputActivation[] {
+function outputsFor(
+  activeInputAlarms: ActiveInputAlarm[],
+  devices: FireDevice[],
+  net = network()
+): OutputActivation[] {
   return resolveCauseAndEffect({
     network: net,
     devices,
@@ -143,7 +151,10 @@ function outputsFor(activeInputAlarms: ActiveInputAlarm[], devices: FireDevice[]
 }
 
 function outputIds(outputs: OutputActivation[]): string[] {
-  return outputs.filter((output) => output.state === 'active').map((output) => output.outputId).sort()
+  return outputs
+    .filter((output) => output.state === 'active')
+    .map((output) => output.outputId)
+    .sort()
 }
 
 describe('cause and effect resolution', () => {
@@ -213,7 +224,13 @@ describe('cause and effect resolution', () => {
     const input = device({ id: 'input-1', zoneNumber: 1 })
 
     expect(
-      outputIds(outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input], network({ sounderMode: 'Preset' })))
+      outputIds(
+        outputsFor(
+          [{ deviceId: 'input-1', activatedAt: 0 }],
+          [input],
+          network({ sounderMode: 'Preset' })
+        )
+      )
     ).toContain('io-group:panel-1:3')
   })
 
@@ -275,7 +292,13 @@ describe('cause and effect resolution', () => {
       disabled: true
     })
 
-    expect(outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input, disabledSounder], network({ withGroupMembers: true }))).toContainEqual(
+    expect(
+      outputsFor(
+        [{ deviceId: 'input-1', activatedAt: 0 }],
+        [input, disabledSounder],
+        network({ withGroupMembers: true })
+      )
+    ).toContainEqual(
       expect.objectContaining({
         outputId: 'sounder-group:panel-1:1',
         state: 'disabled',
@@ -297,7 +320,13 @@ describe('cause and effect resolution', () => {
       disabled: true
     })
 
-    expect(outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input, disabledIO], network({ withGroupMembers: true }))).toContainEqual(
+    expect(
+      outputsFor(
+        [{ deviceId: 'input-1', activatedAt: 0 }],
+        [input, disabledIO],
+        network({ withGroupMembers: true })
+      )
+    ).toContainEqual(
       expect.objectContaining({
         outputId: 'io-group:panel-1:3',
         state: 'disabled',

@@ -2,25 +2,34 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { fireApi } from './fireApi'
 
-// 自定义 API 定义
-const api = {
-  // 监听后端日志
-  onSystemLog: (callback: (log: any) => void) =>
-    ipcRenderer.on('system-log', (_event, log) => callback(log)),
-
-  // 发送日志到终端 (新增)
-  logToTerminal: (level: string, message: string, details?: any) =>
-    ipcRenderer.send('log-to-terminal', { level, message, details }),
-
-  // 保存项目
-  saveProject: (content: string, existingPath?: string) =>
-    ipcRenderer.invoke('save-project', content, existingPath),
-
-  // 打开项目
-  openProject: () => ipcRenderer.invoke('open-project')
+interface SystemLogEntry {
+  message: string
+  level: string
+  source?: string
+  details?: unknown
 }
 
-// 暴露给渲染进程
+type SystemLogCallback = (log: SystemLogEntry) => void
+
+interface LegacyApi {
+  onSystemLog: (callback: SystemLogCallback) => void
+  logToTerminal: (level: string, message: string, details?: unknown) => void
+  saveProject: (content: string, existingPath?: string) => Promise<unknown>
+  openProject: () => Promise<unknown>
+}
+
+const api = {
+  onSystemLog: (callback) =>
+    ipcRenderer.on('system-log', (_event, log) => callback(log as SystemLogEntry)),
+
+  logToTerminal: (level, message, details) =>
+    ipcRenderer.send('log-to-terminal', { level, message, details }),
+
+  saveProject: (content, existingPath) => ipcRenderer.invoke('save-project', content, existingPath),
+
+  openProject: () => ipcRenderer.invoke('open-project')
+} satisfies LegacyApi
+
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -30,10 +39,13 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore
-  window.electron = electronAPI
-  // @ts-ignore
-  window.api = api
-  // @ts-ignore
-  window.fireApi = fireApi
+  const unsafeWindow = window as typeof window & {
+    electron: typeof electronAPI
+    api: typeof api
+    fireApi: typeof fireApi
+  }
+
+  unsafeWindow.electron = electronAPI
+  unsafeWindow.api = api
+  unsafeWindow.fireApi = fireApi
 }

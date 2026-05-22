@@ -78,7 +78,11 @@ export function pointInPolygon(point: Vector2, polygon: Vector2[]): boolean {
 
   let inside = false
 
-  for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+  for (
+    let current = 0, previous = polygon.length - 1;
+    current < polygon.length;
+    previous = current++
+  ) {
     const currentPoint = polygon[current]
     const previousPoint = polygon[previous]
 

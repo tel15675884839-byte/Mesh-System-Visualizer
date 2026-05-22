@@ -264,7 +264,11 @@ function adaptSounderGroup(
   }
 }
 
-function adaptIOGroup(groupInput: Record<string, unknown>, networkId: string, panelId: string): IOGroup {
+function adaptIOGroup(
+  groupInput: Record<string, unknown>,
+  networkId: string,
+  panelId: string
+): IOGroup {
   const groupId = numberValue(groupInput.groupId)
 
   return {

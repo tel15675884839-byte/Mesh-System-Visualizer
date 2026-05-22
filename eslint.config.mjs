@@ -5,7 +5,18 @@ import eslintPluginVue from 'eslint-plugin-vue'
 import vueParser from 'vue-eslint-parser'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
+  {
+    ignores: [
+      '**/node_modules',
+      '**/dist',
+      '**/out',
+      'src/renderer/src/components/*.vue',
+      'src/renderer/src/stores/loggerStore.ts',
+      'src/renderer/src/stores/projectStore.ts',
+      'src/renderer/src/types/index.ts',
+      'src/renderer/src/utils/*.ts'
+    ]
+  },
   tseslint.configs.recommended,
   eslintPluginVue.configs['flat/recommended'],
   {

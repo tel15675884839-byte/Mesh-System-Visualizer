@@ -170,7 +170,9 @@ export async function readFireProjectPackage(path: string): Promise<ReadFireProj
   await mkdir(extractedAssetRoot, { recursive: true })
 
   for (const assetDir of ASSET_DIRS) {
-    await mkdir(join(extractedAssetRoot, ...assetDir.replace(/\/$/, '').split('/')), { recursive: true })
+    await mkdir(join(extractedAssetRoot, ...assetDir.replace(/\/$/, '').split('/')), {
+      recursive: true
+    })
   }
 
   for (const entry of zip.getEntries()) {
@@ -184,7 +186,9 @@ export async function readFireProjectPackage(path: string): Promise<ReadFireProj
     }
 
     if (isCpdPath(entryName)) {
-      throw new Error(`Invalid .fireproj package: original CPD file entry is not allowed (${entryName}).`)
+      throw new Error(
+        `Invalid .fireproj package: original CPD file entry is not allowed (${entryName}).`
+      )
     }
 
     const outputPath = assertExtractedPath(extractedAssetRoot, entryName)
