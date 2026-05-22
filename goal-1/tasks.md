@@ -23,8 +23,8 @@
 - [x] Task 6: Implement Zone Geometry Helpers
   - Completion note: Added `zoneGeometry.ts` and tests for rectangle creation, polygon creation, bounding highlight points for placed devices, and point-in-polygon detection. Manager verification: `npm run test -- src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts` passed with 4 tests; `npm run typecheck` still fails from out-of-scope `src/main/index.ts` logger level errors. Spec compliance and code quality reviews approved.
 
-- [ ] Review Cycle B: Broad debug/review after Tasks 4-6
-  - Completion note:
+- [x] Review Cycle B: Broad debug/review after Tasks 4-6
+  - Completion note: Ran broad checks after Tasks 4-6. `npm run test` passed with 5 files and 29 tests. `npm run typecheck` still fails at existing out-of-scope `src/main/index.ts` logger level errors. No new fire-domain regression was found.
 
 - [ ] Task 7: Implement CIE Simulation Engine
   - Completion note:
