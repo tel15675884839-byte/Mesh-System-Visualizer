@@ -41,8 +41,8 @@
 - [x] Task 10: Implement `.fireproj` Package Import And Export
   - Completion note: Added `adm-zip` package support, implemented main-process `.fireproj` package writer/reader with required `metadata.json`, `project.json`, `assets/maps/`, `assets/icons/`, and `assets/audio/` entries, rejected original `.cpd` paths, guarded package extraction paths, and exposed `window.fireApi.saveFireProject(projectPayload)` / `window.fireApi.openFireProject()`. Verification: `npm run typecheck:node` passed; `npm run test` passed with 9 files and 61 tests; `npm run typecheck` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Spec compliance review approved; manager code quality review found no blocking Task 10 issues.
 
-- [ ] Task 11: Implement Device Tree UI
-  - Completion note:
+- [x] Task 11: Implement Device Tree UI
+  - Completion note: Added pure `buildFireDeviceTree` helper and tests for Network > Panel > Group > Device hierarchy, Loop/Zone/Type/Sounder Group/I/O Group grouping, status filters, issue filters, and CPD-field search. Added `components/fire/DeviceTree.vue` wired to the fire project store with group/status segmented controls, search, left-click selection, double-click focus emit, drag payloads, and right-click context-menu emit. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 6 tests; `npm run typecheck:web` failed only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts` after fixing the one new icon import error.
 
 - [ ] Task 12: Implement 2D Planner UI
   - Completion note:
