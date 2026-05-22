@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
 import { importCpdFile } from './cpdImport'
+import { readFireProjectPackage, writeFireProjectPackage } from './fireProjectPackage'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -146,6 +147,60 @@ ipcMain.handle('fire:select-and-import-cpd', async () => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(`CPD extractor produced JSON that could not be parsed: ${message}`)
+  }
+})
+
+// 4. Save a complete .fireproj package.
+ipcMain.handle('fire:save-project-package', async (_event, payload) => {
+  if (!mainWindow) {
+    throw new Error('Window not found')
+  }
+
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Fire Project',
+    defaultPath: payload?.suggestedFileName || 'my-fire-project.fireproj',
+    filters: [{ name: 'Fire Project', extensions: ['fireproj'] }]
+  })
+
+  if (canceled || !filePath) {
+    return { canceled: true }
+  }
+
+  await writeFireProjectPackage({
+    targetPath: filePath,
+    metadata: payload?.metadata,
+    project: payload?.project,
+    assetPaths: payload?.assetPaths ?? []
+  })
+
+  sendLogToRenderer(`Fire project saved: ${filePath}`, 'success')
+  return { canceled: false, filePath }
+})
+
+// 5. Open a complete .fireproj package.
+ipcMain.handle('fire:open-project-package', async () => {
+  if (!mainWindow) {
+    throw new Error('Window not found')
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Open Fire Project',
+    filters: [{ name: 'Fire Project', extensions: ['fireproj'] }],
+    properties: ['openFile']
+  })
+
+  if (canceled || filePaths.length === 0) {
+    return { canceled: true }
+  }
+
+  const filePath = filePaths[0]
+  const result = await readFireProjectPackage(filePath)
+
+  sendLogToRenderer(`Fire project opened: ${filePath}`, 'success')
+  return {
+    canceled: false,
+    filePath,
+    ...result
   }
 })
 

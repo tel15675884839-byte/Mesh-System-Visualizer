@@ -38,8 +38,8 @@
 - [x] Review Cycle C: Broad debug/review after Tasks 7-9
   - Completion note: Ran broad checks after Tasks 7-9. `npm run test` passed with 9 files and 61 tests. `npm run typecheck` now passes node typecheck and fails only in existing out-of-scope renderer files: `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. No new fire-domain regression was found.
 
-- [ ] Task 10: Implement `.fireproj` Package Import And Export
-  - Completion note:
+- [x] Task 10: Implement `.fireproj` Package Import And Export
+  - Completion note: Added `adm-zip` package support, implemented main-process `.fireproj` package writer/reader with required `metadata.json`, `project.json`, `assets/maps/`, `assets/icons/`, and `assets/audio/` entries, rejected original `.cpd` paths, guarded package extraction paths, and exposed `window.fireApi.saveFireProject(projectPayload)` / `window.fireApi.openFireProject()`. Verification: `npm run typecheck:node` passed; `npm run test` passed with 9 files and 61 tests; `npm run typecheck` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Spec compliance review approved; manager code quality review found no blocking Task 10 issues.
 
 - [ ] Task 11: Implement Device Tree UI
   - Completion note:
