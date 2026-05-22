@@ -257,3 +257,13 @@ export interface SimulationSettings {
 export interface PanelSounderConfig {
   raw: Record<string, unknown>
 }
+
+export type FireIssueSeverity = 'info' | 'warning' | 'error'
+
+export interface FireIssue {
+  code: string
+  severity: FireIssueSeverity
+  message: string
+  targetId?: string
+  raw?: Record<string, unknown>
+}
