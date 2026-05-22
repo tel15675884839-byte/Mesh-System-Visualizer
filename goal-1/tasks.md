@@ -53,8 +53,8 @@
 - [x] Task 13: Implement 3D Viewer UI
   - Completion note: Added `components/fire/Viewer3D.vue` as a fire-specific Three.js viewer with full-surface canvas rendering, building/floor planes, optional map textures, placed device icon sprites, solid effective Loop lines across floors/buildings, translucent Zone overlays, selected-device highlighting, and simulation state coloring for alarm/fault/output/disabled devices. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts` passed with 5 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Manual 3D browser/canvas verification is deferred until Task 19 wires the new fire shell into the running app.
 
-- [ ] Task 14: Implement Property Panel And Group Inspector
-  - Completion note:
+- [x] Task 14: Implement Property Panel And Group Inspector
+  - Completion note: Added `components/fire/PropertyPanel.vue` for selected-device CPD properties, placement status, Panel/Loop/Address/Type/Location/Zone/group fields, disabled/inhibit/delay flags, reporting/sensitivity fields, and raw CPD details collapsed by default. Added `components/fire/GroupInspector.vue` for Sounder/I/O group ID, description, members, Panel/Loop/Address/Zone/location, non-addressable sounder channels, triggering Zones, current simulation output state, delay, and inhibit/disabled reason. Verification: `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 34 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
 - [ ] Task 15: Implement Simulation Panel
   - Completion note:
