@@ -28,6 +28,8 @@ export interface SimulationState {
   activeFaults: ActiveFault[]
   outputs: OutputActivation[]
   eventLog: SimulationEvent[]
+  manualEvacuateActive?: boolean
+  evacuatedAt?: number
 }
 
 export interface SimulationEvent {
