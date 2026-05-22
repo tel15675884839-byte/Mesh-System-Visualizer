@@ -1,5 +1,21 @@
 export default {
   fire: {
+    app: {
+      name: 'Numens Fire Alarm Simulator',
+      newFromCpd: 'New from CPD',
+      openProject: 'Open Fire Project',
+      saveProject: 'Save Fire Project',
+      reimportCpd: 'Re-import CPD',
+      view2d: '2D',
+      view3d: '3D',
+      properties: 'Properties',
+      group: 'Group',
+      simulation: 'Simulation',
+      noProject: 'Start from a CPD file or open a fire project.',
+      importFailed: 'Import failed',
+      saveFailed: 'Save failed',
+      openFailed: 'Open failed'
+    },
     common: {
       apply: 'Apply',
       cancel: 'Cancel',

@@ -1,5 +1,21 @@
 export default {
   fire: {
+    app: {
+      name: 'Numens 消防报警模拟器',
+      newFromCpd: '从 CPD 新建',
+      openProject: '打开 Fire 项目',
+      saveProject: '保存 Fire 项目',
+      reimportCpd: '重新导入 CPD',
+      view2d: '2D',
+      view3d: '3D',
+      properties: '属性',
+      group: '组',
+      simulation: '模拟',
+      noProject: '从 CPD 文件开始，或打开 Fire 项目。',
+      importFailed: '导入失败',
+      saveFailed: '保存失败',
+      openFailed: '打开失败'
+    },
     common: {
       apply: '应用',
       cancel: '取消',

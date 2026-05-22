@@ -74,8 +74,8 @@
 - [x] Review Cycle F: Broad debug/review after Tasks 16-18
   - Completion note: Ran broad checks after Tasks 16-18. `npm run test` passed with 11 files and 70 tests. `npm run typecheck` passed node typecheck and still fails only in existing out-of-scope renderer files: `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Local review confirmed drawing import, CPD re-import diff, and i18n changes remain scoped to fire-domain/main/preload/new fire UI code.
 
-- [ ] Task 19: Wire App Shell And Retire Mesh UI
-  - Completion note:
+- [x] Task 19: Wire App Shell And Retire Mesh UI
+  - Completion note: Replaced `App.vue` with the new Numens Fire Alarm Simulator shell: New from CPD, Open `.fireproj`, Save `.fireproj`, Re-import CPD / Compare & Sync, 2D/3D view switch, left Fire Device Tree, central Planner2D/Viewer3D, right Properties/Group/Simulation tabs, and Import Diff dialog. Removed old Mesh Studio app shell from the active user-facing workflow. Fixed old residual typecheck blockers in `ThreeDView.vue`, `types/index.ts`, and `projectStore.ts` so the project can build while those legacy files remain unused. Verification: `npm run test` passed with 11 files and 70 tests; `npm run typecheck` passed; `npm run build` passed.
 
 - [ ] Task 20: Final Verification And Review
   - Completion note:
