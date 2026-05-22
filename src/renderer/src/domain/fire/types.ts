@@ -237,6 +237,7 @@ export interface FireAsset {
   kind: 'map' | 'icon' | 'audio'
   name: string
   packagePath: string
+  runtimePath?: string
   mimeType?: string
 }
 

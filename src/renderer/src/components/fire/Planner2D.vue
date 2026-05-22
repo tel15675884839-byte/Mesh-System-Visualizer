@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Upload } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice, FireFloor, FirePanel, Vector2 } from '../../domain/fire/types'
@@ -91,7 +92,7 @@ const mapAssetHref = computed(() => {
   const asset = floor?.mapAssetId
     ? project.value.assets.find((candidate) => candidate.id === floor.mapAssetId)
     : undefined
-  return asset?.packagePath
+  return asset?.runtimePath ?? asset?.packagePath
 })
 
 const deviceById = computed(
@@ -363,6 +364,30 @@ function restoreDefaultLoop(): void {
   draftLoopOrder.value = []
 }
 
+async function importDrawingForCurrentFloor(): Promise<void> {
+  const building = currentBuilding.value
+  const floor = currentFloor.value
+  if (!building || !floor) return
+
+  const result = await window.fireApi.importDrawing()
+  if (result.canceled) return
+
+  store.assignFloorMapAsset({
+    asset: {
+      id: result.asset.id,
+      kind: result.asset.kind,
+      name: result.asset.name,
+      packagePath: result.asset.packagePath,
+      runtimePath: result.asset.runtimePath,
+      mimeType: result.asset.mimeType
+    },
+    buildingId: building.id,
+    floorId: floor.id,
+    mapWidth: result.asset.mapWidth,
+    mapHeight: result.asset.mapHeight
+  })
+}
+
 function finishPolygon(): void {
   if (
     !selectedZone.value ||
@@ -511,6 +536,14 @@ function closeContextMenu(): void {
             :value="floor.id"
           />
         </el-select>
+        <el-tooltip content="Import Drawing" placement="bottom">
+          <el-button
+            :icon="Upload"
+            size="small"
+            :disabled="!currentFloor"
+            @click="importDrawingForCurrentFloor"
+          />
+        </el-tooltip>
       </div>
 
       <ZoneToolbar

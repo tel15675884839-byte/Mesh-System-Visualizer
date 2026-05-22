@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import type { CpdAdapterResult } from '../domain/fire/cpdAdapter'
 import type {
   DeviceStatusFilter,
+  FireAsset,
   FireDevice,
   FireIssue,
   FireProject,
@@ -180,6 +181,38 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     }
   }
 
+  function assignFloorMapAsset(args: {
+    asset: FireAsset
+    buildingId: string
+    floorId: string
+    mapWidth?: number
+    mapHeight?: number
+  }): void {
+    withPlanningSnapshot(() => {
+      project.value.assets = [
+        ...project.value.assets.filter((asset) => asset.id !== args.asset.id),
+        cloneValue(args.asset)
+      ]
+      project.value.buildings = project.value.buildings.map((building) =>
+        building.id === args.buildingId
+          ? {
+              ...building,
+              floors: building.floors.map((floor) =>
+                floor.id === args.floorId
+                  ? {
+                      ...floor,
+                      mapAssetId: args.asset.id,
+                      mapWidth: args.mapWidth ?? floor.mapWidth,
+                      mapHeight: args.mapHeight ?? floor.mapHeight
+                    }
+                  : floor
+              )
+            }
+          : building
+      )
+    })
+  }
+
   function addZoneArea(area: ZoneVisualArea): void {
     withPlanningSnapshot(() => {
       project.value.networks = project.value.networks.map((network) => ({
@@ -344,6 +377,7 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     setDeviceStatusFilter,
     setSearchText,
     setSimulationTimeScale,
+    assignFloorMapAsset,
     addZoneArea,
     removeZoneArea,
     setManualLoopOrder,

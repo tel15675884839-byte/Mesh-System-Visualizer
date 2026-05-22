@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
 import { importCpdFile } from './cpdImport'
+import { importDrawingFile } from './drawingImport'
 import { readFireProjectPackage, writeFireProjectPackage } from './fireProjectPackage'
 
 let mainWindow: BrowserWindow | null = null
@@ -202,6 +203,35 @@ ipcMain.handle('fire:open-project-package', async () => {
     filePath,
     ...result
   }
+})
+
+// 6. Import a map drawing asset for the fire planning workspace.
+ipcMain.handle('fire:select-and-import-drawing', async (_event, options?: { pdfPage?: number }) => {
+  if (!mainWindow) {
+    throw new Error('Window not found')
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Drawing',
+    filters: [
+      { name: 'Drawings', extensions: ['png', 'jpg', 'jpeg', 'svg', 'pdf'] },
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'svg'] },
+      { name: 'PDF', extensions: ['pdf'] }
+    ],
+    properties: ['openFile']
+  })
+
+  if (canceled || filePaths.length === 0) {
+    return { canceled: true }
+  }
+
+  const asset = await importDrawingFile({
+    sourcePath: filePaths[0],
+    pdfPage: options?.pdfPage
+  })
+
+  sendLogToRenderer(`Drawing imported: ${asset.name}`, 'success')
+  return { canceled: false, asset }
 })
 
 function createWindow(): void {
