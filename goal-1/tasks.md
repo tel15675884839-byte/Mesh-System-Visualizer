@@ -56,8 +56,8 @@
 - [x] Task 14: Implement Property Panel And Group Inspector
   - Completion note: Added `components/fire/PropertyPanel.vue` for selected-device CPD properties, placement status, Panel/Loop/Address/Type/Location/Zone/group fields, disabled/inhibit/delay flags, reporting/sensitivity fields, and raw CPD details collapsed by default. Added `components/fire/GroupInspector.vue` for Sounder/I/O group ID, description, members, Panel/Loop/Address/Zone/location, non-addressable sounder channels, triggering Zones, current simulation output state, delay, and inhibit/disabled reason. Verification: `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 34 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
-- [ ] Task 15: Implement Simulation Panel
-  - Completion note:
+- [x] Task 15: Implement Simulation Panel
+  - Completion note: Added `components/fire/SimulationPanel.vue` with Simulation Mode toggle, EVACUATE, BUZZER SILENCE, SYSTEM RESET, time scale `1x/5x/10x/30x`, periodic delay ticking, Skip Delay controls, system/sound/buzzer/output status, active input/fault restore controls, delayed/active output lists, Fire Brigade and Fault I/O status, and event log. Added `setSimulationTimeScale` to the fire project store. Verification: `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 32 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
 - [ ] Review Cycle E: Broad debug/review after Tasks 13-15
   - Completion note:

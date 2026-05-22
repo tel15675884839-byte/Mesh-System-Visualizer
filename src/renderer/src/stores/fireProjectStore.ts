@@ -18,7 +18,12 @@ import {
 } from '../domain/fire/simulation/engine'
 import type { SimulationState } from '../domain/fire/simulation/types'
 
-export type FirePlannerTool = 'select' | 'placeDevice' | 'zoneRectangle' | 'zonePolygon' | 'manualLoopWiring'
+export type FirePlannerTool =
+  | 'select'
+  | 'placeDevice'
+  | 'zoneRectangle'
+  | 'zonePolygon'
+  | 'manualLoopWiring'
 
 export interface FireProjectDocument extends FireProject {
   devices: FireDevice[]
@@ -85,7 +90,12 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     selectedDeviceId.value = deviceId
   }
 
-  function placeDevices(deviceIds: string[], buildingId: string, floorId: string, startPosition: Vector3): void {
+  function placeDevices(
+    deviceIds: string[],
+    buildingId: string,
+    floorId: string,
+    startPosition: Vector3
+  ): void {
     if (deviceIds.length === 0) {
       return
     }
@@ -163,6 +173,13 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     searchText.value = text
   }
 
+  function setSimulationTimeScale(timeScale: FireProject['simulationSettings']['timeScale']): void {
+    project.value.simulationSettings = {
+      ...project.value.simulationSettings,
+      timeScale
+    }
+  }
+
   function addZoneArea(area: ZoneVisualArea): void {
     withPlanningSnapshot(() => {
       project.value.networks = project.value.networks.map((network) => ({
@@ -170,7 +187,8 @@ export const useFireProjectStore = defineStore('fireProject', () => {
         panels: network.panels.map((panel) => ({
           ...panel,
           zones: panel.zones.map((zone) =>
-            zone.id === area.id || (zone.panelId === area.panelId && zone.zoneNumber === area.zoneNumber)
+            zone.id === area.id ||
+            (zone.panelId === area.panelId && zone.zoneNumber === area.zoneNumber)
               ? {
                   ...zone,
                   visualAreas: [...zone.visualAreas, cloneValue(area)]
@@ -246,7 +264,9 @@ export const useFireProjectStore = defineStore('fireProject', () => {
   }
 
   function dispatchSimulationAction(action: SimulationAction): void {
-    const network = project.value.networks.find((item) => item.id === selectedNetworkId.value) ?? project.value.networks[0]
+    const network =
+      project.value.networks.find((item) => item.id === selectedNetworkId.value) ??
+      project.value.networks[0]
     if (!network) {
       return
     }
@@ -256,7 +276,9 @@ export const useFireProjectStore = defineStore('fireProject', () => {
       {
         network,
         devices: project.value.devices.filter((device) => device.networkId === network.id),
-        nonAddressablePoints: project.value.nonAddressableSounderPoints.filter((point) => point.networkId === network.id),
+        nonAddressablePoints: project.value.nonAddressableSounderPoints.filter(
+          (point) => point.networkId === network.id
+        ),
         now: 'at' in action ? action.at : Date.now()
       },
       action
@@ -321,6 +343,7 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     setTreeGroupMode,
     setDeviceStatusFilter,
     setSearchText,
+    setSimulationTimeScale,
     addZoneArea,
     removeZoneArea,
     setManualLoopOrder,
