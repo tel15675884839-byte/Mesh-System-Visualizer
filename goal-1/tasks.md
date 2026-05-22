@@ -71,8 +71,8 @@
 - [x] Task 18: Implement I18n
   - Completion note: Added `vue-i18n`, created `src/renderer/src/i18n/index.ts`, `en.ts`, and `zh.ts`, wired i18n into `main.ts`, and converted the major visible strings in the new fire Device Tree, Planner toolbar, context menu, Zone/Loop toolbars, Property Panel, Group Inspector, Simulation Panel, and Import Diff dialog to translation keys. Verification: `npm run test` passed with 11 files and 70 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
-- [ ] Review Cycle F: Broad debug/review after Tasks 16-18
-  - Completion note:
+- [x] Review Cycle F: Broad debug/review after Tasks 16-18
+  - Completion note: Ran broad checks after Tasks 16-18. `npm run test` passed with 11 files and 70 tests. `npm run typecheck` passed node typecheck and still fails only in existing out-of-scope renderer files: `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`. Local review confirmed drawing import, CPD re-import diff, and i18n changes remain scoped to fire-domain/main/preload/new fire UI code.
 
 - [ ] Task 19: Wire App Shell And Retire Mesh UI
   - Completion note:
