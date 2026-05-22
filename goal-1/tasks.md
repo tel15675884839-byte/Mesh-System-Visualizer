@@ -44,8 +44,8 @@
 - [x] Task 11: Implement Device Tree UI
   - Completion note: Added pure `buildFireDeviceTree` helper and tests for Network > Panel > Group > Device hierarchy, Loop/Zone/Type/Sounder Group/I/O Group grouping, status filters, issue filters, and CPD-field search. Added `components/fire/DeviceTree.vue` wired to the fire project store with group/status segmented controls, search, left-click selection, double-click focus emit, drag payloads, and right-click context-menu emit. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 6 tests; `npm run typecheck:web` failed only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts` after fixing the one new icon import error.
 
-- [ ] Task 12: Implement 2D Planner UI
-  - Completion note:
+- [x] Task 12: Implement 2D Planner UI
+  - Completion note: Added new fire 2D planner components: `Planner2D.vue`, `DeviceContextMenu.vue`, `ZoneToolbar.vue`, and `LoopWiringToolbar.vue`. The planner renders current floor maps, placed device icons/labels, solid Loop lines, Zone overlays, drag/drop placement, single-commit device move preview, right-click context actions, Simulation Mode alarm/fault actions, rectangle Zone drawing, polygon Zone drawing with Esc cancel, and manual Loop wiring draft/save/restore flow. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 13 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
 - [ ] Review Cycle D: Broad debug/review after Tasks 10-12
   - Completion note:
