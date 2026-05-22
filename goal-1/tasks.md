@@ -68,8 +68,8 @@
 - [x] Task 17: Implement CPD Re-import Diff
   - Completion note: Added `cpdDiff.ts` with `diffCpdImport` and `applyCpdDiff`, matching devices by `panelNumber + loopId + address`, reporting added/removed/changed devices, preserving matched placement, preserving Zone visual areas and manual Loop wiring, adding new devices as unplaced, and marking removed devices as missing. Added `ImportDiffDialog.vue` and store pending re-import actions. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/cpdDiff.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts` passed with 7 tests; `npm run typecheck:web` still fails only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
-- [ ] Task 18: Implement I18n
-  - Completion note:
+- [x] Task 18: Implement I18n
+  - Completion note: Added `vue-i18n`, created `src/renderer/src/i18n/index.ts`, `en.ts`, and `zh.ts`, wired i18n into `main.ts`, and converted the major visible strings in the new fire Device Tree, Planner toolbar, context menu, Zone/Loop toolbars, Property Panel, Group Inspector, Simulation Panel, and Import Diff dialog to translation keys. Verification: `npm run test` passed with 11 files and 70 tests; `npm run typecheck:web` and `npm run build` still fail only in existing out-of-scope renderer files `ThreeDView.vue`, `loggerStore.ts`, and old `projectStore.ts`.
 
 - [ ] Review Cycle F: Broad debug/review after Tasks 16-18
   - Completion note:

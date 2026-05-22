@@ -9,11 +9,13 @@ import {
   Timer,
   WarningFilled
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice } from '../../domain/fire/types'
 import type { OutputActivation } from '../../domain/fire/simulation/types'
 
 const store = useFireProjectStore()
+const { t } = useI18n()
 const { project, selectedNetworkId, simulationMode, simulationState } = storeToRefs(store)
 
 let tickTimer: number | undefined
@@ -143,13 +145,13 @@ function stopTicking(): void {
   <aside class="simulation-panel">
     <header class="simulation-header">
       <div>
-        <h2>Simulation</h2>
-        <p>{{ currentNetwork?.sounderMode ?? 'No Network' }}</p>
+        <h2>{{ t('fire.simulation.title') }}</h2>
+        <p>{{ currentNetwork?.sounderMode ?? t('fire.simulation.noNetwork') }}</p>
       </div>
       <el-switch
         :model-value="simulationMode"
-        active-text="On"
-        inactive-text="Off"
+        :active-text="t('fire.simulation.on')"
+        :inactive-text="t('fire.simulation.off')"
         @update:model-value="setSimulationEnabled"
       />
     </header>
@@ -157,15 +159,15 @@ function stopTicking(): void {
     <section class="control-grid">
       <el-button type="danger" :disabled="!simulationMode" @click="dispatch('evacuate')">
         <el-icon><Bell /></el-icon>
-        EVACUATE
+        {{ t('fire.simulation.evacuate') }}
       </el-button>
       <el-button :disabled="!simulationMode" @click="dispatch('buzzer-silence')">
         <el-icon><MuteNotification /></el-icon>
-        BUZZER SILENCE
+        {{ t('fire.simulation.buzzerSilence') }}
       </el-button>
       <el-button :disabled="!simulationMode" @click="dispatch('system-reset')">
         <el-icon><RefreshLeft /></el-icon>
-        SYSTEM RESET
+        {{ t('fire.simulation.systemReset') }}
       </el-button>
       <el-select
         :model-value="project.simulationSettings.timeScale"
@@ -183,25 +185,29 @@ function stopTicking(): void {
 
     <section class="state-grid">
       <div>
-        <span>System</span>
+        <span>{{ t('fire.simulation.system') }}</span>
         <strong :class="simulationState.systemState">{{ simulationState.systemState }}</strong>
       </div>
       <div>
-        <span>Sound</span>
+        <span>{{ t('fire.simulation.sound') }}</span>
         <strong :class="simulationState.soundState">{{ simulationState.soundState }}</strong>
       </div>
       <div>
-        <span>Buzzer</span>
-        <strong>{{ simulationState.buzzerSilenced ? 'silenced' : 'active' }}</strong>
+        <span>{{ t('fire.simulation.buzzer') }}</span>
+        <strong>{{
+          simulationState.buzzerSilenced
+            ? t('fire.simulation.silenced')
+            : t('fire.simulation.active')
+        }}</strong>
       </div>
       <div>
-        <span>Outputs</span>
+        <span>{{ t('fire.simulation.outputs') }}</span>
         <strong>{{ simulationState.outputs.length }}</strong>
       </div>
     </section>
 
     <section class="simulation-section">
-      <h3>Active Inputs</h3>
+      <h3>{{ t('fire.simulation.activeInputs') }}</h3>
       <ul>
         <li v-for="alarm in simulationState.activeInputAlarms" :key="alarm.deviceId">
           <span>{{ deviceLabel(alarm.deviceId) }}</span>
@@ -212,7 +218,7 @@ function stopTicking(): void {
     </section>
 
     <section class="simulation-section">
-      <h3>Active Faults</h3>
+      <h3>{{ t('fire.simulation.activeFaults') }}</h3>
       <ul>
         <li v-for="fault in simulationState.activeFaults" :key="fault.deviceId">
           <span>{{ deviceLabel(fault.deviceId) }}</span>
@@ -228,7 +234,7 @@ function stopTicking(): void {
     </section>
 
     <section class="simulation-section">
-      <h3>Delayed Outputs</h3>
+      <h3>{{ t('fire.simulation.delayedOutputs') }}</h3>
       <ul>
         <li v-for="output in delayedOutputs" :key="output.outputId">
           <span>
@@ -242,7 +248,7 @@ function stopTicking(): void {
     </section>
 
     <section class="simulation-section">
-      <h3>Active Outputs</h3>
+      <h3>{{ t('fire.simulation.activeOutputs') }}</h3>
       <ul>
         <li v-for="output in activeOutputs" :key="output.outputId">
           <span>
@@ -256,17 +262,17 @@ function stopTicking(): void {
 
     <section class="state-grid compact">
       <div>
-        <span>Fire Brigade</span>
-        <strong>{{ fireBrigadeOutput?.state ?? 'normal' }}</strong>
+        <span>{{ t('fire.simulation.fireBrigade') }}</span>
+        <strong>{{ fireBrigadeOutput?.state ?? t('fire.common.normal') }}</strong>
       </div>
       <div>
-        <span>Fault I/O</span>
-        <strong>{{ faultIOOutput?.state ?? 'normal' }}</strong>
+        <span>{{ t('fire.simulation.faultIO') }}</span>
+        <strong>{{ faultIOOutput?.state ?? t('fire.common.normal') }}</strong>
       </div>
     </section>
 
     <section class="simulation-section event-log">
-      <h3>Event Log</h3>
+      <h3>{{ t('fire.simulation.eventLog') }}</h3>
       <ol>
         <li v-for="event in recentEvents" :key="event.id">
           <time>{{ formatEventTime(event.timestamp) }}</time>

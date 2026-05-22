@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Close, Crop, EditPen, Pointer } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import type { FirePlannerTool } from '../../stores/fireProjectStore'
 import type { FireZone } from '../../domain/fire/types'
 
@@ -15,6 +16,8 @@ const emit = defineEmits<{
   selectTool: [tool: FirePlannerTool]
   cancelPolygon: []
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -23,7 +26,7 @@ const emit = defineEmits<{
       :model-value="selectedZoneId"
       size="small"
       class="zone-select"
-      placeholder="Zone"
+      :placeholder="t('fire.zoneToolbar.zone')"
       clearable
       @update:model-value="(value) => emit('selectZone', value || null)"
     >
@@ -36,7 +39,7 @@ const emit = defineEmits<{
     </el-select>
 
     <el-button-group>
-      <el-tooltip content="Select" placement="bottom">
+      <el-tooltip :content="t('fire.zoneToolbar.select')" placement="bottom">
         <el-button
           :type="activeTool === 'select' ? 'primary' : 'default'"
           :icon="Pointer"
@@ -44,7 +47,7 @@ const emit = defineEmits<{
           @click="emit('selectTool', 'select')"
         />
       </el-tooltip>
-      <el-tooltip content="Rectangle Zone" placement="bottom">
+      <el-tooltip :content="t('fire.zoneToolbar.rectangle')" placement="bottom">
         <el-button
           :type="activeTool === 'zoneRectangle' ? 'primary' : 'default'"
           :icon="Crop"
@@ -52,7 +55,7 @@ const emit = defineEmits<{
           @click="emit('selectTool', 'zoneRectangle')"
         />
       </el-tooltip>
-      <el-tooltip content="Polygon Zone" placement="bottom">
+      <el-tooltip :content="t('fire.zoneToolbar.polygon')" placement="bottom">
         <el-button
           :type="activeTool === 'zonePolygon' ? 'primary' : 'default'"
           :icon="EditPen"
@@ -60,7 +63,7 @@ const emit = defineEmits<{
           @click="emit('selectTool', 'zonePolygon')"
         />
       </el-tooltip>
-      <el-tooltip content="Cancel Polygon" placement="bottom">
+      <el-tooltip :content="t('fire.zoneToolbar.cancelPolygon')" placement="bottom">
         <el-button
           :disabled="polygonPointCount === 0"
           :icon="Close"

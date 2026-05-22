@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { CpdDiffResult } from '../../domain/fire/cpdDiff'
 
 defineProps<{
@@ -10,37 +11,39 @@ const emit = defineEmits<{
   confirm: []
   cancel: []
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <el-dialog
     :model-value="visible"
-    title="Compare & Sync CPD"
+    :title="t('fire.diff.title')"
     width="640px"
     @update:model-value="(value) => !value && emit('cancel')"
   >
     <div v-if="diff" class="diff-dialog">
       <section class="diff-summary">
         <div>
-          <span>Matched</span>
+          <span>{{ t('fire.diff.matched') }}</span>
           <strong>{{ diff.matched.length }}</strong>
         </div>
         <div>
-          <span>Added</span>
+          <span>{{ t('fire.diff.added') }}</span>
           <strong>{{ diff.added.length }}</strong>
         </div>
         <div>
-          <span>Removed</span>
+          <span>{{ t('fire.diff.removed') }}</span>
           <strong>{{ diff.removed.length }}</strong>
         </div>
         <div>
-          <span>Changed</span>
+          <span>{{ t('fire.diff.changed') }}</span>
           <strong>{{ diff.changed.length }}</strong>
         </div>
       </section>
 
       <section class="diff-section">
-        <h3>Added</h3>
+        <h3>{{ t('fire.diff.added') }}</h3>
         <ul>
           <li v-for="deviceId in diff.added" :key="deviceId">{{ deviceId }}</li>
           <li v-if="diff.added.length === 0">-</li>
@@ -48,7 +51,7 @@ const emit = defineEmits<{
       </section>
 
       <section class="diff-section">
-        <h3>Removed</h3>
+        <h3>{{ t('fire.diff.removed') }}</h3>
         <ul>
           <li v-for="deviceId in diff.removed" :key="deviceId">{{ deviceId }}</li>
           <li v-if="diff.removed.length === 0">-</li>
@@ -56,7 +59,7 @@ const emit = defineEmits<{
       </section>
 
       <section class="diff-section">
-        <h3>Changed</h3>
+        <h3>{{ t('fire.diff.changed') }}</h3>
         <ul>
           <li v-for="change in diff.changed" :key="change.deviceId">
             <strong>{{ change.deviceId }}</strong>
@@ -68,8 +71,10 @@ const emit = defineEmits<{
     </div>
 
     <template #footer>
-      <el-button @click="emit('cancel')">Cancel</el-button>
-      <el-button type="primary" :disabled="!diff" @click="emit('confirm')">Apply</el-button>
+      <el-button @click="emit('cancel')">{{ t('fire.common.cancel') }}</el-button>
+      <el-button type="primary" :disabled="!diff" @click="emit('confirm')">{{
+        t('fire.common.apply')
+      }}</el-button>
     </template>
   </el-dialog>
 </template>

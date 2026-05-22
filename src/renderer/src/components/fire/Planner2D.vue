@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice, FireFloor, FirePanel, Vector2 } from '../../domain/fire/types'
 import { buildCurrentFloorLoopSegments } from '../../domain/fire/loopWiring'
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useFireProjectStore()
+const { t } = useI18n()
 const {
   project,
   selectedNetworkId,
@@ -520,7 +522,11 @@ function closeContextMenu(): void {
   <section class="planner-2d" @click="closeContextMenu">
     <header class="planner-toolbar" @click.stop>
       <div class="floor-controls">
-        <el-select v-model="selectedBuildingId" size="small" placeholder="Building">
+        <el-select
+          v-model="selectedBuildingId"
+          size="small"
+          :placeholder="t('fire.planner.building')"
+        >
           <el-option
             v-for="building in project.buildings"
             :key="building.id"
@@ -528,7 +534,7 @@ function closeContextMenu(): void {
             :value="building.id"
           />
         </el-select>
-        <el-select v-model="selectedFloorId" size="small" placeholder="Floor">
+        <el-select v-model="selectedFloorId" size="small" :placeholder="t('fire.planner.floor')">
           <el-option
             v-for="floor in currentBuilding?.floors ?? []"
             :key="floor.id"
@@ -536,7 +542,7 @@ function closeContextMenu(): void {
             :value="floor.id"
           />
         </el-select>
-        <el-tooltip content="Import Drawing" placement="bottom">
+        <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
           <el-button
             :icon="Upload"
             size="small"
@@ -678,7 +684,7 @@ function closeContextMenu(): void {
         </g>
       </svg>
 
-      <div v-if="!currentFloor" class="empty-floor">No floor selected</div>
+      <div v-if="!currentFloor" class="empty-floor">{{ t('fire.planner.noFloor') }}</div>
     </div>
 
     <DeviceContextMenu

@@ -4,6 +4,7 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import App from './App.vue'
 import { useFireProjectStore } from './stores/fireProjectStore'
+import { i18n } from './i18n'
 
 // [新增] 1. 引入 Element Plus 暗黑模式专用变量
 import 'element-plus/theme-chalk/dark/css-vars.css'
@@ -17,5 +18,6 @@ const pinia = createPinia()
 app.use(pinia)
 useFireProjectStore(pinia)
 app.use(ElementPlus)
+app.use(i18n)
 
 app.mount('#app')

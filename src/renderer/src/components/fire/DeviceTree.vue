@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { Check, Search, WarningFilled } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import { buildFireDeviceTree, flattenFireTree, type FireTreeNode } from '../../domain/fire/tree'
 import type { DeviceStatusFilter, GroupMode } from '../../domain/fire/types'
@@ -13,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useFireProjectStore()
+const { t } = useI18n()
 const { project, selectedDeviceId, treeGroupMode, deviceStatusFilter, searchText } =
   storeToRefs(store)
 const treeRef = ref()
@@ -20,20 +22,20 @@ const expandedKeys = ref<string[]>([])
 const selectedIds = ref<Set<string>>(new Set())
 const lastSelectedDeviceId = ref<string | null>(null)
 
-const groupModeOptions: Array<{ label: string; value: GroupMode }> = [
-  { label: 'Loop', value: 'loop' },
-  { label: 'Zone', value: 'zone' },
-  { label: 'Type', value: 'type' },
-  { label: 'Sounder Group', value: 'sounderGroup' },
-  { label: 'I/O Group', value: 'ioGroup' }
-]
+const groupModeOptions = computed<Array<{ label: string; value: GroupMode }>>(() => [
+  { label: t('fire.tree.group.loop'), value: 'loop' },
+  { label: t('fire.tree.group.zone'), value: 'zone' },
+  { label: t('fire.tree.group.type'), value: 'type' },
+  { label: t('fire.tree.group.sounderGroup'), value: 'sounderGroup' },
+  { label: t('fire.tree.group.ioGroup'), value: 'ioGroup' }
+])
 
-const statusOptions: Array<{ label: string; value: DeviceStatusFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Unplaced', value: 'unplaced' },
-  { label: 'Placed', value: 'placed' },
-  { label: 'Issues', value: 'issues' }
-]
+const statusOptions = computed<Array<{ label: string; value: DeviceStatusFilter }>>(() => [
+  { label: t('fire.tree.filter.all'), value: 'all' },
+  { label: t('fire.tree.filter.unplaced'), value: 'unplaced' },
+  { label: t('fire.tree.filter.placed'), value: 'placed' },
+  { label: t('fire.tree.filter.issues'), value: 'issues' }
+])
 
 const treeData = computed(() =>
   buildFireDeviceTree({
@@ -203,7 +205,7 @@ function issueClass(node: FireTreeNode): string {
       <el-input
         v-model="searchText"
         :prefix-icon="Search"
-        placeholder="Search devices"
+        :placeholder="t('fire.tree.search')"
         clearable
         size="small"
       />
@@ -217,7 +219,7 @@ function issueClass(node: FireTreeNode): string {
       :default-expanded-keys="expandedKeys"
       :expand-on-click-node="false"
       :highlight-current="false"
-      empty-text="No devices"
+      :empty-text="t('fire.tree.empty')"
       @node-click="handleNodeClick"
     >
       <template #default="{ data }">

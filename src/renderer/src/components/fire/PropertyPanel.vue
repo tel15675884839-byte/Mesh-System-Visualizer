@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice, FirePanel } from '../../domain/fire/types'
 
 const store = useFireProjectStore()
+const { t } = useI18n()
 const { project, selectedDeviceId } = storeToRefs(store)
 
 const selectedDevice = computed(() =>
@@ -28,15 +30,15 @@ const flagRows = computed(() => {
   if (!device) return []
 
   return [
-    ['Disabled', device.disabled],
-    ['Inhibit Sounders', device.inhibitSounders],
-    ['Inhibit I/O', device.inhibitIO],
-    ['Inhibit Relays', device.inhibitRelays],
-    ['Evacuate I/O', device.evacuateIO],
-    ['I/O Override Delay', device.ioOverrideDelay],
-    ['Immediate Evacuate', device.immediateEvacuate],
-    ['Set Evacuate Timer', device.setEvacuateTimer],
-    ['Override Delays', device.overrideDelays]
+    [t('fire.property.disabled'), device.disabled],
+    [t('fire.property.inhibitSounders'), device.inhibitSounders],
+    [t('fire.property.inhibitIO'), device.inhibitIO],
+    [t('fire.property.inhibitRelays'), device.inhibitRelays],
+    [t('fire.property.evacuateIO'), device.evacuateIO],
+    [t('fire.property.ioOverrideDelay'), device.ioOverrideDelay],
+    [t('fire.property.immediateEvacuate'), device.immediateEvacuate],
+    [t('fire.property.setEvacuateTimer'), device.setEvacuateTimer],
+    [t('fire.property.overrideDelays'), device.overrideDelays]
   ] as Array<[string, boolean]>
 })
 
@@ -45,7 +47,7 @@ function valueOrDash(value: unknown): string {
 }
 
 function formatBoolean(value: boolean): string {
-  return value ? 'Yes' : 'No'
+  return value ? t('fire.property.yes') : t('fire.property.no')
 }
 
 function rawJson(device: FireDevice): string {
@@ -67,94 +69,94 @@ function rawJson(device: FireDevice): string {
       </header>
 
       <section class="property-section">
-        <h3>Device</h3>
+        <h3>{{ t('fire.property.device') }}</h3>
         <dl>
           <div>
-            <dt>Panel</dt>
+            <dt>{{ t('fire.property.panel') }}</dt>
             <dd>{{ selectedPanel?.panelName || `Panel ${selectedDevice.panelNumber}` }}</dd>
           </div>
           <div>
-            <dt>Loop</dt>
+            <dt>{{ t('fire.property.loop') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.loopId) }}</dd>
           </div>
           <div>
-            <dt>Address</dt>
+            <dt>{{ t('fire.property.address') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.address) }}</dd>
           </div>
           <div>
-            <dt>Type</dt>
+            <dt>{{ t('fire.property.type') }}</dt>
             <dd>{{ selectedDevice.friendlyTypeName }}</dd>
           </div>
           <div>
-            <dt>Description</dt>
+            <dt>{{ t('fire.property.description') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.description) }}</dd>
           </div>
           <div>
-            <dt>Location</dt>
+            <dt>{{ t('fire.property.location') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.location) }}</dd>
           </div>
           <div>
-            <dt>Zone</dt>
+            <dt>{{ t('fire.property.zone') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.zoneNumber) }}</dd>
           </div>
           <div>
-            <dt>Sounder Group</dt>
+            <dt>{{ t('fire.property.sounderGroup') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.sounderGroupId) }}</dd>
           </div>
           <div>
-            <dt>I/O Group</dt>
+            <dt>{{ t('fire.property.ioGroup') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.ioGroupId) }}</dd>
           </div>
         </dl>
       </section>
 
       <section class="property-section">
-        <h3>Disablement And Inhibit</h3>
+        <h3>{{ t('fire.property.disablement') }}</h3>
         <dl>
           <div v-for="[label, value] in flagRows" :key="label">
             <dt>{{ label }}</dt>
             <dd>{{ formatBoolean(value) }}</dd>
           </div>
           <div>
-            <dt>Selected Disablement</dt>
+            <dt>{{ t('fire.property.selectedDisablement') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.selectedDisablement) }}</dd>
           </div>
         </dl>
       </section>
 
       <section class="property-section">
-        <h3>Reporting</h3>
+        <h3>{{ t('fire.property.reporting') }}</h3>
         <dl>
           <div>
-            <dt>Reporting Detail</dt>
+            <dt>{{ t('fire.property.reportingDetail') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.reportingDetail) }}</dd>
           </div>
           <div>
-            <dt>Smoke Sensitivity</dt>
+            <dt>{{ t('fire.property.smokeSensitivity') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.smokeSensitivity) }}</dd>
           </div>
           <div>
-            <dt>Heat Grade</dt>
+            <dt>{{ t('fire.property.heatGrade') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.heatGrade) }}</dd>
           </div>
           <div>
-            <dt>Sounder Group Value</dt>
+            <dt>{{ t('fire.property.sounderGroupValue') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.sounderGroupValue) }}</dd>
           </div>
           <div>
-            <dt>Image Index</dt>
+            <dt>{{ t('fire.property.imageIndex') }}</dt>
             <dd>{{ valueOrDash(selectedDevice.imageIndex) }}</dd>
           </div>
         </dl>
       </section>
 
       <details class="raw-section">
-        <summary>Raw CPD</summary>
+        <summary>{{ t('fire.property.rawCpd') }}</summary>
         <pre>{{ rawJson(selectedDevice) }}</pre>
       </details>
     </template>
 
-    <div v-else class="empty-panel">No device selected</div>
+    <div v-else class="empty-panel">{{ t('fire.property.noSelection') }}</div>
   </aside>
 </template>
 

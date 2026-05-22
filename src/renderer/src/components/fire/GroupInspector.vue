@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type {
   FireDevice,
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const store = useFireProjectStore()
+const { t } = useI18n()
 const { project, selectedPanelId, selectedDeviceId, simulationState } = storeToRefs(store)
 
 const selectedDevice = computed(() =>
@@ -76,7 +78,7 @@ const title = computed(() => {
   if (inspectedKind.value === 'io' && inspectedGroupId.value !== null) {
     return `I/O Group ${inspectedGroupId.value}`
   }
-  return 'Group Inspector'
+  return t('fire.groupInspector.title')
 })
 
 const description = computed(() => {
@@ -178,7 +180,7 @@ function valueOrDash(value: unknown): string {
       <header class="inspector-header">
         <div>
           <h2>{{ title }}</h2>
-          <p>{{ description || panel?.panelName || 'Panel group' }}</p>
+          <p>{{ description || panel?.panelName || t('fire.groupInspector.panelGroup') }}</p>
         </div>
         <span class="state-chip" :class="output?.state ?? 'normal'">
           {{ output?.state ?? 'normal' }}
@@ -187,32 +189,32 @@ function valueOrDash(value: unknown): string {
 
       <section class="summary-grid">
         <div>
-          <span>Group ID</span>
+          <span>{{ t('fire.groupInspector.groupId') }}</span>
           <strong>{{ inspectedGroupId }}</strong>
         </div>
         <div>
-          <span>Panel</span>
+          <span>{{ t('fire.groupInspector.panel') }}</span>
           <strong>{{ panel?.panelName || '-' }}</strong>
         </div>
         <div>
-          <span>Delay</span>
+          <span>{{ t('fire.groupInspector.delay') }}</span>
           <strong>{{ output?.remainingDelaySeconds ?? 0 }}s</strong>
         </div>
         <div>
-          <span>Reason</span>
+          <span>{{ t('fire.groupInspector.reason') }}</span>
           <strong>{{ output?.reason || '-' }}</strong>
         </div>
       </section>
 
       <section class="inspector-section">
-        <h3>Members</h3>
+        <h3>{{ t('fire.groupInspector.members') }}</h3>
         <table>
           <thead>
             <tr>
-              <th>Device</th>
-              <th>Loop</th>
-              <th>Address</th>
-              <th>Zone</th>
+              <th>{{ t('fire.groupInspector.device') }}</th>
+              <th>{{ t('fire.groupInspector.loop') }}</th>
+              <th>{{ t('fire.groupInspector.address') }}</th>
+              <th>{{ t('fire.groupInspector.zone') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -228,25 +230,27 @@ function valueOrDash(value: unknown): string {
               <td>{{ member.zone }}</td>
             </tr>
             <tr v-if="memberRows.length === 0">
-              <td colspan="4" class="empty-cell">No addressable members</td>
+              <td colspan="4" class="empty-cell">
+                {{ t('fire.groupInspector.noAddressableMembers') }}
+              </td>
             </tr>
           </tbody>
         </table>
       </section>
 
       <section v-if="nonAddressableRows.length > 0" class="inspector-section">
-        <h3>Non-addressable</h3>
+        <h3>{{ t('fire.groupInspector.nonAddressable') }}</h3>
         <ul>
           <li v-for="(member, index) in nonAddressableRows" :key="index">
-            CIE {{ valueOrDash(member.cieId) }}:
-            {{ member.nonAddressable1 ? 'Channel 1' : '' }}
-            {{ member.nonAddressable2 ? 'Channel 2' : '' }}
+            {{ t('fire.groupInspector.cie') }} {{ valueOrDash(member.cieId) }}:
+            {{ member.nonAddressable1 ? t('fire.groupInspector.channel1') : '' }}
+            {{ member.nonAddressable2 ? t('fire.groupInspector.channel2') : '' }}
           </li>
         </ul>
       </section>
 
       <section class="inspector-section">
-        <h3>Triggering Zones</h3>
+        <h3>{{ t('fire.groupInspector.triggeringZones') }}</h3>
         <ul>
           <li v-for="zone in sourceZones" :key="zone.id">
             Zone {{ zone.zoneNumber }}<span v-if="zone.text"> - {{ zone.text }}</span>
@@ -256,7 +260,7 @@ function valueOrDash(value: unknown): string {
       </section>
     </template>
 
-    <div v-else class="empty-inspector">No group selected</div>
+    <div v-else class="empty-inspector">{{ t('fire.groupInspector.noSelection') }}</div>
   </aside>
 </template>
 

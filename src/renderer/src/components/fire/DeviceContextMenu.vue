@@ -9,6 +9,7 @@ import {
   View,
   WarningFilled
 } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import type { FireDevice } from '../../domain/fire/types'
 
 defineProps<{
@@ -32,6 +33,8 @@ const emit = defineEmits<{
   restoreFault: [deviceId: string]
 }>()
 
+const { t } = useI18n()
+
 function run(action: (deviceId: string) => void, device: FireDevice | null): void {
   if (!device) return
   action(device.id)
@@ -49,15 +52,15 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
   >
     <button type="button" @click="run((id) => emit('openProperties', id), device)">
       <el-icon><View /></el-icon>
-      <span>Open Properties</span>
+      <span>{{ t('fire.contextMenu.openProperties') }}</span>
     </button>
     <button type="button" @click="run((id) => emit('removeFromDrawing', id), device)">
       <el-icon><Delete /></el-icon>
-      <span>Remove from Drawing</span>
+      <span>{{ t('fire.contextMenu.removeFromDrawing') }}</span>
     </button>
     <button type="button" @click="run((id) => emit('locateInTree', id), device)">
       <el-icon><Aim /></el-icon>
-      <span>Locate in Tree</span>
+      <span>{{ t('fire.contextMenu.locateInTree') }}</span>
     </button>
 
     <div v-if="simulationMode" class="menu-separator" />
@@ -68,7 +71,7 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
       @click="run((id) => emit('startAlarm', id), device)"
     >
       <el-icon><Bell /></el-icon>
-      <span>Start Alarm</span>
+      <span>{{ t('fire.contextMenu.startAlarm') }}</span>
     </button>
     <button
       v-if="simulationMode && device.isInputCapable && inputActive"
@@ -76,7 +79,7 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
       @click="run((id) => emit('restoreInput', id), device)"
     >
       <el-icon><SwitchButton /></el-icon>
-      <span>Restore Input</span>
+      <span>{{ t('fire.contextMenu.restoreInput') }}</span>
     </button>
     <button
       v-if="simulationMode && !faultActive"
@@ -84,7 +87,7 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
       @click="run((id) => emit('triggerFault', id), device)"
     >
       <el-icon><WarningFilled /></el-icon>
-      <span>Trigger Fault</span>
+      <span>{{ t('fire.contextMenu.triggerFault') }}</span>
     </button>
     <button
       v-if="simulationMode && faultActive"
@@ -92,11 +95,11 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
       @click="run((id) => emit('restoreFault', id), device)"
     >
       <el-icon><Refresh /></el-icon>
-      <span>Restore Fault</span>
+      <span>{{ t('fire.contextMenu.restoreFault') }}</span>
     </button>
     <button v-if="simulationMode" type="button" class="menu-note" disabled>
       <el-icon><MuteNotification /></el-icon>
-      <span>Simulation Mode</span>
+      <span>{{ t('fire.contextMenu.simulationMode') }}</span>
     </button>
   </div>
 </template>

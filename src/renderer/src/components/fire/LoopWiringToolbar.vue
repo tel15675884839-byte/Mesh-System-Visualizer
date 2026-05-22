@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Connection, Finished, Link, RefreshLeft, Remove } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import type { FireLoop } from '../../domain/fire/types'
 import type { FirePlannerTool } from '../../stores/fireProjectStore'
 
@@ -17,6 +18,8 @@ const emit = defineEmits<{
   clearDraft: []
   restoreDefault: []
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -25,7 +28,7 @@ const emit = defineEmits<{
       :model-value="selectedLoopId"
       size="small"
       class="loop-select"
-      placeholder="Loop"
+      :placeholder="t('fire.loopToolbar.loop')"
       clearable
       @update:model-value="(value) => emit('selectLoop', value || null)"
     >
@@ -38,7 +41,7 @@ const emit = defineEmits<{
     </el-select>
 
     <el-button-group>
-      <el-tooltip content="Start Manual Loop Wiring" placement="bottom">
+      <el-tooltip :content="t('fire.loopToolbar.start')" placement="bottom">
         <el-button
           :type="activeTool === 'manualLoopWiring' ? 'primary' : 'default'"
           :icon="Connection"
@@ -46,7 +49,7 @@ const emit = defineEmits<{
           @click="emit('startManual')"
         />
       </el-tooltip>
-      <el-tooltip content="Save Manual Wiring" placement="bottom">
+      <el-tooltip :content="t('fire.loopToolbar.save')" placement="bottom">
         <el-button
           :disabled="draftOrderCount < 2"
           :icon="Finished"
@@ -54,7 +57,7 @@ const emit = defineEmits<{
           @click="emit('saveManual')"
         />
       </el-tooltip>
-      <el-tooltip content="Clear Draft" placement="bottom">
+      <el-tooltip :content="t('fire.loopToolbar.clear')" placement="bottom">
         <el-button
           :disabled="draftOrderCount === 0"
           :icon="Remove"
@@ -62,7 +65,7 @@ const emit = defineEmits<{
           @click="emit('clearDraft')"
         />
       </el-tooltip>
-      <el-tooltip content="Restore Default Wiring" placement="bottom">
+      <el-tooltip :content="t('fire.loopToolbar.restore')" placement="bottom">
         <el-button
           :disabled="!selectedLoopId"
           :icon="RefreshLeft"
