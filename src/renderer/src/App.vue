@@ -12,7 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
 import { adaptCpdExport } from './domain/fire/cpdAdapter'
-import type { FireAsset } from './domain/fire/types'
+import { resolveOpenedProjectAssetRuntimePaths } from './domain/fire/projectAssets'
 import DeviceTree from './components/fire/DeviceTree.vue'
 import Planner2D from './components/fire/Planner2D.vue'
 import Viewer3D from './components/fire/Viewer3D.vue'
@@ -63,7 +63,10 @@ async function openFireProject(): Promise<void> {
     const result = await window.fireApi.openFireProject()
     if (result.canceled) return
     store.loadFireProject(
-      resolveOpenedAssets(result.project as FireProjectDocument, result.extractedAssetRoot)
+      resolveOpenedProjectAssetRuntimePaths(
+        result.project as FireProjectDocument,
+        result.extractedAssetRoot
+      )
     )
   } catch (error) {
     ElMessage.error(`${t('fire.app.openFailed')}: ${errorMessage(error)}`)
@@ -88,26 +91,6 @@ async function saveFireProject(): Promise<void> {
   } catch (error) {
     ElMessage.error(`${t('fire.app.saveFailed')}: ${errorMessage(error)}`)
   }
-}
-
-function resolveOpenedAssets(
-  openedProject: FireProjectDocument,
-  extractedAssetRoot: string
-): FireProjectDocument {
-  return {
-    ...openedProject,
-    assets: openedProject.assets.map((asset) => ({
-      ...asset,
-      runtimePath: asset.runtimePath ?? resolveAssetRuntimePath(asset, extractedAssetRoot)
-    }))
-  }
-}
-
-function resolveAssetRuntimePath(asset: FireAsset, extractedAssetRoot: string): string | undefined {
-  if (!asset.packagePath.startsWith('assets/')) {
-    return asset.runtimePath
-  }
-  return `${extractedAssetRoot}\\${asset.packagePath.replace(/\//g, '\\')}`
 }
 
 function errorMessage(error: unknown): string {
