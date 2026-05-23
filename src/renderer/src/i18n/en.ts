@@ -36,6 +36,8 @@ export default {
         placed: 'Placed',
         issues: 'Issues'
       },
+      groupLabel: 'Group',
+      filterLabel: 'Filter',
       search: 'Search devices',
       empty: 'No devices'
     },

@@ -1,7 +1,7 @@
 export default {
   fire: {
     app: {
-      name: 'Numens 消防报警模拟器',
+      name: 'Numens 火灾报警模拟器',
       newFromCpd: '从 CPD 新建',
       openProject: '打开 Fire 项目',
       saveProject: '保存 Fire 项目',
@@ -36,6 +36,8 @@ export default {
         placed: '已放置',
         issues: '问题'
       },
+      groupLabel: '分组',
+      filterLabel: '筛选',
       search: '搜索设备',
       empty: '无设备'
     },
@@ -57,7 +59,7 @@ export default {
     },
     loopToolbar: {
       loop: '回路',
-      start: '开始手动画线',
+      start: '开始手动布线',
       save: '保存手动布线',
       clear: '清空草稿',
       restore: '恢复默认布线'
@@ -128,8 +130,8 @@ export default {
     simulation: {
       title: '模拟',
       noNetwork: '无网络',
-      on: '开',
-      off: '关',
+      on: '开启',
+      off: '关闭',
       evacuate: '疏散',
       buzzerSilence: '蜂鸣静音',
       systemReset: '系统复位',

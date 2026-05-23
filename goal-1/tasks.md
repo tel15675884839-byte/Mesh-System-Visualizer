@@ -104,7 +104,7 @@
     - Do not continue to Task 23 until this passes.
   - Completion note: Updated `src/renderer/src/domain/fire/__tests__/tree.test.ts` with failing coverage for Zone 0, Sounder Group 0, I/O Group 0, unassigned group buckets, and pure output devices in Zone grouping. Updated `src/renderer/src/domain/fire/tree.ts` so Zone grouping only includes input-capable devices with a positive Zone, Sounder/I/O grouping only includes positive configured/member groups, and no unassigned Sounder/I/O buckets are produced. Verification: first targeted run failed on the old Sounder-in-Zone and Zone 0 behavior; after the fix, `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 7 tests. Risk: this intentionally removes unassigned output-class devices from Sounder/I/O grouped views per the stability requirement, so users must use Loop/Type/All views to locate ungrouped outputs.
 
-- [ ] Task 23: Redesign Device Tree Header Controls
+- [x] Task 23: Redesign Device Tree Header Controls
   - Owned files: `src/renderer/src/components/fire/DeviceTree.vue`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
   - Requirements:
     - Replace long header controls with compact icon buttons and hover tooltips where practical.
@@ -115,6 +115,7 @@
     - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts`
     - Manual UI check when running the app: inspect the Device Tree header at normal and narrow panel widths.
     - Do not continue to Task 24 until the header is visually acceptable.
+  - Completion note: Updated `src/renderer/src/components/fire/DeviceTree.vue` to replace long segmented labels with compact icon button groups and tooltips, with search kept as a separate full-width row. Added `groupLabel` and `filterLabel` i18n keys in `src/renderer/src/i18n/en.ts` and replaced the mojibake Chinese dictionary in `src/renderer/src/i18n/zh.ts` with valid UTF-8 Chinese while adding the same keys. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 7 tests; `npm run typecheck:web` passed. Manual UI check: started the dev renderer at `http://localhost:5173`, used a temporary Vite harness with the real `DeviceTree.vue` and CPD fixture at 340px and 280px widths; both headers rendered 9 compact icon buttons, search stayed full-width, toolbar `scrollWidth` equaled `clientWidth` at both widths, and Zone/Group 0 text was not visible. Risk: manual check used a local component harness because the Electron app's real import/open flows use native file dialogs; the harness was deleted before commit and did not alter product code.
 
 - [ ] Task 24: Confirm 2D Loop-Only Line Source
   - Owned files: `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/components/fire/Planner2D.vue`

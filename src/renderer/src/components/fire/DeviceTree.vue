@@ -1,6 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { Check, Search, WarningFilled } from '@element-plus/icons-vue'
+import { computed, nextTick, ref, watch, type Component } from 'vue'
+import {
+  Bell,
+  Check,
+  Close,
+  Connection,
+  Crop,
+  Finished,
+  Search,
+  SwitchButton,
+  WarningFilled
+} from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
@@ -23,19 +33,23 @@ const expandedKeys = ref<string[]>([])
 const selectedIds = ref<Set<string>>(new Set())
 const lastSelectedDeviceId = ref<string | null>(null)
 
-const groupModeOptions = computed<Array<{ label: string; value: GroupMode }>>(() => [
-  { label: t('fire.tree.group.loop'), value: 'loop' },
-  { label: t('fire.tree.group.zone'), value: 'zone' },
-  { label: t('fire.tree.group.type'), value: 'type' },
-  { label: t('fire.tree.group.sounderGroup'), value: 'sounderGroup' },
-  { label: t('fire.tree.group.ioGroup'), value: 'ioGroup' }
-])
+const groupModeOptions = computed<Array<{ label: string; value: GroupMode; icon: Component }>>(
+  () => [
+    { label: t('fire.tree.group.loop'), value: 'loop', icon: Connection },
+    { label: t('fire.tree.group.zone'), value: 'zone', icon: Crop },
+    { label: t('fire.tree.group.type'), value: 'type', icon: Search },
+    { label: t('fire.tree.group.sounderGroup'), value: 'sounderGroup', icon: Bell },
+    { label: t('fire.tree.group.ioGroup'), value: 'ioGroup', icon: SwitchButton }
+  ]
+)
 
-const statusOptions = computed<Array<{ label: string; value: DeviceStatusFilter }>>(() => [
-  { label: t('fire.tree.filter.all'), value: 'all' },
-  { label: t('fire.tree.filter.unplaced'), value: 'unplaced' },
-  { label: t('fire.tree.filter.placed'), value: 'placed' },
-  { label: t('fire.tree.filter.issues'), value: 'issues' }
+const statusOptions = computed<
+  Array<{ label: string; value: DeviceStatusFilter; icon: Component }>
+>(() => [
+  { label: t('fire.tree.filter.all'), value: 'all', icon: Finished },
+  { label: t('fire.tree.filter.unplaced'), value: 'unplaced', icon: Close },
+  { label: t('fire.tree.filter.placed'), value: 'placed', icon: Check },
+  { label: t('fire.tree.filter.issues'), value: 'issues', icon: WarningFilled }
 ])
 
 const treeData = computed(() =>
@@ -191,18 +205,48 @@ function issueClass(node: FireTreeNode): string {
 <template>
   <aside class="fire-device-tree">
     <header class="tree-toolbar">
-      <el-segmented
-        v-model="treeGroupMode"
-        :options="groupModeOptions"
-        size="small"
-        class="group-mode"
-      />
-      <el-segmented
-        v-model="deviceStatusFilter"
-        :options="statusOptions"
-        size="small"
-        class="status-filter"
-      />
+      <div class="toolbar-row">
+        <span class="toolbar-label">{{ t('fire.tree.groupLabel') }}</span>
+        <el-button-group class="icon-group" role="radiogroup">
+          <el-tooltip
+            v-for="option in groupModeOptions"
+            :key="option.value"
+            :content="option.label"
+            placement="bottom"
+          >
+            <el-button
+              :type="treeGroupMode === option.value ? 'primary' : 'default'"
+              size="small"
+              :aria-label="option.label"
+              :aria-pressed="treeGroupMode === option.value"
+              @click="treeGroupMode = option.value"
+            >
+              <el-icon><component :is="option.icon" /></el-icon>
+            </el-button>
+          </el-tooltip>
+        </el-button-group>
+      </div>
+      <div class="toolbar-row">
+        <span class="toolbar-label">{{ t('fire.tree.filterLabel') }}</span>
+        <el-button-group class="icon-group" role="radiogroup">
+          <el-tooltip
+            v-for="option in statusOptions"
+            :key="option.value"
+            :content="option.label"
+            placement="bottom"
+          >
+            <el-button
+              :type="deviceStatusFilter === option.value ? 'primary' : 'default'"
+              size="small"
+              :aria-label="option.label"
+              :aria-pressed="deviceStatusFilter === option.value"
+              @click="deviceStatusFilter = option.value"
+            >
+              <el-icon><component :is="option.icon" /></el-icon>
+            </el-button>
+          </el-tooltip>
+        </el-button-group>
+      </div>
       <el-input
         v-model="searchText"
         :prefix-icon="Search"
@@ -274,30 +318,46 @@ function issueClass(node: FireTreeNode): string {
 
 .tree-toolbar {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   padding: 10px;
   border-bottom: 1px solid #d8dee8;
   background: #ffffff;
 }
 
-.group-mode,
-.status-filter {
-  width: 100%;
-}
-
-:deep(.el-segmented) {
-  --el-segmented-item-selected-bg-color: #1d4ed8;
-  --el-segmented-item-selected-color: #ffffff;
-}
-
-:deep(.el-segmented__item) {
+.toolbar-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-:deep(.el-segmented__item-label) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.toolbar-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.icon-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(30px, 1fr);
+  min-width: 0;
+}
+
+.icon-group :deep(.el-button) {
+  display: inline-flex;
+  width: 100%;
+  min-width: 30px;
+  margin: 0;
+  justify-content: center;
+  padding: 5px 0;
+}
+
+.icon-group :deep(.el-button .el-icon) {
+  margin: 0;
 }
 
 .tree-body {
