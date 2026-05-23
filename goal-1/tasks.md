@@ -117,7 +117,7 @@
     - Do not continue to Task 24 until the header is visually acceptable.
   - Completion note: Updated `src/renderer/src/components/fire/DeviceTree.vue` to replace long segmented labels with compact icon button groups and tooltips, with search kept as a separate full-width row. Added `groupLabel` and `filterLabel` i18n keys in `src/renderer/src/i18n/en.ts` and replaced the mojibake Chinese dictionary in `src/renderer/src/i18n/zh.ts` with valid UTF-8 Chinese while adding the same keys. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 7 tests; `npm run typecheck:web` passed. Manual UI check: started the dev renderer at `http://localhost:5173`, used a temporary Vite harness with the real `DeviceTree.vue` and CPD fixture at 340px and 280px widths; both headers rendered 9 compact icon buttons, search stayed full-width, toolbar `scrollWidth` equaled `clientWidth` at both widths, and Zone/Group 0 text was not visible. Risk: manual check used a local component harness because the Electron app's real import/open flows use native file dialogs; the harness was deleted before commit and did not alter product code.
 
-- [ ] Task 24: Confirm 2D Loop-Only Line Source
+- [x] Task 24: Confirm 2D Loop-Only Line Source
   - Owned files: `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/components/fire/Planner2D.vue`
   - Requirements:
     - Prove 2D connection lines come only from effective Loop order.
@@ -126,6 +126,7 @@
   - Verification before next task:
     - `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`
     - Do not continue to Task 25 until this passes.
+  - Completion note: Added a focused `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts` case proving `buildCurrentFloorLoopSegments` only connects consecutive devices in the effective Loop order and ignores unrelated same-floor devices that share Zone, Sounder Group, or I/O Group membership. Code audit of `src/renderer/src/components/fire/Planner2D.vue` confirmed 2D `loopLines` are built only by iterating panel `loops` and `buildCurrentFloorLoopSegments`; no Zone/Group data path creates connection lines. Verification: `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts` passed with 6 tests. Risk: this validates the current helper/component path; manual drawing review remains covered again in Tasks 25, 27, 34, and 35.
 
 - [ ] Task 25: Optimize 2D Drag Line Preview
   - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`

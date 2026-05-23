@@ -91,6 +91,35 @@ describe('loop wiring', () => {
     })
   })
 
+  it('does not create 2D segments from Zone, Sounder Group, or I/O Group membership', () => {
+    const loop = createLoop({
+      configuredDeviceOrder: ['device-a', 'device-b']
+    })
+    const devices = [
+      {
+        ...createDevice('device-a', 'floor-1'),
+        zoneNumber: 1,
+        sounderGroupId: 3
+      },
+      {
+        ...createDevice('device-b', 'floor-1'),
+        zoneNumber: 2,
+        ioGroupId: 4
+      },
+      {
+        ...createDevice('device-c', 'floor-1'),
+        zoneNumber: 1,
+        sounderGroupId: 3,
+        ioGroupId: 4
+      }
+    ]
+
+    expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
+      segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-b' }],
+      skippedSegments: []
+    })
+  })
+
   it('builds 3D segments for placed device pairs across floors', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c']
