@@ -1,5 +1,5 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { basename, join } from 'path'
+import { app, shell, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
+import { basename, extname, join, normalize, sep } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
@@ -10,6 +10,18 @@ import { readFireProjectPackage, writeFireProjectPackage } from './fireProjectPa
 let mainWindow: BrowserWindow | null = null
 
 type MainLogLevel = 'info' | 'warn' | 'error' | 'success'
+const FIRE_ASSET_SCHEME = 'fire-asset'
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: FIRE_ASSET_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true
+    }
+  }
+])
 
 function sendLogToRenderer(message: string, level: MainLogLevel = 'info', details?: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -108,6 +120,78 @@ function getDefaultCpdExtractorDir(): string {
 
 function getCpdImportTempDir(): string {
   return join(app.getPath('temp'), 'numens-fire-alarm-simulator', 'cpd-imports')
+}
+
+function registerFireAssetProtocol(): void {
+  protocol.handle(FIRE_ASSET_SCHEME, async (request) => {
+    try {
+      const requestUrl = new URL(request.url)
+      const filePath = decodeFireAssetPath(requestUrl)
+      const userDataRoot = app.getPath('userData')
+
+      if (!isPathInside(filePath, userDataRoot)) {
+        return new Response('Asset path is outside the application data directory.', {
+          status: 403
+        })
+      }
+
+      const content = await fs.readFile(filePath)
+      return new Response(content, {
+        headers: {
+          'content-type': mimeTypeForAsset(filePath),
+          'cache-control': 'no-cache'
+        }
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return new Response(message, { status: 404 })
+    }
+  })
+}
+
+function decodeFireAssetPath(requestUrl: URL): string {
+  if (requestUrl.hostname !== 'local') {
+    throw new Error('Unsupported fire asset host.')
+  }
+
+  const encoded = requestUrl.pathname.replace(/^\/+/, '')
+  if (!encoded) {
+    throw new Error('Missing fire asset path.')
+  }
+
+  const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+  return Buffer.from(padded, 'base64').toString('utf8')
+}
+
+function isPathInside(filePath: string, rootPath: string): boolean {
+  const normalizedFilePath = normalize(filePath)
+  const normalizedRootPath = normalize(rootPath)
+  const comparableFilePath =
+    process.platform === 'win32' ? normalizedFilePath.toLowerCase() : normalizedFilePath
+  const comparableRootPath =
+    process.platform === 'win32' ? normalizedRootPath.toLowerCase() : normalizedRootPath
+
+  return (
+    comparableFilePath === comparableRootPath ||
+    comparableFilePath.startsWith(`${comparableRootPath}${sep}`)
+  )
+}
+
+function mimeTypeForAsset(filePath: string): string {
+  switch (extname(filePath).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.png':
+      return 'image/png'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.pdf':
+      return 'application/pdf'
+    default:
+      return 'application/octet-stream'
+  }
 }
 
 // 3. Select and import CPD through the main-process extractor boundary.
@@ -267,6 +351,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
+  registerFireAssetProtocol()
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

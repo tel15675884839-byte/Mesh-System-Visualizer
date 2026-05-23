@@ -8,6 +8,7 @@ import type { FireDevice, FireFloor, FirePanel, Vector2 } from '../../domain/fir
 import { buildCurrentFloorLoopSegments } from '../../domain/fire/loopWiring'
 import { createPolygonArea, createRectangleArea } from '../../domain/fire/zoneGeometry'
 import { getDeviceIconHrefByType } from '../../domain/fire/deviceIcons'
+import { getFireAssetHref } from '../../domain/fire/projectAssets'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 import ZoneToolbar from './ZoneToolbar.vue'
 import LoopWiringToolbar from './LoopWiringToolbar.vue'
@@ -94,7 +95,7 @@ const mapAssetHref = computed(() => {
   const asset = floor?.mapAssetId
     ? project.value.assets.find((candidate) => candidate.id === floor.mapAssetId)
     : undefined
-  return asset?.runtimePath ?? asset?.packagePath
+  return getFireAssetHref(asset)
 })
 
 const deviceById = computed(

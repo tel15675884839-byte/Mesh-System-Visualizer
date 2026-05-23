@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FireProjectDocument } from '../../../stores/fireProjectStore'
-import { resolveOpenedProjectAssetRuntimePaths } from '../projectAssets'
+import { getFireAssetHref, resolveOpenedProjectAssetRuntimePaths } from '../projectAssets'
 
 describe('project asset runtime paths', () => {
   it('uses extracted package assets instead of stale saved runtime paths', () => {
@@ -31,6 +31,21 @@ describe('project asset runtime paths', () => {
     const resolved = resolveOpenedProjectAssetRuntimePaths(project, 'D:\\Temp\\opened-fireproj')
 
     expect(resolved.assets[0].runtimePath).toBe('C:\\maps\\external.png')
+  })
+
+  it('uses the app asset protocol for imported local map files', () => {
+    const href = getFireAssetHref({
+      id: 'map-1',
+      kind: 'map',
+      name: 'floor.jpg',
+      packagePath: 'assets/maps/floor.jpg',
+      runtimePath:
+        'C:\\Users\\30741\\AppData\\Roaming\\numens-fire-alarm-simulator\\fire-assets\\maps\\floor.jpg'
+    })
+
+    expect(href).toMatch(/^fire-asset:\/\/local\//)
+    expect(href).not.toContain('file://')
+    expect(href).not.toContain('C:')
   })
 })
 
