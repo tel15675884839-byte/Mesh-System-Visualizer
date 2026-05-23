@@ -173,7 +173,7 @@ function groupByLoop(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
 function groupByZone(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
   const buckets = new Map<string, GroupBucket>()
 
-  for (const zone of panel.zones) {
+  for (const zone of panel.zones.filter((zone) => hasValidGroupNumber(zone.zoneNumber))) {
     buckets.set(String(zone.zoneNumber), {
       key: String(zone.zoneNumber),
       label: `Zone ${zone.zoneNumber}`,
@@ -184,7 +184,7 @@ function groupByZone(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
   }
 
   for (const device of devices) {
-    if (device.zoneNumber === undefined) continue
+    if (!hasValidGroupNumber(device.zoneNumber) || !device.isInputCapable) continue
     const key = String(device.zoneNumber)
     const bucket =
       buckets.get(key) ??
@@ -224,8 +224,9 @@ function groupByType(devices: FireDevice[]): GroupBucket[] {
 
 function groupBySounderGroup(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
   const buckets = new Map<string, GroupBucket>()
+  const validGroups = panel.sounderGroups.filter((group) => hasValidGroupNumber(group.groupId))
 
-  for (const group of panel.sounderGroups) {
+  for (const group of validGroups) {
     buckets.set(String(group.groupId), {
       key: String(group.groupId),
       label: group.title || `Sounder Group ${group.groupId}`,
@@ -237,20 +238,19 @@ function groupBySounderGroup(panel: FirePanel, devices: FireDevice[]): GroupBuck
 
   for (const device of devices) {
     const memberGroupId =
-      device.sounderGroupId ??
-      panel.sounderGroups.find((group) => isDeviceInMembers(device, group.addressableMembers))
-        ?.groupId
+      validGroupNumber(device.sounderGroupId) ??
+      validGroups.find((group) => isDeviceInMembers(device, group.addressableMembers))?.groupId
 
-    if (!device.isSounder && memberGroupId === undefined) {
+    if (memberGroupId === undefined) {
       continue
     }
 
-    const key = memberGroupId === undefined ? 'unassigned-sounder-group' : String(memberGroupId)
+    const key = String(memberGroupId)
     const bucket =
       buckets.get(key) ??
       ensureBucket(buckets, key, {
-        label: memberGroupId === undefined ? 'No Sounder Group' : `Sounder Group ${memberGroupId}`,
-        sortValue: memberGroupId === undefined ? 'zzzz' : String(memberGroupId).padStart(4, '0')
+        label: `Sounder Group ${memberGroupId}`,
+        sortValue: String(memberGroupId).padStart(4, '0')
       })
 
     bucket.devices.push(device)
@@ -261,8 +261,9 @@ function groupBySounderGroup(panel: FirePanel, devices: FireDevice[]): GroupBuck
 
 function groupByIOGroup(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
   const buckets = new Map<string, GroupBucket>()
+  const validGroups = panel.ioGroups.filter((group) => hasValidGroupNumber(group.groupId))
 
-  for (const group of panel.ioGroups) {
+  for (const group of validGroups) {
     buckets.set(String(group.groupId), {
       key: String(group.groupId),
       label: group.raw?.title ? String(group.raw.title) : `I/O Group ${group.groupId}`,
@@ -274,20 +275,19 @@ function groupByIOGroup(panel: FirePanel, devices: FireDevice[]): GroupBucket[] 
 
   for (const device of devices) {
     const memberGroupId =
-      device.ioGroupId ??
-      panel.ioGroups.find((group) => isDeviceInMembers(device, group.members))?.groupId
-    const isIOClassDevice = device.isInputCapable && device.isOutputCapable && !device.isSounder
+      validGroupNumber(device.ioGroupId) ??
+      validGroups.find((group) => isDeviceInMembers(device, group.members))?.groupId
 
-    if (memberGroupId === undefined && !isIOClassDevice) {
+    if (memberGroupId === undefined) {
       continue
     }
 
-    const key = memberGroupId === undefined ? 'unassigned-io-group' : String(memberGroupId)
+    const key = String(memberGroupId)
     const bucket =
       buckets.get(key) ??
       ensureBucket(buckets, key, {
-        label: memberGroupId === undefined ? 'No I/O Group' : `I/O Group ${memberGroupId}`,
-        sortValue: memberGroupId === undefined ? 'zzzz' : String(memberGroupId).padStart(4, '0')
+        label: `I/O Group ${memberGroupId}`,
+        sortValue: String(memberGroupId).padStart(4, '0')
       })
 
     bucket.devices.push(device)
@@ -471,6 +471,14 @@ function compareMaybeNumber(left: number | undefined, right: number | undefined)
   if (left === undefined) return 1
   if (right === undefined) return -1
   return left - right
+}
+
+function validGroupNumber(value: number | undefined): number | undefined {
+  return hasValidGroupNumber(value) ? value : undefined
+}
+
+function hasValidGroupNumber(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
 function normalizeSearch(value: string | undefined): string {

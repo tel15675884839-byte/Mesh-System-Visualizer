@@ -58,7 +58,7 @@ describe('fire device tree', () => {
     ).toEqual(['device-1'])
   })
 
-  it('groups by Zone and hides devices without Zone configuration', () => {
+  it('groups by Zone and hides devices without Zone configuration or pure output devices', () => {
     const tree = buildFireDeviceTree({
       project: fixtureProject(),
       groupMode: 'zone',
@@ -73,7 +73,91 @@ describe('fire device tree', () => {
       .map((node) => node.deviceId)
 
     expect(groupLabels).toEqual(['Zone 1', 'Zone 2'])
-    expect(deviceIds).toEqual(['device-1', 'device-3', 'device-4'])
+    expect(deviceIds).toEqual(['device-1', 'device-4'])
+  })
+
+  it('does not render Zone 0, group 0, or unassigned buckets in grouped views', () => {
+    const project = fixtureProject()
+    const panel = project.networks[0].panels[0]
+    panel.zones = [
+      {
+        ...panel.zones[0],
+        id: 'zone-0',
+        zoneNumber: 0,
+        text: 'Invalid zero Zone'
+      },
+      ...panel.zones
+    ]
+    panel.sounderGroups = [
+      {
+        ...panel.sounderGroups[0],
+        id: 'sg-0',
+        groupId: 0,
+        title: 'Sounder Group 0'
+      },
+      ...panel.sounderGroups
+    ]
+    panel.ioGroups = [
+      {
+        ...panel.ioGroups[0],
+        id: 'io-0',
+        groupId: 0
+      },
+      ...panel.ioGroups
+    ]
+    project.devices = [
+      makeDevice('zone-zero-input', 1, 50, 'manual_call_point', 'MCP Zero', {
+        zoneNumber: 0
+      }),
+      makeDevice('sounder-zero', 1, 51, 'sounder', 'Sounder Zero', {
+        isInputCapable: false,
+        isOutputCapable: true,
+        isSounder: true,
+        sounderGroupId: 0
+      }),
+      makeDevice('sounder-unassigned', 1, 52, 'sounder', 'Sounder Unassigned', {
+        isInputCapable: false,
+        isOutputCapable: true,
+        isSounder: true,
+        sounderGroupId: undefined
+      }),
+      makeDevice('sounder-valid', 1, 30, 'sounder', 'Sounder Valid', {
+        isInputCapable: false,
+        isOutputCapable: true,
+        isSounder: true,
+        sounderGroupId: 7
+      }),
+      makeDevice('io-zero', 2, 53, 'input_output', 'I/O Zero', {
+        isOutputCapable: true,
+        ioGroupId: 0,
+        zoneNumber: 2
+      }),
+      makeDevice('io-unassigned', 2, 54, 'input_output', 'I/O Unassigned', {
+        isOutputCapable: true,
+        ioGroupId: undefined,
+        zoneNumber: 2
+      }),
+      makeDevice('io-valid', 2, 40, 'input_output', 'I/O Valid', {
+        isOutputCapable: true,
+        ioGroupId: 9,
+        zoneNumber: 2
+      })
+    ]
+
+    const zoneTree = buildFireDeviceTree({ project, groupMode: 'zone', statusFilter: 'all' })
+    const sounderTree = buildFireDeviceTree({
+      project,
+      groupMode: 'sounderGroup',
+      statusFilter: 'all'
+    })
+    const ioTree = buildFireDeviceTree({ project, groupMode: 'ioGroup', statusFilter: 'all' })
+
+    expect(groupLabels(zoneTree)).toEqual(['Zone 2'])
+    expect(deviceIds(zoneTree)).toEqual(['io-valid', 'io-zero', 'io-unassigned'])
+    expect(groupLabels(sounderTree)).toEqual(['Sounder Group 7'])
+    expect(deviceIds(sounderTree)).toEqual(['sounder-valid'])
+    expect(groupLabels(ioTree)).toEqual(['I/O Group 9'])
+    expect(deviceIds(ioTree)).toEqual(['io-valid'])
   })
 
   it('groups by Type using description or classify display names', () => {
@@ -115,6 +199,18 @@ describe('fire device tree', () => {
     ).toEqual(['device-4'])
   })
 })
+
+function groupLabels(tree: ReturnType<typeof buildFireDeviceTree>): string[] {
+  return flattenFireTree(tree)
+    .filter((node) => node.kind === 'group')
+    .map((node) => node.label)
+}
+
+function deviceIds(tree: ReturnType<typeof buildFireDeviceTree>): Array<string | undefined> {
+  return flattenFireTree(tree)
+    .filter((node) => node.kind === 'device')
+    .map((node) => node.deviceId)
+}
 
 function fixtureProject(): FireTreeProject {
   return {

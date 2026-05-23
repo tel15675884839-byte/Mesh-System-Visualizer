@@ -92,7 +92,7 @@
     - Do not continue to Task 22 until this passes.
   - Completion note: Added CPD adapter tests for valid non-zero Zone, Sounder Group, and I/O Group values supplied as CPD-like numeric strings, plus zero/empty/missing/unparseable group values. Updated `src/renderer/src/domain/fire/cpdAdapter.ts` so device group references, Zone output mappings, FaultIOGroup, and panel Zone/Sounder/I/O group rows only keep positive group numbers; invalid group rows are skipped instead of creating group 0. Verification: first targeted test run failed as expected on group `0` parsing; after the fix, `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts` passed with 9 tests. Risk: no real customer `.cpd` sample is present, so this remains schema-fixture validation against the documented extractor output.
 
-- [ ] Task 22: Fix Device Tree Group Filtering Rules
+- [x] Task 22: Fix Device Tree Group Filtering Rules
   - Owned files: `src/renderer/src/domain/fire/tree.ts`, `src/renderer/src/domain/fire/__tests__/tree.test.ts`
   - Requirements:
     - Do not render `Zone 0`, `Sounder Group 0`, or `I/O Group 0`.
@@ -102,6 +102,7 @@
   - Verification before next task:
     - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts`
     - Do not continue to Task 23 until this passes.
+  - Completion note: Updated `src/renderer/src/domain/fire/__tests__/tree.test.ts` with failing coverage for Zone 0, Sounder Group 0, I/O Group 0, unassigned group buckets, and pure output devices in Zone grouping. Updated `src/renderer/src/domain/fire/tree.ts` so Zone grouping only includes input-capable devices with a positive Zone, Sounder/I/O grouping only includes positive configured/member groups, and no unassigned Sounder/I/O buckets are produced. Verification: first targeted run failed on the old Sounder-in-Zone and Zone 0 behavior; after the fix, `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts` passed with 7 tests. Risk: this intentionally removes unassigned output-class devices from Sounder/I/O grouped views per the stability requirement, so users must use Loop/Type/All views to locate ungrouped outputs.
 
 - [ ] Task 23: Redesign Device Tree Header Controls
   - Owned files: `src/renderer/src/components/fire/DeviceTree.vue`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
