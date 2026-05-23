@@ -35,6 +35,8 @@ export interface FireProjectDocument extends FireProject {
 }
 
 const GRID_SPACING = 48
+const MIN_DEVICE_ICON_SCALE_2D = 0.4
+const MAX_DEVICE_ICON_SCALE_2D = 3
 
 export const useFireProjectStore = defineStore('fireProject', () => {
   const project = ref<FireProjectDocument>(createEmptyFireProject())
@@ -208,6 +210,17 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     project.value.simulationSettings = {
       ...project.value.simulationSettings,
       timeScale
+    }
+  }
+
+  function setDeviceIconScale2D(scale: number): void {
+    project.value.viewSettings = {
+      ...project.value.viewSettings,
+      deviceIconScale2D: clampNumber(
+        Number.isFinite(scale) ? scale : 1,
+        MIN_DEVICE_ICON_SCALE_2D,
+        MAX_DEVICE_ICON_SCALE_2D
+      )
     }
   }
 
@@ -479,6 +492,7 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     setDeviceStatusFilter,
     setSearchText,
     setSimulationTimeScale,
+    setDeviceIconScale2D,
     addBuilding,
     addFloor,
     ensureDefaultPlanningFloor,
@@ -555,4 +569,8 @@ function createId(prefix: string): string {
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }

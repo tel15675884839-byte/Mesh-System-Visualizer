@@ -42,6 +42,13 @@ const draggingDeviceId = ref<string | null>(null)
 const dragPreview = ref<{ deviceId: string; point: Vector2 } | null>(null)
 const contextMenu = ref({ visible: false, x: 0, y: 0, deviceId: null as string | null })
 const draftLoopOrder = ref<string[]>([])
+const viewport = ref({ x: 0, y: 0, width: 1200, height: 800 })
+const isPanning = ref(false)
+const panStart = ref<{
+  clientX: number
+  clientY: number
+  viewport: { x: number; y: number; width: number; height: number }
+} | null>(null)
 
 const currentNetwork = computed(
   () =>
@@ -88,7 +95,19 @@ const selectedLoop = computed(() => loops.value.find((loop) => loop.id === selec
 
 const mapWidth = computed(() => currentFloor.value?.mapWidth ?? 1200)
 const mapHeight = computed(() => currentFloor.value?.mapHeight ?? 800)
-const viewBox = computed(() => `0 0 ${mapWidth.value} ${mapHeight.value}`)
+const viewBox = computed(
+  () =>
+    `${viewport.value.x} ${viewport.value.y} ${viewport.value.width} ${viewport.value.height}`
+)
+const mapZoomPercent = computed(() => Math.round((mapWidth.value / viewport.value.width) * 100))
+const deviceIconScale2D = computed({
+  get: () => project.value.viewSettings.deviceIconScale2D ?? 1,
+  set: (scale: number) => store.setDeviceIconScale2D(scale)
+})
+const deviceIconSize = computed(() => 24 * deviceIconScale2D.value)
+const deviceIconOffset = computed(() => -deviceIconSize.value / 2)
+const deviceRingRadius = computed(() => deviceIconSize.value / 2 + 5)
+const deviceLabelOffset = computed(() => deviceIconSize.value / 2 + 14)
 
 const mapAssetHref = computed(() => {
   const floor = currentFloor.value
@@ -194,8 +213,22 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => window.addEventListener('keydown', handleKeyDown))
-onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
+watch(
+  () => `${currentFloor.value?.id ?? 'none'}:${mapWidth.value}:${mapHeight.value}`,
+  () => resetViewport(),
+  { immediate: true }
+)
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('mousemove', handleWindowMouseMove)
+  window.addEventListener('mouseup', handleWindowMouseUp)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('mousemove', handleWindowMouseMove)
+  window.removeEventListener('mouseup', handleWindowMouseUp)
+})
 
 function handleDrop(event: DragEvent): void {
   event.preventDefault()
@@ -216,6 +249,12 @@ function handleDrop(event: DragEvent): void {
 
 function handleCanvasMouseDown(event: MouseEvent): void {
   closeContextMenu()
+  if (event.button === 1) {
+    startViewportPan(event)
+    return
+  }
+  if (event.button !== 0) return
+
   if (
     activeTool.value === 'zoneRectangle' &&
     selectedZone.value &&
@@ -228,6 +267,8 @@ function handleCanvasMouseDown(event: MouseEvent): void {
 }
 
 function handleCanvasMouseMove(event: MouseEvent): void {
+  if (isPanning.value) return
+
   const point = toSvgPoint(event)
 
   if (draggingDeviceId.value) {
@@ -241,6 +282,8 @@ function handleCanvasMouseMove(event: MouseEvent): void {
 }
 
 function handleCanvasMouseUp(event: MouseEvent): void {
+  if (event.button !== 0 || isPanning.value) return
+
   if (draggingDeviceId.value) {
     const preview = dragPreview.value
     if (preview && preview.deviceId === draggingDeviceId.value) {
@@ -288,6 +331,12 @@ function handleCanvasMouseUp(event: MouseEvent): void {
   rectanglePreview.value = null
 }
 
+function handleCanvasWheel(event: WheelEvent): void {
+  event.preventDefault()
+  const focusPoint = toSvgPoint(event)
+  zoomViewport(focusPoint, event.deltaY > 0 ? 1.12 : 0.88)
+}
+
 function handleCanvasClick(event: MouseEvent): void {
   if (activeTool.value !== 'zonePolygon' || !selectedZone.value) return
   polygonDraft.value = [...polygonDraft.value, toSvgPoint(event)]
@@ -300,6 +349,7 @@ function handleCanvasDoubleClick(event: MouseEvent): void {
 }
 
 function startDeviceDrag(device: FireDevice, event: MouseEvent): void {
+  if (event.button !== 0) return
   if (activeTool.value !== 'select' && activeTool.value !== 'placeDevice') return
   event.stopPropagation()
   draggingDeviceId.value = device.id
@@ -419,12 +469,29 @@ function finishPolygon(): void {
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
+  if (isEditableTarget(event.target) && event.key !== 'Escape') return
+
   if (event.key === 'Escape') {
+    event.preventDefault()
     polygonDraft.value = []
     rectangleStart.value = null
     rectanglePreview.value = null
     draggingDeviceId.value = null
     dragPreview.value = null
+    draftLoopOrder.value = []
+    store.activeTool = 'select'
+    stopViewportPan()
+    closeContextMenu()
+    return
+  }
+
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    const deviceId = selectedDeviceId.value
+    const device = deviceId ? deviceById.value.get(deviceId) : undefined
+    if (device?.placement.status !== 'placed') return
+
+    event.preventDefault()
+    store.removeDeviceFromDrawing(device.id)
     closeContextMenu()
   }
 }
@@ -462,6 +529,105 @@ function deviceClass(device: FireDevice): string[] {
 
 function deviceIcon(device: FireDevice): string {
   return getDeviceIconHrefByType(device.type)
+}
+
+function resetViewport(): void {
+  viewport.value = { x: 0, y: 0, width: mapWidth.value, height: mapHeight.value }
+  stopViewportPan()
+}
+
+function startViewportPan(event: MouseEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+  isPanning.value = true
+  panStart.value = {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    viewport: { ...viewport.value }
+  }
+}
+
+function stopViewportPan(): void {
+  isPanning.value = false
+  panStart.value = null
+}
+
+function handleWindowMouseMove(event: MouseEvent): void {
+  if (!isPanning.value || !panStart.value) return
+
+  const svg = svgRef.value
+  const bounds = svg?.getBoundingClientRect()
+  if (!bounds?.width || !bounds.height) return
+
+  const start = panStart.value
+  const deltaX = (event.clientX - start.clientX) * (start.viewport.width / bounds.width)
+  const deltaY = (event.clientY - start.clientY) * (start.viewport.height / bounds.height)
+
+  viewport.value = clampViewport({
+    ...start.viewport,
+    x: start.viewport.x - deltaX,
+    y: start.viewport.y - deltaY
+  })
+}
+
+function handleWindowMouseUp(event: MouseEvent): void {
+  if (event.button === 1) {
+    stopViewportPan()
+  }
+}
+
+function zoomViewport(focusPoint: Vector2, factor: number): void {
+  const current = viewport.value
+  const nextWidth = current.width * factor
+  const nextHeight = current.height * factor
+  const focusRatioX = (focusPoint.x - current.x) / current.width
+  const focusRatioY = (focusPoint.y - current.y) / current.height
+
+  viewport.value = clampViewport({
+    x: focusPoint.x - nextWidth * focusRatioX,
+    y: focusPoint.y - nextHeight * focusRatioY,
+    width: nextWidth,
+    height: nextHeight
+  })
+}
+
+function clampViewport(nextViewport: {
+  x: number
+  y: number
+  width: number
+  height: number
+}): { x: number; y: number; width: number; height: number } {
+  const width = clampNumber(nextViewport.width, mapWidth.value / 8, mapWidth.value * 4)
+  const height = clampNumber(nextViewport.height, mapHeight.value / 8, mapHeight.value * 4)
+
+  return {
+    x: clampViewportAxis(nextViewport.x, mapWidth.value, width),
+    y: clampViewportAxis(nextViewport.y, mapHeight.value, height),
+    width,
+    height
+  }
+}
+
+function clampViewportAxis(value: number, contentSize: number, viewportSize: number): number {
+  const margin = viewportSize * 0.35
+  const min = -margin
+  const max = contentSize - viewportSize + margin
+  if (min > max) return (min + max) / 2
+  return clampNumber(value, min, max)
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target instanceof HTMLElement ? target : null
+  if (!element) return false
+  return (
+    element.isContentEditable ||
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName) ||
+    Boolean(element.closest('[contenteditable="true"]'))
+  )
 }
 
 function addBuilding(): void {
@@ -609,12 +775,27 @@ function closeContextMenu(): void {
         @clear-draft="draftLoopOrder = []"
         @restore-default="restoreDefaultLoop"
       />
+
+      <div class="view-controls">
+        <span class="control-label">{{ t('fire.planner.iconScale') }}</span>
+        <el-slider
+          v-model="deviceIconScale2D"
+          size="small"
+          :min="0.4"
+          :max="3"
+          :step="0.1"
+          :show-tooltip="false"
+        />
+        <span class="control-value">{{ deviceIconScale2D.toFixed(1) }}x</span>
+        <span class="zoom-value">{{ mapZoomPercent }}%</span>
+      </div>
     </header>
 
     <div class="canvas-shell">
       <svg
         ref="svgRef"
         class="planner-canvas"
+        :class="{ 'is-panning': isPanning }"
         :viewBox="viewBox"
         role="img"
         @dragover.prevent
@@ -622,6 +803,8 @@ function closeContextMenu(): void {
         @mousedown="handleCanvasMouseDown"
         @mousemove="handleCanvasMouseMove"
         @mouseup="handleCanvasMouseUp"
+        @wheel.prevent="handleCanvasWheel"
+        @auxclick.prevent
         @click="handleCanvasClick"
         @dblclick="handleCanvasDoubleClick"
       >
@@ -713,9 +896,17 @@ function closeContextMenu(): void {
             @dblclick="handleDeviceDoubleClick(device, $event)"
             @contextmenu="showDeviceContextMenu(device, $event)"
           >
-            <circle r="18" class="device-halo" />
-            <image :href="deviceIcon(device)" x="-12" y="-12" width="24" height="24" />
-            <text y="32" text-anchor="middle">{{ device.address ?? device.id }}</text>
+            <circle :r="deviceRingRadius" class="device-ring" />
+            <image
+              :href="deviceIcon(device)"
+              :x="deviceIconOffset"
+              :y="deviceIconOffset"
+              :width="deviceIconSize"
+              :height="deviceIconSize"
+            />
+            <text :y="deviceLabelOffset" text-anchor="middle">
+              {{ device.address ?? device.id }}
+            </text>
           </g>
         </g>
       </svg>
@@ -792,6 +983,36 @@ function closeContextMenu(): void {
   width: 150px;
 }
 
+.view-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 230px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.view-controls :deep(.el-slider) {
+  width: 96px;
+}
+
+.control-label {
+  white-space: nowrap;
+}
+
+.control-value,
+.zoom-value {
+  min-width: 34px;
+  color: #172033;
+  text-align: right;
+}
+
+.zoom-value {
+  color: #64748b;
+}
+
 .canvas-shell {
   position: relative;
   min-height: 0;
@@ -809,6 +1030,10 @@ function closeContextMenu(): void {
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.planner-canvas.is-panning {
+  cursor: grabbing;
 }
 
 .canvas-bg {
@@ -832,31 +1057,35 @@ function closeContextMenu(): void {
   cursor: grabbing;
 }
 
-.device-halo {
-  fill: #ffffff;
-  stroke: #334155;
-  stroke-width: 2;
+.device-ring {
+  fill: rgba(37, 99, 235, 0.05);
+  opacity: 0;
+  pointer-events: none;
+  stroke: rgba(37, 99, 235, 0.3);
+  stroke-width: 1.5;
 }
 
-.device-node.selected .device-halo {
-  stroke: #1d4ed8;
-  stroke-width: 4;
+.device-node.selected .device-ring {
+  opacity: 1;
 }
 
-.device-node.alarm .device-halo {
-  fill: #fee2e2;
-  stroke: #dc2626;
+.device-node.alarm .device-ring {
+  fill: rgba(220, 38, 38, 0.1);
+  opacity: 1;
+  stroke: rgba(220, 38, 38, 0.7);
   animation: pulse-fire 1s infinite;
 }
 
-.device-node.fault .device-halo {
-  fill: #fef3c7;
-  stroke: #d97706;
+.device-node.fault .device-ring {
+  fill: rgba(217, 119, 6, 0.1);
+  opacity: 1;
+  stroke: rgba(217, 119, 6, 0.65);
 }
 
-.device-node.output-active .device-halo {
-  fill: #dbeafe;
-  stroke: #2563eb;
+.device-node.output-active .device-ring {
+  fill: rgba(37, 99, 235, 0.1);
+  opacity: 1;
+  stroke: rgba(37, 99, 235, 0.6);
 }
 
 .device-node.disabled {
@@ -896,10 +1125,10 @@ function closeContextMenu(): void {
 @keyframes pulse-fire {
   0%,
   100% {
-    r: 18;
+    opacity: 1;
   }
   50% {
-    r: 23;
+    opacity: 0.55;
   }
 }
 </style>

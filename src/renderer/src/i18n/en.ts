@@ -45,6 +45,7 @@ export default {
       addBuilding: 'Add Building',
       addFloor: 'Add Floor',
       importDrawing: 'Import Drawing',
+      iconScale: 'Icon size',
       noFloor: 'No floor selected'
     },
     zoneToolbar: {

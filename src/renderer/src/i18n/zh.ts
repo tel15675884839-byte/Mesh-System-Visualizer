@@ -45,6 +45,7 @@ export default {
       addBuilding: '新增建筑',
       addFloor: '新增楼层',
       importDrawing: '导入图纸',
+      iconScale: '图标大小',
       noFloor: '未选择楼层'
     },
     zoneToolbar: {

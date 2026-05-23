@@ -130,6 +130,20 @@ describe('fire project store', () => {
     ])
     expect(store.simulationMode).toBe(true)
   })
+
+  it('updates global 2D device icon scale within usable bounds', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    store.setDeviceIconScale2D(2.4)
+    expect(store.project.viewSettings.deviceIconScale2D).toBe(2.4)
+
+    store.setDeviceIconScale2D(99)
+    expect(store.project.viewSettings.deviceIconScale2D).toBe(3)
+
+    store.setDeviceIconScale2D(0)
+    expect(store.project.viewSettings.deviceIconScale2D).toBe(0.4)
+  })
 })
 
 function makeProject(): FireProject & { devices: FireDevice[] } {
