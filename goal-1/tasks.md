@@ -80,85 +80,177 @@
 - [x] Task 20: Final Verification And Review
   - Completion note: Final manager review completed in-process per the user's later instruction to stop using SubAgents. Fixed active lint blockers in the main/preload entrypoints, formatted new fire-domain files, and updated ESLint scope so the active Fire Alarm app is checked while retired top-level Mesh UI files are excluded from lint. Verification: `npm run lint` passed; `npm run typecheck` passed; `npm run test` passed with 11 files and 70 tests; `npm run build` passed. Compliance review: active App shell is the Fire Alarm Simulator workflow, `.cpd` remains import/config source only, `.fireproj` remains complete save/open package format, and the CIE simulation test suite covers Fire Alarm, Evacuate, Fault, Fire Brigade, Sounder/I/O outputs, Delay/Skip Delay, Disabled/Inhibit, BUZZER SILENCE, and SYSTEM RESET behavior. Search review found no old Mesh/RSSI/Leader/Router/topology product exposure in active fire code; the only `Mesh` hits were Three.js geometry class names in `Viewer3D.vue`. Risk: no sample `.cpd` or `.fireproj` was present in the repository, so the long manual import/export workflow from the plan was not executed end-to-end with real files; behavior is validated through unit tests, typecheck, lint, build, and code review.
 
-- [ ] Task 21: Fix Device Tree Header And Grouping Semantics
-  - Owned files: `src/renderer/src/components/fire/DeviceTree.vue`, `src/renderer/src/domain/fire/tree.ts`, `src/renderer/src/domain/fire/__tests__/tree.test.ts`, `src/renderer/src/domain/fire/cpdAdapter.ts`, `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
+- [ ] Task 21: Verify CPD Group Parsing Semantics
+  - Owned files: `src/renderer/src/domain/fire/cpdAdapter.ts`, `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`, `src/renderer/src/domain/fire/types.ts`
   - Requirements:
-    - Redesign Device Tree header controls as compact icon buttons with hover tooltips.
-    - Prevent top controls from squeezing, colliding, or truncating unpredictably.
-    - Do not show `Zone 0`, `Sounder Group 0`, or `I/O Group 0`.
-    - Treat `0`, empty, missing, or unparseable group values as unassigned.
-    - Do not render unassigned group buckets.
+    - Add focused tests for valid non-zero Zone, Sounder Group, and I/O Group extraction from CPD-like data.
+    - Add focused tests proving `0`, empty, missing, or unparseable group values become unassigned rather than valid groups.
+    - Recheck I/O Group mapping specifically, because incorrect recognition is a known risk.
+    - Fix adapter mapping only if tests show a parsing or normalization bug.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+    - Do not continue to Task 22 until this passes.
+
+- [ ] Task 22: Fix Device Tree Group Filtering Rules
+  - Owned files: `src/renderer/src/domain/fire/tree.ts`, `src/renderer/src/domain/fire/__tests__/tree.test.ts`
+  - Requirements:
+    - Do not render `Zone 0`, `Sounder Group 0`, or `I/O Group 0`.
+    - Do not render an "Unassigned" bucket for Zone, Sounder Group, or I/O Group grouped views.
     - Do not put sounders or pure output devices under Zone grouping.
-    - Allow devices with input capability to appear under Zone only when they have a valid non-zero Zone assignment.
-    - Recheck CPD adapter I/O Group recognition and fix parsed fields if real I/O groups are being mapped to `0` or missing.
-  - Verification:
-    - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
-    - Manual UI check only when requested: confirm Device Tree header layout and group views in the running app.
+    - Include dual-capability devices in Zone grouping only when they have a valid non-zero Zone assignment.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts`
+    - Do not continue to Task 23 until this passes.
 
-- [ ] Task 22: Refine 2D Planner Loop Lines, Drag Preview, Selection Highlight, And Toolbar
-  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/components/fire/ZoneToolbar.vue`, `src/renderer/src/components/fire/LoopWiringToolbar.vue`, `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
+- [ ] Task 23: Redesign Device Tree Header Controls
+  - Owned files: `src/renderer/src/components/fire/DeviceTree.vue`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
   - Requirements:
-    - Ensure all 2D connection lines are Loop-based only.
-    - Do not use Zone, Sounder Group, or I/O Group to create 2D device connection lines.
-    - During drag, update only the visual preview for adjacent Loop segments connected to the dragged device.
-    - Do not write every mousemove into the store.
-    - Commit the final device coordinate once on mouse release.
-    - Remove any selected-device outer circle/ring.
-    - Use icon-only selection highlighting such as subtle brightness or shadow.
-    - Reorganize the top toolbar into floor/drawing, Zone tools, Loop tools, and view controls.
-    - Use SVG/icon buttons with tooltips for action commands to avoid long text layout pressure.
-  - Verification:
-    - `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
-    - Manual UI check only when requested: drag a middle Loop device and confirm only adjacent lines visually follow during drag, then persist on mouse release.
+    - Replace long header controls with compact icon buttons and hover tooltips where practical.
+    - Keep search input full-width and visually separated from grouped icon controls.
+    - Prevent squeezing, collision, and unstable wrapping in the left panel.
+    - Keep the existing grouping and status-filter behavior intact.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts`
+    - Manual UI check when running the app: inspect the Device Tree header at normal and narrow panel widths.
+    - Do not continue to Task 24 until the header is visually acceptable.
 
-- [ ] Task 23: Fix 3D Floor Maps, Floor Spacing, Device Scale, And Grid Visibility
-  - Owned files: `src/renderer/src/components/fire/Viewer3D.vue`, `src/renderer/src/domain/fire/projectAssets.ts`, `src/renderer/src/domain/fire/__tests__/projectAssets.test.ts`, `src/renderer/src/stores/fireProjectStore.ts`, `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+- [ ] Task 24: Confirm 2D Loop-Only Line Source
+  - Owned files: `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/components/fire/Planner2D.vue`
+  - Requirements:
+    - Prove 2D connection lines come only from effective Loop order.
+    - Do not use Zone, Sounder Group, or I/O Group to create 2D device connection lines.
+    - Preserve manual Loop order priority over configured CPD Loop order.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`
+    - Do not continue to Task 25 until this passes.
+
+- [ ] Task 25: Optimize 2D Drag Line Preview
+  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/domain/fire/loopWiring.ts`, `src/renderer/src/domain/fire/__tests__/loopWiring.test.ts`, `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+  - Requirements:
+    - During drag, visually update only Loop segments adjacent to the dragged device.
+    - Do not write every mousemove into the store.
+    - Commit final device coordinates once on mouse release.
+    - Keep drag behavior smooth on larger device lists.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - Manual UI check when running the app: drag a middle Loop device and confirm only adjacent lines follow during drag, then persist after release.
+    - Do not continue to Task 26 until the drag behavior is smooth and correct.
+
+- [ ] Task 26: Refine 2D Device Selection Highlight
+  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`
+  - Requirements:
+    - Remove any selected-device outer circle or ring.
+    - Use icon-only highlighting such as subtle brightness, opacity, or shadow.
+    - Keep alarm, fault, delayed, and active-output visual states distinguishable from selected-only state.
+  - Verification before next task:
+    - Manual UI check when running the app: select normal, alarm, fault, and output devices and confirm no selected outer ring appears.
+    - Run a targeted command only if related domain logic changes; otherwise record this as UI-only verification.
+    - Do not continue to Task 27 until selection visuals are acceptable.
+
+- [ ] Task 27: Rework 2D Planner Toolbar Layout
+  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/components/fire/ZoneToolbar.vue`, `src/renderer/src/components/fire/LoopWiringToolbar.vue`, `src/renderer/src/i18n/en.ts`, `src/renderer/src/i18n/zh.ts`
+  - Requirements:
+    - Group controls into floor/drawing, Zone tools, Loop tools, and view controls.
+    - Use SVG/icon buttons with hover tooltips for action commands.
+    - Keep selects and sliders aligned and readable.
+    - Prevent long visible text from forcing toolbar collision.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/loopWiring.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - Manual UI check when running the app: inspect toolbar at normal and narrow central panel widths.
+    - Do not continue to Task 28 until the toolbar is visually acceptable.
+
+- [ ] Task 28: Fix 3D Floor Map Texture Rendering
+  - Owned files: `src/renderer/src/components/fire/Viewer3D.vue`, `src/renderer/src/domain/fire/projectAssets.ts`, `src/renderer/src/domain/fire/__tests__/projectAssets.test.ts`
   - Requirements:
     - Render each 3D floor with the same imported drawing asset used by the corresponding 2D floor.
     - Fix the black floor-map rendering issue.
-    - Keep 3D floor map dimensions aligned with the 2D floor map dimensions.
-    - Increase floor-to-floor spacing so multiple floors are visually distinct.
+    - Keep texture loading compatible with packaged `fire-asset:` paths and managed map assets.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/projectAssets.test.ts`
+    - Manual UI check when running the app: import a JPG/PNG drawing, switch to 3D, and confirm the floor texture is visible rather than black.
+    - Do not continue to Task 29 until 3D map rendering is correct.
+
+- [ ] Task 29: Adjust 3D Floor Spacing, Device Scale, And Grid Visibility
+  - Owned files: `src/renderer/src/components/fire/Viewer3D.vue`, `src/renderer/src/stores/fireProjectStore.ts`, `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+  - Requirements:
+    - Increase default floor-to-floor spacing so multiple floors are visually distinct.
     - Make 3D device marker size follow the global 2D device icon scale.
     - Do not add a separate 3D size control.
-    - Hide the visible 3D bottom reference grid while preserving any internal coordinate or scaling logic.
-  - Verification:
-    - `npm run test -- src/renderer/src/domain/fire/__tests__/projectAssets.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
-    - Manual UI check only when requested: load a project with at least two floors and an imported drawing, then inspect 3D map texture, floor spacing, device size, and grid visibility.
+    - Hide the visible bottom reference grid while preserving any internal coordinate or scaling logic.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - Manual UI check when running the app: inspect two floors, device size changes after adjusting 2D icon size, and absence of visible reference grid.
+    - Do not continue to Task 30 until 3D spacing/scale/grid behavior is acceptable.
 
-- [ ] Task 24: Audit Simulation Logic Against Parsed CPD Configuration
-  - Owned files: `src/renderer/src/domain/fire/simulation/engine.ts`, `src/renderer/src/domain/fire/simulation/causeEffect.ts`, `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`, `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`, `src/renderer/src/domain/fire/cpdAdapter.ts`, `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+- [ ] Task 30: Audit Simulation Input-To-Output Logic
+  - Owned files: `src/renderer/src/domain/fire/simulation/engine.ts`, `src/renderer/src/domain/fire/simulation/causeEffect.ts`, `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`, `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
   - Requirements:
     - Audit the full path from triggered input action to calculated output state.
-    - Confirm cause/effect output calculation uses parsed CPD configuration for Zone triggers, Sounder Groups, I/O Groups, delays, disabled flags, and inhibit flags.
-    - Treat already parsed but unused CPD fields as bugs if they affect simulation correctness.
-    - Do not add speculative behavior for CPD fields that are not parsed yet.
-    - Confirm delayed outputs remain distinguishable from active outputs.
-    - Confirm disabled or inhibited devices and outputs do not incorrectly activate.
-  - Verification:
-    - `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
-
-- [ ] Task 25: Add Simulation Visual And Audio Feedback
-  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/components/fire/Viewer3D.vue`, `src/renderer/src/components/fire/SimulationPanel.vue`, `src/renderer/src/stores/fireProjectStore.ts`, `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
-  - Requirements:
-    - Triggered input devices should show a clear red alarm animation.
-    - Active sounders should show a strong flashing visual state.
-    - Active I/O outputs should show a distinct active state that is not confused with alarm inputs or sounders.
-    - Delayed outputs should show a pending/slow animation state.
-    - Faults should show an amber warning animation.
-    - Disabled or inhibited items should remain muted/greyed and not be overridden by normal active animations.
-    - Add audible feedback for active sounder behavior while respecting the existing simulation sound setting.
-    - Keep animation styling adjustable; prioritize state correctness and visibility in the first pass.
-  - Verification:
+    - Confirm output calculation uses parsed CPD Zone triggers, Sounder Groups, and I/O Groups.
+    - Confirm active outputs appear in simulation state with the correct output IDs and reasons.
+  - Verification before next task:
     - `npm run test -- src/renderer/src/domain/fire/simulation`
-    - Manual UI/audio check only when requested: trigger an input device, confirm visual states and sound output, then test silence/reset behavior.
+    - Do not continue to Task 31 until this passes.
 
-- [ ] Task 26: Focused Stability Review And Handoff Update
+- [ ] Task 31: Audit Simulation Delay, Disable, And Inhibit Behavior
+  - Owned files: `src/renderer/src/domain/fire/simulation/engine.ts`, `src/renderer/src/domain/fire/simulation/causeEffect.ts`, `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`, `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`, `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+  - Requirements:
+    - Confirm delayed outputs remain distinguishable from active outputs.
+    - Confirm disabled devices and disabled outputs do not incorrectly activate.
+    - Confirm inhibited sounders, I/O, and relays suppress the correct output types.
+    - Treat already parsed but unused CPD fields as bugs if they affect simulation correctness.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+    - Do not continue to Task 32 until this passes.
+
+- [ ] Task 32: Add 2D And 3D Simulation Visual States
+  - Owned files: `src/renderer/src/components/fire/Planner2D.vue`, `src/renderer/src/components/fire/Viewer3D.vue`
+  - Requirements:
+    - Input alarms show clear red flashing or pulsing.
+    - Active sounders show a strong flashing visual state.
+    - Active I/O outputs show a distinct active state.
+    - Delayed outputs show a pending or slower animation state.
+    - Faults show amber warning animation.
+    - Disabled or inhibited items remain muted/greyed and are not overridden by normal active animations.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/simulation`
+    - Manual UI check when running the app: trigger input, fault, delayed output, and disabled/inhibited cases; inspect 2D and 3D visuals.
+    - Do not continue to Task 33 until visual states are distinguishable.
+
+- [ ] Task 33: Add Simulation Audio Feedback
+  - Owned files: `src/renderer/src/components/fire/SimulationPanel.vue`, `src/renderer/src/stores/fireProjectStore.ts`, `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
+  - Requirements:
+    - Add audible feedback for active sounder behavior.
+    - Respect the existing simulation sound setting.
+    - Ensure BUZZER SILENCE, SYSTEM RESET, and output restoration stop or mute audio appropriately.
+    - Avoid overlapping or runaway repeated audio playback.
+  - Verification before next task:
+    - `npm run test -- src/renderer/src/domain/fire/simulation`
+    - Manual UI/audio check when running the app: trigger a sounder, toggle sound setting, silence, reset, and restore.
+    - Do not continue to Task 34 until audio behavior is acceptable.
+
+- [ ] Task 34: Cross-Module Runtime Review
+  - Owned files: active fire UI and domain files changed by Tasks 21-33
+  - Requirements:
+    - Review the running app across Device Tree, 2D, 3D, Properties, Output Groups, and Simulation.
+    - Confirm no old Mesh, RSSI, Leader, Router, or HTML topology product feature was reconnected.
+    - Confirm UI layout has no obvious clipping, overlap, or confusing control grouping.
+    - Confirm each task's verification result is recorded in its completion note before moving on.
+  - Verification before next task:
+    - Manual runtime UI review is required after Tasks 21-33.
+    - Targeted test reruns should cover the files changed during Tasks 21-33.
+    - Do not continue to Task 35 until runtime review passes.
+
+- [ ] Task 35: Final Logic, Code, And UI Validation
   - Owned files: `docs/2026-05-23-fire-simulator-stability-requirements.md`, `docs/2026-05-23-implementation-handoff.md`, `goal-1/tasks.md`
   - Requirements:
-    - Confirm Tasks 21-25 preserve active Fire Alarm Simulator scope and do not reconnect retired Mesh UI.
-    - Record any remaining real-data risks, especially lack of checked-in `.cpd` or `.fireproj` samples.
-    - Keep validation scoped unless the user explicitly requests full validation.
-    - Document exact targeted commands and manual checks performed during each fix.
+    - Run final logic and code validation after all stability tasks are complete.
+    - Run final UI review once more after the code validation passes.
+    - Update the handoff with completed tasks, exact commands, results, manual UI findings, and residual risks.
+    - Preserve unrelated dirty worktree changes unless explicitly told otherwise.
   - Verification:
-    - Run only the targeted tests used by Tasks 21-25 unless the user asks for full verification.
-    - Update this task with command results and residual risks before final commit.
+    - `npm run lint`
+    - `npm run typecheck`
+    - `npm run test`
+    - `npm run build`
+    - Final manual UI review of Device Tree, 2D, 3D, and Simulation.

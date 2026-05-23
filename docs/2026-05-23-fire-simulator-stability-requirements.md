@@ -84,15 +84,26 @@ This document records the confirmed stability and usability requirements discove
 
 ## Recommended Task Order
 
-1. Fix Device Tree grouping semantics and header layout first because it affects navigation and validation of imported CPD data.
-2. Fix 2D planner loop-line rendering, drag preview behavior, selection highlight, and toolbar layout.
-3. Fix 3D floor map texture rendering, floor spacing, device sizing, and grid visibility.
-4. Audit Simulation logic and connect visible/audio output feedback.
-5. Run targeted regression tests after each task and reserve full validation for explicit user request or final release verification.
+1. Verify CPD group parsing semantics before changing Device Tree behavior.
+2. Fix Device Tree group filtering, then its header layout.
+3. Confirm 2D Loop-only line sources before changing drag preview rendering.
+4. Fix 2D drag-line preview, selection highlight, and toolbar layout as separate tasks.
+5. Fix 3D floor map texture rendering before changing spacing, scale, and grid visibility.
+6. Audit Simulation input-to-output logic before adding visual or audio feedback.
+7. Add Simulation visual states before audio feedback.
+8. Run a cross-module runtime review after all focused tasks pass.
+9. Run final logic, code, build, and UI validation after all stability tasks are complete.
 
 ## Verification Guidance
 
 - Prefer focused tests before behavior changes.
 - Use targeted Vitest files for domain/store logic.
-- Use runtime/manual checks for 2D/3D rendering and audio behavior when the user requests interactive verification.
-- Avoid full `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` unless the user explicitly asks for full validation.
+- Each task must pass its listed verification before the next task starts.
+- Use runtime/manual checks for Device Tree, 2D, 3D, and audio behavior when the task changes visible or audible behavior.
+- Record exact commands, results, and manual findings in `goal-1/tasks.md` completion notes.
+- Run full validation only after all stability tasks are complete, per the updated user request:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build`
+- After full validation, perform one final UI review for Device Tree, 2D, 3D, and Simulation layout/behavior.
