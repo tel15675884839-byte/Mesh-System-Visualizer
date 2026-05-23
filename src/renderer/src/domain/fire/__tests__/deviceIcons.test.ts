@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { existsSync } from 'fs'
+import { resolve } from 'path'
 import {
+  deviceIconByType,
   getDeviceIconByType,
+  getDeviceIconHrefByType,
   getFriendlyDeviceTypeName,
   isInputCapableType,
   isOutputCapableType,
-  normalizeDeviceType
+  normalizeDeviceType,
+  unknownDeviceIcon
 } from '../deviceIcons'
 
 describe('device icon mapping', () => {
@@ -17,8 +22,20 @@ describe('device icon mapping', () => {
     expect(getDeviceIconByType('smoke_detector')).toBe('optical-detector.svg')
   })
 
+  it('creates Electron-safe public icon hrefs', () => {
+    expect(getDeviceIconHrefByType('manual_call_point')).toBe('icons/manual-call-point.svg')
+  })
+
   it('returns unknown icon for unsupported type', () => {
     expect(getDeviceIconByType('not_real')).toBe('unknown-device.svg')
+  })
+
+  it('has SVG assets for every mapped fire device icon', () => {
+    const icons = new Set([...Object.values(deviceIconByType), unknownDeviceIcon])
+
+    for (const icon of icons) {
+      expect(existsSync(resolve('public/icons', icon)), icon).toBe(true)
+    }
   })
 
   it('returns friendly names', () => {

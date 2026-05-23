@@ -9,7 +9,7 @@ export default {
       view2d: '2D',
       view3d: '3D',
       properties: '属性',
-      group: '组',
+      group: '输出组',
       simulation: '模拟',
       noProject: '从 CPD 文件开始，或打开 Fire 项目。',
       importFailed: '导入失败',
@@ -42,6 +42,8 @@ export default {
     planner: {
       building: '建筑',
       floor: '楼层',
+      addBuilding: '新增建筑',
+      addFloor: '新增楼层',
       importDrawing: '导入图纸',
       noFloor: '未选择楼层'
     },

@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import { buildFireDeviceTree, flattenFireTree, type FireTreeNode } from '../../domain/fire/tree'
+import { getPublicIconHref } from '../../domain/fire/deviceIcons'
 import type { DeviceStatusFilter, GroupMode } from '../../domain/fire/types'
 
 const emit = defineEmits<{
@@ -236,7 +237,7 @@ function issueClass(node: FireTreeNode): string {
           @dragstart="handleDragStart(data, $event)"
         >
           <span v-if="data.kind === 'device'" class="device-icon-wrap">
-            <img v-if="data.icon" class="device-icon" :src="`/icons/${data.icon}`" alt="" />
+            <img v-if="data.icon" class="device-icon" :src="getPublicIconHref(data.icon)" alt="" />
             <span v-else class="device-icon-fallback" />
           </span>
           <span v-else class="branch-marker" />

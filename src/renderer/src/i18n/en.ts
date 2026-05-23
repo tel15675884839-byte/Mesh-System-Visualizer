@@ -9,7 +9,7 @@ export default {
       view2d: '2D',
       view3d: '3D',
       properties: 'Properties',
-      group: 'Group',
+      group: 'Output Groups',
       simulation: 'Simulation',
       noProject: 'Start from a CPD file or open a fire project.',
       importFailed: 'Import failed',
@@ -42,6 +42,8 @@ export default {
     planner: {
       building: 'Building',
       floor: 'Floor',
+      addBuilding: 'Add Building',
+      addFloor: 'Add Floor',
       importDrawing: 'Import Drawing',
       noFloor: 'No floor selected'
     },

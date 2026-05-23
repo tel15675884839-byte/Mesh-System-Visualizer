@@ -56,6 +56,34 @@ describe('fire project store', () => {
     expect(store.project.devices[0].placement.status).toBe('placed')
   })
 
+  it('creates configurable building and floor targets for 2D planning', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    const buildingId = store.addBuilding()
+    const floorId = store.addFloor(buildingId)
+
+    const building = store.project.buildings.find((item) => item.id === buildingId)
+    expect(building?.name).toBe('Building 1')
+    expect(building?.floors.map((floor) => floor.id)).toContain(floorId)
+    expect(building?.floors).toHaveLength(2)
+    expect(store.canUndo).toBe(true)
+  })
+
+  it('ensures a default planning floor when importing or dropping before setup', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    const target = store.ensureDefaultPlanningFloor()
+
+    expect(store.project.buildings).toHaveLength(1)
+    expect(store.project.buildings[0].floors).toHaveLength(1)
+    expect(target).toEqual({
+      buildingId: store.project.buildings[0].id,
+      floorId: store.project.buildings[0].floors[0].id
+    })
+  })
+
   it('tracks zone and loop planning changes in undo history', () => {
     const store = useFireProjectStore()
     store.loadFireProject(makeProject())

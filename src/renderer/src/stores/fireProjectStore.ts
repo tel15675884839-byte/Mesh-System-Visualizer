@@ -6,6 +6,7 @@ import type {
   DeviceStatusFilter,
   FireAsset,
   FireDevice,
+  FireFloor,
   FireIssue,
   FireProject,
   GroupMode,
@@ -210,6 +211,73 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     }
   }
 
+  function addBuilding(name?: string): string {
+    const buildingId = createId('building')
+    const floor = createPlanningFloor(buildingId, 1)
+
+    withPlanningSnapshot(() => {
+      project.value.buildings = [
+        ...project.value.buildings,
+        {
+          id: buildingId,
+          name: name ?? `Building ${project.value.buildings.length + 1}`,
+          floors: [floor],
+          position: { x: 0, y: 0 },
+          size: { width: 1200, depth: 800 },
+          rotation: 0
+        }
+      ]
+    })
+
+    return buildingId
+  }
+
+  function addFloor(buildingId: string, name?: string): string | null {
+    const building = project.value.buildings.find((candidate) => candidate.id === buildingId)
+    if (!building) {
+      return null
+    }
+
+    const floor = createPlanningFloor(buildingId, building.floors.length + 1, name)
+
+    withPlanningSnapshot(() => {
+      project.value.buildings = project.value.buildings.map((candidate) =>
+        candidate.id === buildingId
+          ? {
+              ...candidate,
+              floors: [...candidate.floors, floor]
+            }
+          : candidate
+      )
+    })
+
+    return floor.id
+  }
+
+  function ensureDefaultPlanningFloor(): { buildingId: string; floorId: string } {
+    const existingBuilding = project.value.buildings[0]
+    const existingFloor = existingBuilding?.floors[0]
+
+    if (existingBuilding && existingFloor) {
+      return { buildingId: existingBuilding.id, floorId: existingFloor.id }
+    }
+
+    if (existingBuilding && !existingFloor) {
+      const floorId = addFloor(existingBuilding.id) as string
+      return { buildingId: existingBuilding.id, floorId }
+    }
+
+    const buildingId = addBuilding()
+    const building = project.value.buildings.find((candidate) => candidate.id === buildingId)
+    const floorId = building?.floors[0]?.id
+
+    if (!floorId) {
+      throw new Error('Unable to create a default planning floor.')
+    }
+
+    return { buildingId, floorId }
+  }
+
   function assignFloorMapAsset(args: {
     asset: FireAsset
     buildingId: string
@@ -411,6 +479,9 @@ export const useFireProjectStore = defineStore('fireProject', () => {
     setDeviceStatusFilter,
     setSearchText,
     setSimulationTimeScale,
+    addBuilding,
+    addFloor,
+    ensureDefaultPlanningFloor,
     assignFloorMapAsset,
     addZoneArea,
     removeZoneArea,
@@ -462,6 +533,24 @@ function normalizeProjectDocument(project: FireProject | FireProjectDocument): F
     issues: cloneValue(document.issues ?? []),
     nonAddressableSounderPoints: cloneValue(document.nonAddressableSounderPoints ?? [])
   }
+}
+
+function createPlanningFloor(buildingId: string, index: number, name?: string): FireFloor {
+  return {
+    id: createId('floor'),
+    buildingId,
+    name: name ?? `Floor ${index}`,
+    levelIndex: index - 1,
+    mapWidth: 1200,
+    mapHeight: 800,
+    camera2D: { x: 0, y: 0, scale: 1 },
+    floorScale3D: 1,
+    floorHeight3D: 3
+  }
+}
+
+function createId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 function cloneValue<T>(value: T): T {

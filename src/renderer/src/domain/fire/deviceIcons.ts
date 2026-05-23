@@ -80,6 +80,15 @@ export function getDeviceIconByType(type: string | undefined | null): string {
   return deviceIconByType[normalizeDeviceType(type)] ?? unknownDeviceIcon
 }
 
+export function getDeviceIconHrefByType(type: string | undefined | null): string {
+  return getPublicIconHref(getDeviceIconByType(type))
+}
+
+export function getPublicIconHref(iconName: string | undefined | null): string {
+  const normalized = String(iconName ?? unknownDeviceIcon).replace(/^\/+/, '')
+  return `icons/${normalized}`
+}
+
 export function getFriendlyDeviceTypeName(type: string | undefined | null): string {
   const normalized = normalizeDeviceType(type)
   return friendlyNameByType[normalized] ?? String(type ?? 'Unknown Device')

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Upload } from '@element-plus/icons-vue'
+import { OfficeBuilding, Plus, Upload } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice, FireFloor, FirePanel, Vector2 } from '../../domain/fire/types'
 import { buildCurrentFloorLoopSegments } from '../../domain/fire/loopWiring'
 import { createPolygonArea, createRectangleArea } from '../../domain/fire/zoneGeometry'
-import { getDeviceIconByType } from '../../domain/fire/deviceIcons'
+import { getDeviceIconHrefByType } from '../../domain/fire/deviceIcons'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 import ZoneToolbar from './ZoneToolbar.vue'
 import LoopWiringToolbar from './LoopWiringToolbar.vue'
@@ -198,9 +198,10 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
 
 function handleDrop(event: DragEvent): void {
   event.preventDefault()
+  const target = ensurePlanningFloorSelection()
   const floor = currentFloor.value
   const building = currentBuilding.value
-  if (!floor || !building) return
+  if (!target || !floor || !building) return
 
   const raw =
     event.dataTransfer?.getData('application/x-fire-device-ids') ||
@@ -367,9 +368,10 @@ function restoreDefaultLoop(): void {
 }
 
 async function importDrawingForCurrentFloor(): Promise<void> {
+  const target = ensurePlanningFloorSelection()
   const building = currentBuilding.value
   const floor = currentFloor.value
-  if (!building || !floor) return
+  if (!target || !building || !floor) return
 
   const result = await window.fireApi.importDrawing()
   if (result.canceled) return
@@ -458,7 +460,39 @@ function deviceClass(device: FireDevice): string[] {
 }
 
 function deviceIcon(device: FireDevice): string {
-  return `/icons/${getDeviceIconByType(device.type)}`
+  return getDeviceIconHrefByType(device.type)
+}
+
+function addBuilding(): void {
+  const buildingId = store.addBuilding()
+  selectedBuildingId.value = buildingId
+  selectedFloorId.value = currentBuilding.value?.floors[0]?.id ?? null
+}
+
+function addFloor(): void {
+  const buildingId = currentBuilding.value?.id ?? selectedBuildingId.value
+  const floorId = buildingId ? store.addFloor(buildingId) : null
+
+  if (floorId) {
+    selectedBuildingId.value = buildingId
+    selectedFloorId.value = floorId
+    return
+  }
+
+  const target = store.ensureDefaultPlanningFloor()
+  selectedBuildingId.value = target.buildingId
+  selectedFloorId.value = target.floorId
+}
+
+function ensurePlanningFloorSelection(): { buildingId: string; floorId: string } | null {
+  if (currentBuilding.value && currentFloor.value) {
+    return { buildingId: currentBuilding.value.id, floorId: currentFloor.value.id }
+  }
+
+  const target = store.ensureDefaultPlanningFloor()
+  selectedBuildingId.value = target.buildingId
+  selectedFloorId.value = target.floorId
+  return target
 }
 
 function devicePoint(device: FireDevice): Vector2 {
@@ -543,12 +577,13 @@ function closeContextMenu(): void {
           />
         </el-select>
         <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
-          <el-button
-            :icon="Upload"
-            size="small"
-            :disabled="!currentFloor"
-            @click="importDrawingForCurrentFloor"
-          />
+          <el-button :icon="Upload" size="small" @click="importDrawingForCurrentFloor" />
+        </el-tooltip>
+        <el-tooltip :content="t('fire.planner.addBuilding')" placement="bottom">
+          <el-button :icon="OfficeBuilding" size="small" @click="addBuilding" />
+        </el-tooltip>
+        <el-tooltip :content="t('fire.planner.addFloor')" placement="bottom">
+          <el-button :icon="Plus" size="small" @click="addFloor" />
         </el-tooltip>
       </div>
 
@@ -684,7 +719,17 @@ function closeContextMenu(): void {
         </g>
       </svg>
 
-      <div v-if="!currentFloor" class="empty-floor">{{ t('fire.planner.noFloor') }}</div>
+      <div v-if="!currentFloor" class="empty-floor" @click.stop>
+        <p>{{ t('fire.planner.noFloor') }}</p>
+        <div>
+          <el-button type="primary" :icon="OfficeBuilding" @click="addBuilding">
+            {{ t('fire.planner.addBuilding') }}
+          </el-button>
+          <el-button :icon="Upload" @click="importDrawingForCurrentFloor">
+            {{ t('fire.planner.importDrawing') }}
+          </el-button>
+        </div>
+      </div>
     </div>
 
     <DeviceContextMenu
@@ -830,9 +875,21 @@ function closeContextMenu(): void {
   position: absolute;
   inset: 0;
   display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
   place-items: center;
   color: #64748b;
   font-weight: 700;
+}
+
+.empty-floor p {
+  margin: 0;
+}
+
+.empty-floor div {
+  display: flex;
+  gap: 8px;
 }
 
 @keyframes pulse-fire {
