@@ -80,7 +80,7 @@
 - [x] Task 20: Final Verification And Review
   - Completion note: Final manager review completed in-process per the user's later instruction to stop using SubAgents. Fixed active lint blockers in the main/preload entrypoints, formatted new fire-domain files, and updated ESLint scope so the active Fire Alarm app is checked while retired top-level Mesh UI files are excluded from lint. Verification: `npm run lint` passed; `npm run typecheck` passed; `npm run test` passed with 11 files and 70 tests; `npm run build` passed. Compliance review: active App shell is the Fire Alarm Simulator workflow, `.cpd` remains import/config source only, `.fireproj` remains complete save/open package format, and the CIE simulation test suite covers Fire Alarm, Evacuate, Fault, Fire Brigade, Sounder/I/O outputs, Delay/Skip Delay, Disabled/Inhibit, BUZZER SILENCE, and SYSTEM RESET behavior. Search review found no old Mesh/RSSI/Leader/Router/topology product exposure in active fire code; the only `Mesh` hits were Three.js geometry class names in `Viewer3D.vue`. Risk: no sample `.cpd` or `.fireproj` was present in the repository, so the long manual import/export workflow from the plan was not executed end-to-end with real files; behavior is validated through unit tests, typecheck, lint, build, and code review.
 
-- [ ] Task 21: Verify CPD Group Parsing Semantics
+- [x] Task 21: Verify CPD Group Parsing Semantics
   - Owned files: `src/renderer/src/domain/fire/cpdAdapter.ts`, `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`, `src/renderer/src/domain/fire/types.ts`
   - Requirements:
     - Add focused tests for valid non-zero Zone, Sounder Group, and I/O Group extraction from CPD-like data.
@@ -90,6 +90,7 @@
   - Verification before next task:
     - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
     - Do not continue to Task 22 until this passes.
+  - Completion note: Added CPD adapter tests for valid non-zero Zone, Sounder Group, and I/O Group values supplied as CPD-like numeric strings, plus zero/empty/missing/unparseable group values. Updated `src/renderer/src/domain/fire/cpdAdapter.ts` so device group references, Zone output mappings, FaultIOGroup, and panel Zone/Sounder/I/O group rows only keep positive group numbers; invalid group rows are skipped instead of creating group 0. Verification: first targeted test run failed as expected on group `0` parsing; after the fix, `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts` passed with 9 tests. Risk: no real customer `.cpd` sample is present, so this remains schema-fixture validation against the documented extractor output.
 
 - [ ] Task 22: Fix Device Tree Group Filtering Rules
   - Owned files: `src/renderer/src/domain/fire/tree.ts`, `src/renderer/src/domain/fire/__tests__/tree.test.ts`

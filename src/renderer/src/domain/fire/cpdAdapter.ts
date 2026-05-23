@@ -83,12 +83,15 @@ export function adaptCpdExport(input: unknown, now = Date.now()): CpdAdapterResu
     panel.zones = zonesInput
       .filter((zone) => numberValue(zone.panelNumber) === panel.panelNumber)
       .map((zone) => adaptZone(zone, networkId, panel.id, issues))
+      .filter(isNotNull)
     panel.sounderGroups = sounderGroupsInput
       .filter((group) => numberValue(group.panelNumber) === panel.panelNumber)
       .map((group) => adaptSounderGroup(group, networkId, panel.id))
+      .filter(isNotNull)
     panel.ioGroups = ioGroupsInput
       .filter((group) => numberValue(group.panelNumber) === panel.panelNumber)
       .map((group) => adaptIOGroup(group, networkId, panel.id))
+      .filter(isNotNull)
   }
 
   const firstPanelMode = panels[0]?.general.sounderMode ?? 'Programmed'
@@ -118,7 +121,7 @@ function adaptGeneral(
   return {
     panelNumber,
     sounderMode,
-    faultIOGroup: optionalNumber(general.FaultIOGroup),
+    faultIOGroup: optionalGroupNumber(general.FaultIOGroup),
     evacuateDelaySeconds: delaySeconds(general.EvacuteDelayMM, general.EvacuteDelaySS),
     evacuateMode: optionalString(general.EvacuteMode),
     sounderDelaySeconds: delaySeconds(general.SounderDelayMM, general.SounderDelaySS),
@@ -163,9 +166,9 @@ function adaptDevice(
     description: optionalString(deviceInput.description),
     classify: optionalString(deviceInput.classify),
     location: optionalString(deviceInput.location),
-    zoneNumber: optionalNumber(deviceInput.zone),
-    sounderGroupId: optionalNumber(deviceInput.sounderGroup),
-    ioGroupId: optionalNumber(deviceInput.ioGroup),
+    zoneNumber: optionalGroupNumber(deviceInput.zone),
+    sounderGroupId: optionalGroupNumber(deviceInput.sounderGroup),
+    ioGroupId: optionalGroupNumber(deviceInput.ioGroup),
     isInputCapable: isInputCapableType(normalizedType),
     isOutputCapable: isOutputCapableType(normalizedType),
     isSounder: isSounderType(normalizedType),
@@ -218,8 +221,12 @@ function adaptZone(
   networkId: string,
   panelId: string,
   issues: FireIssue[]
-): FireZone {
-  const zoneNumber = numberValue(zoneInput.zoneNumber)
+): FireZone | null {
+  const zoneNumber = optionalGroupNumber(zoneInput.zoneNumber)
+  if (zoneNumber === undefined) {
+    return null
+  }
+
   const id = `${panelId}-zone-${zoneNumber}`
   const alarmMode = mapZoneAlarmMode(zoneInput, id, issues)
 
@@ -232,13 +239,13 @@ function adaptZone(
     enabled: booleanValue(zoneInput.enabled, true),
     delayedSounders: booleanValue(zoneInput.delayedSounders),
     alarmMode,
-    sounderGroupAlarm1: optionalNumber(zoneInput.sounderGroupAlarm1),
-    sounderGroupAlarm2: optionalNumber(zoneInput.sounderGroupAlarm2),
-    ioGroup1Alarm1: optionalNumber(zoneInput.ioGroup1Alarm1),
-    ioGroup1Alarm2: optionalNumber(zoneInput.ioGroup1Alarm2),
-    ioGroup2Alarm1: optionalNumber(zoneInput.ioGroup2Alarm1),
-    ioGroup3Alarm1: optionalNumber(zoneInput.ioGroup3Alarm1),
-    ioGroup4Alarm1: optionalNumber(zoneInput.ioGroup4Alarm1),
+    sounderGroupAlarm1: optionalGroupNumber(zoneInput.sounderGroupAlarm1),
+    sounderGroupAlarm2: optionalGroupNumber(zoneInput.sounderGroupAlarm2),
+    ioGroup1Alarm1: optionalGroupNumber(zoneInput.ioGroup1Alarm1),
+    ioGroup1Alarm2: optionalGroupNumber(zoneInput.ioGroup1Alarm2),
+    ioGroup2Alarm1: optionalGroupNumber(zoneInput.ioGroup2Alarm1),
+    ioGroup3Alarm1: optionalGroupNumber(zoneInput.ioGroup3Alarm1),
+    ioGroup4Alarm1: optionalGroupNumber(zoneInput.ioGroup4Alarm1),
     visualAreas: [],
     raw: toRecord(zoneInput.raw)
   }
@@ -248,8 +255,11 @@ function adaptSounderGroup(
   groupInput: Record<string, unknown>,
   networkId: string,
   panelId: string
-): SounderGroup {
-  const groupId = numberValue(groupInput.groupId)
+): SounderGroup | null {
+  const groupId = optionalGroupNumber(groupInput.groupId)
+  if (groupId === undefined) {
+    return null
+  }
 
   return {
     id: `${panelId}-sounder-group-${groupId}`,
@@ -268,8 +278,11 @@ function adaptIOGroup(
   groupInput: Record<string, unknown>,
   networkId: string,
   panelId: string
-): IOGroup {
-  const groupId = numberValue(groupInput.groupId)
+): IOGroup | null {
+  const groupId = optionalGroupNumber(groupInput.groupId)
+  if (groupId === undefined) {
+    return null
+  }
 
   return {
     id: `${panelId}-io-group-${groupId}`,
@@ -405,10 +418,19 @@ function optionalNumber(value: unknown): number | undefined {
   return undefined
 }
 
+function optionalGroupNumber(value: unknown): number | undefined {
+  const parsed = optionalNumber(value)
+  return parsed !== undefined && parsed > 0 ? parsed : undefined
+}
+
 function numberValue(value: unknown, fallback = 0): number {
   return optionalNumber(value) ?? fallback
 }
 
 function booleanValue(value: unknown, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback
+}
+
+function isNotNull<T>(value: T | null): value is T {
+  return value !== null
 }

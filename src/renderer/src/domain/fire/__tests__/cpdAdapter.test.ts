@@ -251,6 +251,112 @@ describe('adaptCpdExport', () => {
     })
   })
 
+  it('extracts valid non-zero Zone, Sounder Group, and I/O Group values from CPD-like strings', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          {
+            ...fixture.devices[0],
+            zone: ' 12 ',
+            sounderGroup: ' 34 ',
+            ioGroup: ' 56 '
+          }
+        ],
+        zones: [
+          {
+            ...fixture.zones[0],
+            zoneNumber: '12',
+            sounderGroupAlarm1: '34',
+            sounderGroupAlarm2: '35',
+            ioGroup1Alarm1: '56',
+            ioGroup1Alarm2: '57'
+          }
+        ],
+        sounderGroups: [{ ...fixture.sounderGroups[0], groupId: '34' }],
+        ioGroups: [{ ...fixture.ioGroups[0], groupId: '56' }]
+      },
+      1234
+    )
+
+    expect(result.devices[0]).toMatchObject({
+      zoneNumber: 12,
+      sounderGroupId: 34,
+      ioGroupId: 56
+    })
+    expect(result.network.panels[0].zones[0]).toMatchObject({
+      zoneNumber: 12,
+      sounderGroupAlarm1: 34,
+      sounderGroupAlarm2: 35,
+      ioGroup1Alarm1: 56,
+      ioGroup1Alarm2: 57
+    })
+    expect(result.network.panels[0].sounderGroups.map((group) => group.groupId)).toEqual([34])
+    expect(result.network.panels[0].ioGroups.map((group) => group.groupId)).toEqual([56])
+  })
+
+  it('treats zero, empty, missing, and unparseable group values as unassigned', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          {
+            ...fixture.devices[0],
+            zone: 0,
+            sounderGroup: '',
+            ioGroup: 'not-a-number'
+          },
+          {
+            ...fixture.devices[1],
+            zone: '0',
+            sounderGroup: 0,
+            ioGroup: undefined
+          }
+        ],
+        zones: [
+          { ...fixture.zones[0], zoneNumber: 0 },
+          { ...fixture.zones[0], zoneNumber: 'not-a-number' },
+          {
+            ...fixture.zones[0],
+            zoneNumber: 4,
+            sounderGroupAlarm1: 0,
+            sounderGroupAlarm2: '',
+            ioGroup1Alarm1: '0',
+            ioGroup1Alarm2: 'not-a-number'
+          }
+        ],
+        sounderGroups: [
+          { ...fixture.sounderGroups[0], groupId: 0 },
+          { ...fixture.sounderGroups[0], groupId: '' },
+          { ...fixture.sounderGroups[0], groupId: 'not-a-number' }
+        ],
+        ioGroups: [
+          { ...fixture.ioGroups[0], groupId: 0 },
+          { ...fixture.ioGroups[0], groupId: '' },
+          { ...fixture.ioGroups[0], groupId: 'not-a-number' }
+        ]
+      },
+      1234
+    )
+
+    expect(result.devices.map((device) => device.zoneNumber)).toEqual([undefined, undefined])
+    expect(result.devices.map((device) => device.sounderGroupId)).toEqual([
+      undefined,
+      undefined
+    ])
+    expect(result.devices.map((device) => device.ioGroupId)).toEqual([undefined, undefined])
+    expect(result.network.panels[0].zones).toHaveLength(1)
+    expect(result.network.panels[0].zones[0]).toMatchObject({
+      zoneNumber: 4,
+      sounderGroupAlarm1: undefined,
+      sounderGroupAlarm2: undefined,
+      ioGroup1Alarm1: undefined,
+      ioGroup1Alarm2: undefined
+    })
+    expect(result.network.panels[0].sounderGroups).toEqual([])
+    expect(result.network.panels[0].ioGroups).toEqual([])
+  })
+
   it('defaults unknown sounder mode to Programmed and records an issue', () => {
     const result = adaptCpdExport(
       {
