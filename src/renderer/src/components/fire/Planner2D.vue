@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { OfficeBuilding, Plus, Upload, ZoomIn } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
@@ -9,13 +9,16 @@ import {
   buildAdjacentCurrentFloorLoopSegments,
   buildCurrentFloorLoopSegments
 } from '../../domain/fire/loopWiring'
-import { createPolygonArea, createRectangleArea } from '../../domain/fire/zoneGeometry'
+import {
+  createPolygonArea,
+  createRectangleArea,
+  validateZonePolygon
+} from '../../domain/fire/zoneGeometry'
 import { getDeviceIconHrefByType } from '../../domain/fire/deviceIcons'
 import { getDeviceIconPlanSize } from '../../domain/fire/deviceSizing'
+import { getDeviceStatusAppearance } from '../../domain/fire/deviceVisualState'
 import { getFireAssetHref } from '../../domain/fire/projectAssets'
 import DeviceContextMenu from './DeviceContextMenu.vue'
-import ZoneToolbar from './ZoneToolbar.vue'
-import LoopWiringToolbar from './LoopWiringToolbar.vue'
 
 const emit = defineEmits<{
   openProperties: [deviceId: string]
@@ -31,6 +34,8 @@ const svgRef = ref<SVGSVGElement | null>(null)
 const selectedBuildingId = ref<string | null>(null)
 const selectedFloorId = ref<string | null>(null)
 const selectedZoneId = ref<string | null>(null)
+const selectedZoneAreaId = ref<string | null>(null)
+const replacingZoneAreaId = ref<string | null>(null)
 const selectedLoopId = ref<string | null>(null)
 const rectangleStart = ref<Vector2 | null>(null)
 const rectanglePreview = ref<Vector2[] | null>(null)
@@ -80,32 +85,53 @@ const sortedFloors = computed(() => {
   return [...currentBuilding.value.floors].sort((a, b) => (b.levelIndex ?? 0) - (a.levelIndex ?? 0))
 })
 
+const chineseDigitValues: Record<string, number> = {
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9
+}
+
+const parseChineseFloorNumber = (name: string): string | null => {
+  const match = name.match(/([一二三四五六七八九十]+)(?:层|楼|樓)/)
+  if (!match) return null
+
+  const value = match[1]
+  if (value === '十') return '10'
+  if (!value.includes('十')) return chineseDigitValues[value]?.toString() ?? null
+
+  const [tensText, onesText] = value.split('十')
+  const tens = tensText ? chineseDigitValues[tensText] : 1
+  const ones = onesText ? chineseDigitValues[onesText] : 0
+  if (!tens || ones === undefined) return null
+  return String(tens * 10 + ones)
+}
+
 const getFloorAbbr = (name: string): string => {
-  const lower = name.toLowerCase()
-  if (lower.includes('basement') || lower.includes('地下') || lower.startsWith('b')) {
-    const match = name.match(/\d+/)
-    if (match) return `B${match[0]}`
-    if (lower.includes('一层') || lower.includes('一')) return 'B1'
-    if (lower.includes('二层') || lower.includes('二')) return 'B2'
-    if (lower.includes('三层') || lower.includes('三')) return 'B3'
-    return 'B'
+  const label = name.trim()
+  const lower = label.toLowerCase()
+  const explicitBasement =
+    lower.includes('basement') || label.includes('地下') || /^b\s*\d*$/i.test(label)
+
+  if (explicitBasement) {
+    const numericMatch = label.match(/\d+/)
+    if (numericMatch) return `B${numericMatch[0]}`
+    const chineseNumber = parseChineseFloorNumber(label)
+    return chineseNumber ? `B${chineseNumber}` : 'B'
   }
-  
-  const match = name.match(/\d+/)
-  if (match) return `${match[0]}F`
-  
-  if (lower.includes('一层') || lower.includes('一')) return '1F'
-  if (lower.includes('二层') || lower.includes('二')) return '2F'
-  if (lower.includes('三层') || lower.includes('三')) return '3F'
-  if (lower.includes('四层') || lower.includes('四')) return '4F'
-  if (lower.includes('五层') || lower.includes('五')) return '5F'
-  if (lower.includes('六层') || lower.includes('六')) return '6F'
-  if (lower.includes('七层') || lower.includes('七')) return '7F'
-  if (lower.includes('八层') || lower.includes('八')) return '8F'
-  if (lower.includes('九层') || lower.includes('九')) return '9F'
-  if (lower.includes('十层') || lower.includes('十')) return '10F'
-  
-  return name.slice(0, 3)
+
+  const numericMatch = label.match(/\d+/)
+  if (numericMatch) return `${numericMatch[0]}F`
+
+  const chineseNumber = parseChineseFloorNumber(label)
+  if (chineseNumber) return `${chineseNumber}F`
+
+  return label.slice(0, 3)
 }
 
 const currentDevices = computed(() => {
@@ -141,6 +167,13 @@ const deviceIconSize = computed(() => getDeviceIconPlanSize(deviceIconScale2D.va
 const deviceIconOffset = computed(() => -deviceIconSize.value / 2)
 const deviceRingRadius = computed(() => deviceIconSize.value / 2 + 5)
 const deviceLabelOffset = computed(() => deviceIconSize.value / 2 + 14)
+const deviceStatusBadgeRadius = computed(() => Math.max(5.5, deviceIconSize.value * 0.17))
+const deviceStatusBadgeX = computed(
+  () => deviceIconSize.value / 2 - deviceStatusBadgeRadius.value * 0.55
+)
+const deviceStatusBadgeY = computed(
+  () => -deviceIconSize.value / 2 + deviceStatusBadgeRadius.value * 0.55
+)
 
 const mapAssetHref = computed(() => {
   const floor = currentFloor.value
@@ -163,6 +196,9 @@ const zoneAreas = computed(() => {
     )
   )
 })
+const selectedZoneArea = computed(() =>
+  zoneAreas.value.find((area) => area.id === selectedZoneAreaId.value)
+)
 
 const loopLines = computed(() => {
   const floor = currentFloor.value
@@ -286,6 +322,25 @@ watch(
 )
 
 watch(
+  zoneAreas,
+  (nextAreas) => {
+    if (
+      selectedZoneAreaId.value &&
+      !nextAreas.some((area) => area.id === selectedZoneAreaId.value)
+    ) {
+      selectedZoneAreaId.value = null
+    }
+    if (
+      replacingZoneAreaId.value &&
+      !nextAreas.some((area) => area.id === replacingZoneAreaId.value)
+    ) {
+      replacingZoneAreaId.value = null
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   () => `${currentFloor.value?.id ?? 'none'}:${mapWidth.value}:${mapHeight.value}`,
   () => resetViewport(),
   { immediate: true }
@@ -383,7 +438,7 @@ function handleCanvasMouseUp(event: MouseEvent): void {
     Math.abs(end.x - rectangleStart.value.x) > 4 &&
     Math.abs(end.y - rectangleStart.value.y) > 4
   ) {
-    store.addZoneArea(
+    commitZoneArea(
       createRectangleArea({
         id: `zone-area-${Date.now()}`,
         networkId: selectedZone.value.networkId,
@@ -415,6 +470,8 @@ function handleCanvasClick(event: MouseEvent): void {
     return
   }
 
+  selectedZoneAreaId.value = null
+  replacingZoneAreaId.value = null
   store.selectDevice(null)
 }
 
@@ -435,6 +492,8 @@ function startDeviceDrag(device: FireDevice, event: MouseEvent): void {
       point: { x: device.placement.position.x, y: device.placement.position.y }
     }
   }
+  selectedZoneAreaId.value = null
+  replacingZoneAreaId.value = null
   store.selectDevice(device.id)
 }
 
@@ -447,12 +506,16 @@ function handleDeviceClick(device: FireDevice, event: MouseEvent): void {
     return
   }
 
+  selectedZoneAreaId.value = null
+  replacingZoneAreaId.value = null
   store.selectDevice(device.id)
 }
 
 function showDeviceContextMenu(device: FireDevice, event: MouseEvent): void {
   event.preventDefault()
   event.stopPropagation()
+  selectedZoneAreaId.value = null
+  replacingZoneAreaId.value = null
   store.selectDevice(device.id)
   contextMenu.value = {
     visible: true,
@@ -517,7 +580,13 @@ function finishPolygon(): void {
   )
     return
 
-  store.addZoneArea(
+  const validation = validateZonePolygon(polygonDraft.value)
+  if (!validation.valid) {
+    ElMessage.warning(t('fire.planner.invalidPolygon'))
+    return
+  }
+
+  commitZoneArea(
     createPolygonArea({
       id: `zone-area-${Date.now()}`,
       networkId: selectedZone.value.networkId,
@@ -533,6 +602,20 @@ function finishPolygon(): void {
   polygonDraft.value = []
 }
 
+function commitZoneArea(area: ReturnType<typeof createRectangleArea>): void {
+  if (replacingZoneAreaId.value) {
+    const replacement = { ...area, id: replacingZoneAreaId.value }
+    store.replaceZoneArea(replacingZoneAreaId.value, replacement)
+    selectedZoneAreaId.value = replacement.id
+    replacingZoneAreaId.value = null
+    store.activeTool = 'select'
+    return
+  }
+
+  store.addZoneArea(area)
+  selectedZoneAreaId.value = area.id
+}
+
 function handleKeyDown(event: KeyboardEvent): void {
   if (isEditableTarget(event.target) && event.key !== 'Escape') return
 
@@ -544,6 +627,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     draggingDeviceId.value = null
     dragPreview.value = null
     draftLoopOrder.value = []
+    replacingZoneAreaId.value = null
     store.activeTool = 'select'
     stopViewportPan()
     closeContextMenu()
@@ -551,6 +635,12 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (selectedZoneAreaId.value) {
+      event.preventDefault()
+      deleteSelectedZoneArea()
+      return
+    }
+
     const deviceId = selectedDeviceId.value
     const device = deviceId ? deviceById.value.get(deviceId) : undefined
     if (device?.placement.status !== 'placed') return
@@ -561,15 +651,56 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 }
 
+function selectZoneArea(areaId: string, event: MouseEvent): void {
+  event.stopPropagation()
+  closeContextMenu()
+  store.selectDevice(null)
+  selectedZoneAreaId.value = areaId
+}
+
+function deleteSelectedZoneArea(): void {
+  const areaId = selectedZoneAreaId.value
+  if (!areaId) return
+
+  store.removeZoneArea(areaId)
+  selectedZoneAreaId.value = null
+  if (replacingZoneAreaId.value === areaId) {
+    replacingZoneAreaId.value = null
+  }
+  closeContextMenu()
+}
+
+function startReplaceSelectedZoneArea(): void {
+  const area = selectedZoneArea.value
+  if (!area) return
+
+  const zone = zones.value.find(
+    (candidate) => candidate.panelId === area.panelId && candidate.zoneNumber === area.zoneNumber
+  )
+  selectedZoneId.value = zone?.id ?? selectedZoneId.value
+  selectedBuildingId.value = area.buildingId
+  selectedFloorId.value = area.floorId
+  replacingZoneAreaId.value = area.id
+  polygonDraft.value = []
+  rectangleStart.value = null
+  rectanglePreview.value = null
+  store.activeTool = 'zoneRectangle'
+}
+
 function deviceClass(device: FireDevice): string[] {
+  const status = getDeviceStatusAppearance(device).state
   return [
     selectedDeviceId.value === device.id ? 'selected' : '',
-    device.disabled ? 'disabled' : ''
+    status === 'normal' ? '' : status
   ].filter(Boolean)
 }
 
 function deviceIcon(device: FireDevice): string {
   return getDeviceIconHrefByType(device.type)
+}
+
+function deviceStatus(device: FireDevice): ReturnType<typeof getDeviceStatusAppearance> {
+  return getDeviceStatusAppearance(device)
 }
 
 function resetViewport(): void {
@@ -692,6 +823,59 @@ function addFloor(): void {
   selectedFloorId.value = target.floorId
 }
 
+async function deleteBuilding(): Promise<void> {
+  const buildingId = currentBuilding.value?.id
+  if (!buildingId) return
+
+  const confirmed = await confirmPlanningDelete('fire.planner.confirmDeleteBuilding')
+  if (!confirmed) return
+
+  store.removeBuilding(buildingId)
+  selectFirstAvailablePlanningTarget()
+}
+
+async function deleteFloor(): Promise<void> {
+  const buildingId = currentBuilding.value?.id
+  const floorId = currentFloor.value?.id
+  if (!buildingId || !floorId) return
+
+  const confirmed = await confirmPlanningDelete('fire.planner.confirmDeleteFloor')
+  if (!confirmed) return
+
+  store.removeFloor(buildingId, floorId)
+  selectFirstAvailablePlanningTarget(buildingId)
+}
+
+function clearDrawing(): void {
+  const buildingId = currentBuilding.value?.id
+  const floorId = currentFloor.value?.id
+  if (!buildingId || !floorId || !currentFloor.value?.mapAssetId) return
+
+  store.clearFloorMapAsset(buildingId, floorId)
+}
+
+async function confirmPlanningDelete(messageKey: string): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(t(messageKey), t('fire.planner.confirmDeleteTitle'), {
+      type: 'warning',
+      confirmButtonText: t('fire.common.apply'),
+      cancelButtonText: t('fire.common.cancel')
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function selectFirstAvailablePlanningTarget(preferredBuildingId?: string): void {
+  const building =
+    project.value.buildings.find((candidate) => candidate.id === preferredBuildingId) ??
+    project.value.buildings[0]
+
+  selectedBuildingId.value = building?.id ?? null
+  selectedFloorId.value = building?.floors[0]?.id ?? null
+}
+
 function ensurePlanningFloorSelection(): { buildingId: string; floorId: string } | null {
   if (currentBuilding.value && currentFloor.value) {
     return { buildingId: currentBuilding.value.id, floorId: currentFloor.value.id }
@@ -769,63 +953,324 @@ function segmentTouchesDevice(
 
 <template>
   <section class="planner-2d" @click="closeContextMenu">
-    <header class="planner-toolbar" @click.stop>
-      <div class="toolbar-section floor-controls" :aria-label="t('fire.planner.floor')">
-        <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
-          <el-button :icon="Upload" size="small" @click="importDrawingForCurrentFloor" />
-        </el-tooltip>
-        <el-tooltip :content="t('fire.planner.addBuilding')" placement="bottom">
-          <el-button :icon="OfficeBuilding" size="small" @click="addBuilding" />
-        </el-tooltip>
-        <el-tooltip :content="t('fire.planner.addFloor')" placement="bottom">
-          <el-button :icon="Plus" size="small" @click="addFloor" />
-        </el-tooltip>
-      </div>
-
-      <ZoneToolbar
-        :zones="zones"
-        :selected-zone-id="selectedZoneId"
-        :active-tool="activeTool"
-        :polygon-point-count="polygonDraft.length"
-        @select-zone="selectedZoneId = $event"
-        @select-tool="store.activeTool = $event"
-        @cancel-polygon="polygonDraft = []"
-      />
-
-      <LoopWiringToolbar
-        :loops="loops"
-        :selected-loop-id="selectedLoopId"
-        :active-tool="activeTool"
-        :draft-order-count="draftLoopOrder.length"
-        @select-loop="selectedLoopId = $event"
-        @start-manual="store.activeTool = 'manualLoopWiring'"
-        @save-manual="saveManualLoopOrder"
-        @clear-draft="draftLoopOrder = []"
-        @restore-default="restoreDefaultLoop"
-      />
-
-      <div class="toolbar-section view-controls" :aria-label="t('fire.planner.iconScale')">
-        <el-tooltip :content="t('fire.planner.iconScale')" placement="bottom">
-          <el-icon class="view-icon"><ZoomIn /></el-icon>
-        </el-tooltip>
-        <el-slider
-          v-model="deviceIconScale2D"
-          size="small"
-          :min="0.4"
-          :max="3"
-          :step="0.1"
-          :show-tooltip="false"
-        />
-        <span class="control-value">{{ deviceIconScale2D.toFixed(1) }}x</span>
-        <span class="zoom-value">{{ mapZoomPercent }}%</span>
-      </div>
-    </header>
-
     <div class="canvas-shell" :class="{ 'has-map': mapAssetHref }">
+      <header class="planner-toolbar" @click.stop>
+        <!-- 1. 图纸楼层 (Drawing & Floor) -->
+        <div class="toolbar-section floor-controls" :aria-label="t('fire.planner.floor')">
+          <span class="section-tag">图纸楼层</span>
+          <div class="btn-group">
+            <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
+              <button class="toolbar-btn" @click="importDrawingForCurrentFloor">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.clearDrawing')" placement="bottom">
+              <button class="toolbar-btn" :disabled="!currentFloor?.mapAssetId" @click="clearDrawing">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="m20 20-5-5" />
+                  <path d="M12 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.5" />
+                  <path d="m8.5 12.5 4-4" />
+                  <path d="m11.5 15.5 4-4" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.addBuilding')" placement="bottom">
+              <button class="toolbar-btn" @click="addBuilding">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <rect x="4" y="2" width="8" height="20" rx="1" />
+                  <rect x="12" y="8" width="8" height="14" rx="1" />
+                  <line x1="6" y1="6" x2="6.01" y2="6" />
+                  <line x1="10" y1="6" x2="10.01" y2="6" />
+                  <line x1="6" y1="10" x2="6.01" y2="10" />
+                  <line x1="10" y1="10" x2="10.01" y2="10" />
+                  <line x1="6" y1="14" x2="6.01" y2="14" />
+                  <line x1="10" y1="14" x2="10.01" y2="14" />
+                  <line x1="6" y1="18" x2="6.01" y2="18" />
+                  <line x1="10" y1="18" x2="10.01" y2="18" />
+                  <line x1="14" y1="12" x2="14.01" y2="12" />
+                  <line x1="18" y1="12" x2="18.01" y2="12" />
+                  <line x1="14" y1="16" x2="14.01" y2="16" />
+                  <line x1="18" y1="16" x2="18.01" y2="16" />
+                  <circle cx="17" cy="4" r="3" />
+                  <line x1="17" y1="2" x2="17" y2="6" />
+                  <line x1="15" y1="4" x2="19" y2="4" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.deleteBuilding')" placement="bottom">
+              <button class="toolbar-btn danger" :disabled="!currentBuilding" @click="deleteBuilding">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <rect x="4" y="2" width="8" height="20" rx="1" />
+                  <rect x="12" y="8" width="8" height="14" rx="1" />
+                  <line x1="6" y1="6" x2="6.01" y2="6" />
+                  <line x1="10" y1="6" x2="10.01" y2="6" />
+                  <line x1="6" y1="10" x2="6.01" y2="10" />
+                  <line x1="10" y1="10" x2="10.01" y2="10" />
+                  <line x1="6" y1="14" x2="6.01" y2="14" />
+                  <line x1="10" y1="14" x2="10.01" y2="14" />
+                  <line x1="6" y1="18" x2="6.01" y2="18" />
+                  <line x1="10" y1="18" x2="10.01" y2="18" />
+                  <line x1="14" y1="12" x2="14.01" y2="12" />
+                  <line x1="18" y1="12" x2="18.01" y2="12" />
+                  <line x1="14" y1="16" x2="14.01" y2="16" />
+                  <line x1="18" y1="16" x2="18.01" y2="16" />
+                  <circle cx="17" cy="4" r="3" />
+                  <line x1="15" y1="4" x2="19" y2="4" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.addFloor')" placement="bottom">
+              <button class="toolbar-btn" @click="addFloor">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 17 12 22 22 17" />
+                  <polyline points="2 12 12 17 22 12" />
+                  <circle cx="12" cy="7" r="1.5" fill="currentColor" />
+                  <line x1="12" y1="15" x2="12" y2="19" />
+                  <line x1="10" y1="17" x2="14" y2="17" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.deleteFloor')" placement="bottom">
+              <button class="toolbar-btn danger" :disabled="!currentFloor" @click="deleteFloor">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 17 12 22 22 17" />
+                  <polyline points="2 12 12 17 22 12" />
+                  <circle cx="12" cy="7" r="1.5" fill="currentColor" />
+                  <line x1="10" y1="17" x2="14" y2="17" />
+                </svg>
+              </button>
+            </el-tooltip>
+          </div>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- 2. 探测防区 (Zones) -->
+        <div class="toolbar-section zone-controls" :aria-label="t('fire.zoneToolbar.zone')">
+          <span class="section-tag">探测防区</span>
+          <div class="btn-group">
+            <el-select
+              :model-value="selectedZoneId"
+              size="small"
+              class="zone-select-dock"
+              :placeholder="t('fire.zoneToolbar.zone')"
+              clearable
+              @update:model-value="(value) => selectedZoneId = value || null"
+            >
+              <el-option
+                v-for="zone in zones"
+                :key="zone.id"
+                :label="`Zone ${zone.zoneNumber}${zone.text ? ` - ${zone.text}` : ''}`"
+                :value="zone.id"
+              />
+            </el-select>
+
+            <el-tooltip :content="t('fire.zoneToolbar.select')" placement="bottom">
+              <button
+                :class="['toolbar-btn', { active: activeTool === 'select' }]"
+                @click="store.activeTool = 'select'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                  <path d="m13 13 6 6" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.zoneToolbar.rectangle')" placement="bottom">
+              <button
+                :class="['toolbar-btn', { active: activeTool === 'zoneRectangle' }]"
+                @click="store.activeTool = 'zoneRectangle'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.zoneToolbar.polygon')" placement="bottom">
+              <button
+                :class="['toolbar-btn', { active: activeTool === 'zonePolygon' }]"
+                @click="store.activeTool = 'zonePolygon'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="m12 3-1.912 5.886L4 10.077l5.318 4.38L7.18 21 12 17.562 16.82 21l-2.138-6.543L20 10.077l-6.088-.191L12 3z" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.zoneToolbar.cancelPolygon')" placement="bottom">
+              <button
+                class="toolbar-btn"
+                :disabled="polygonDraft.length === 0"
+                @click="polygonDraft = []"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <span v-if="polygonDraft.length > 0" class="point-count-badge">{{ polygonDraft.length }}</span>
+
+            <!-- Zone Area Controls -->
+            <template v-if="selectedZoneAreaId">
+              <div class="sub-divider"></div>
+              <el-tooltip :content="t('fire.planner.replaceZoneArea')" placement="bottom">
+                <button
+                  :class="['toolbar-btn', { active: replacingZoneAreaId === selectedZoneAreaId }]"
+                  @click="startReplaceSelectedZoneArea"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </button>
+              </el-tooltip>
+              <el-tooltip :content="t('fire.planner.deleteZoneArea')" placement="bottom">
+                <button
+                  class="toolbar-btn danger"
+                  @click="deleteSelectedZoneArea"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+              </el-tooltip>
+            </template>
+          </div>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- 3. 回路连线 (Loops) -->
+        <div class="toolbar-section loop-controls" :aria-label="t('fire.loopToolbar.loop')">
+          <span class="section-tag">回路连线</span>
+          <div class="btn-group">
+            <el-select
+              :model-value="selectedLoopId"
+              size="small"
+              class="loop-select-dock"
+              :placeholder="t('fire.loopToolbar.loop')"
+              clearable
+              @update:model-value="(value) => selectedLoopId = value || null"
+            >
+              <el-option
+                v-for="loop in loops"
+                :key="loop.id"
+                :label="loop.name || `Loop ${loop.loopId}`"
+                :value="loop.id"
+              />
+            </el-select>
+
+            <el-tooltip :content="t('fire.loopToolbar.start')" placement="bottom">
+              <button
+                :class="['toolbar-btn', { active: activeTool === 'manualLoopWiring' }]"
+                @click="store.activeTool = 'manualLoopWiring'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="M18 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                  <circle cx="9" cy="9" r="2" />
+                  <circle cx="15" cy="15" r="2" />
+                  <path d="M9 11v2a2 2 0 0 0 2 2h2" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.loopToolbar.save')" placement="bottom">
+              <button
+                class="toolbar-btn"
+                :disabled="draftLoopOrder.length < 2"
+                @click="saveManualLoopOrder"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.loopToolbar.clear')" placement="bottom">
+              <button
+                class="toolbar-btn danger"
+                :disabled="draftLoopOrder.length === 0"
+                @click="draftLoopOrder = []"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <el-tooltip :content="t('fire.loopToolbar.restore')" placement="bottom">
+              <button
+                class="toolbar-btn"
+                :disabled="!selectedLoopId"
+                @click="restoreDefaultLoop"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <polyline points="3 3 3 8 8 8" />
+                </svg>
+              </button>
+            </el-tooltip>
+
+            <span class="loop-badge">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon link-icon">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              {{ draftLoopOrder.length }}
+            </span>
+          </div>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- 4. 视图缩放 (Viewport) -->
+        <div class="toolbar-section view-controls-section" :aria-label="t('fire.planner.iconScale')">
+          <span class="section-tag">视图缩放</span>
+          <div class="btn-group">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon view-icon-svg">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+
+            <el-slider
+              v-model="deviceIconScale2D"
+              size="small"
+              :min="0.4"
+              :max="3"
+              :step="0.1"
+              :show-tooltip="false"
+              class="view-slider-dock"
+            />
+            <span class="control-value-dock">{{ deviceIconScale2D.toFixed(1) }}x</span>
+            <span class="zoom-value-dock">{{ mapZoomPercent }}%</span>
+          </div>
+        </div>
+      </header>
       <!-- Floor Navigator Panel -->
-      <div class="floor-navigator-panel" v-if="project.buildings.length > 0 && (project.buildings.length > 1 || sortedFloors.length > 0)">
+      <div
+        v-if="
+          project.buildings.length > 0 && (project.buildings.length > 1 || sortedFloors.length > 0)
+        "
+        class="floor-navigator-panel"
+      >
         <!-- Building Selector -->
-        <div class="building-tabs" v-if="project.buildings.length > 1">
+        <div v-if="project.buildings.length > 1" class="building-tabs">
           <button
             v-for="b in project.buildings"
             :key="b.id"
@@ -842,8 +1287,8 @@ function segmentTouchesDevice(
             v-for="f in sortedFloors"
             :key="f.id"
             :class="['floor-btn', { active: selectedFloorId === f.id, 'rect-btn': isMultiColumn }]"
-            @click="selectedFloorId = f.id"
             :title="f.name"
+            @click="selectedFloorId = f.id"
           >
             {{ getFloorAbbr(f.name) }}
           </button>
@@ -883,11 +1328,18 @@ function segmentTouchesDevice(
           <polygon
             v-for="area in zoneAreas"
             :key="area.id"
+            class="zone-area"
+            :class="{
+              selected: selectedZoneAreaId === area.id,
+              replacing: replacingZoneAreaId === area.id
+            }"
             :points="areaPoints(area.points)"
             :fill="area.color"
             :fill-opacity="area.opacity"
-            :stroke="area.color"
-            stroke-width="2"
+            :stroke="selectedZoneAreaId === area.id ? '#111827' : area.color"
+            :stroke-dasharray="replacingZoneAreaId === area.id ? '9 5' : undefined"
+            :stroke-width="selectedZoneAreaId === area.id ? 4 : 2"
+            @click="selectZoneArea(area.id, $event)"
           />
           <polygon
             v-if="rectanglePreview"
@@ -960,11 +1412,15 @@ function segmentTouchesDevice(
             :key="device.id"
             class="device-node"
             :class="deviceClass(device)"
+            :data-device-status="deviceStatus(device).state"
             :transform="`translate(${devicePoint(device).x} ${devicePoint(device).y})`"
             @mousedown="startDeviceDrag(device, $event)"
             @click="handleDeviceClick(device, $event)"
             @contextmenu="showDeviceContextMenu(device, $event)"
           >
+            <title v-if="deviceStatus(device).title">
+              {{ device.address ?? device.id }} - {{ deviceStatus(device).title }}
+            </title>
             <circle :r="deviceRingRadius" class="device-ring" />
             <image
               :href="deviceIcon(device)"
@@ -972,8 +1428,19 @@ function segmentTouchesDevice(
               :y="deviceIconOffset"
               :width="deviceIconSize"
               :height="deviceIconSize"
+              :opacity="deviceStatus(device).iconOpacity"
             />
-            <text :y="deviceLabelOffset" text-anchor="middle">
+            <g
+              v-if="deviceStatus(device).badgeLabel"
+              class="device-status-badge"
+              :transform="`translate(${deviceStatusBadgeX} ${deviceStatusBadgeY})`"
+            >
+              <circle :r="deviceStatusBadgeRadius" :fill="deviceStatus(device).color" />
+              <text class="device-status-badge-label" y="0.35em" text-anchor="middle">
+                {{ deviceStatus(device).badgeLabel }}
+              </text>
+            </g>
+            <text class="device-address-label" :y="deviceLabelOffset" text-anchor="middle">
               {{ device.address ?? device.id }}
             </text>
           </g>
@@ -983,10 +1450,31 @@ function segmentTouchesDevice(
       <div v-if="!currentFloor" class="empty-floor" @click.stop>
         <p>{{ t('fire.planner.noFloor') }}</p>
         <div>
-          <el-button type="primary" :icon="OfficeBuilding" @click="addBuilding">
+          <el-button type="primary" @click="addBuilding">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon btn-inline-svg" style="margin-right: 6px; width: 14px; height: 14px;">
+              <rect x="4" y="2" width="8" height="20" rx="1" />
+              <rect x="12" y="8" width="8" height="14" rx="1" />
+              <line x1="6" y1="6" x2="6.01" y2="6" />
+              <line x1="10" y1="6" x2="10.01" y2="6" />
+              <line x1="6" y1="10" x2="6.01" y2="10" />
+              <line x1="10" y1="10" x2="10.01" y2="10" />
+              <line x1="6" y1="14" x2="6.01" y2="14" />
+              <line x1="10" y1="14" x2="10.01" y2="14" />
+              <line x1="6" y1="18" x2="6.01" y2="18" />
+              <line x1="10" y1="18" x2="10.01" y2="18" />
+              <line x1="14" y1="12" x2="14.01" y2="12" />
+              <line x1="18" y1="12" x2="18.01" y2="12" />
+              <line x1="14" y1="16" x2="14.01" y2="16" />
+              <line x1="18" y1="16" x2="18.01" y2="16" />
+            </svg>
             {{ t('fire.planner.addBuilding') }}
           </el-button>
-          <el-button :icon="Upload" @click="importDrawingForCurrentFloor">
+          <el-button @click="importDrawingForCurrentFloor">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon btn-inline-svg" style="margin-right: 6px; width: 14px; height: 14px;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
             {{ t('fire.planner.importDrawing') }}
           </el-button>
         </div>
@@ -1012,75 +1500,242 @@ function segmentTouchesDevice(
 <style scoped>
 .planner-2d {
   position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   background: #eef2f7;
   color: #172033;
 }
 
+/* 悬浮磨砂玻璃工具坞 */
 .planner-toolbar {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 8px 10px;
-  border-bottom: 1px solid #d8dee8;
-  background: #ffffff;
-  overflow-x: auto;
+  align-items: stretch;
+  gap: 12px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  user-select: none;
+  pointer-events: auto;
 }
 
 .toolbar-section {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid #e2e8f0;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+.section-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.btn-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  align-self: center;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* 按钮样式微调 */
+.toolbar-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
-  background: #f8fafc;
-}
-
-.floor-controls {
-  max-width: 390px;
-}
-
-.floor-controls :deep(.el-select) {
-  width: 118px;
-}
-
-.view-controls {
-  min-width: 148px;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.view-controls :deep(.el-slider) {
-  width: 68px;
-}
-
-.view-icon {
+  border: none;
+  background: transparent;
   color: #334155;
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  padding: 0;
 }
 
-.control-value,
-.zoom-value {
-  min-width: 34px;
-  color: #172033;
+.toolbar-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #000000;
+  transform: scale(1.06);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.toolbar-btn.active:not(:disabled) {
+  background: #0071e3;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.35);
+}
+
+.toolbar-btn:disabled {
+  color: rgba(0, 0, 0, 0.22);
+  cursor: not-allowed;
+}
+
+.toolbar-btn.danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.toolbar-btn.danger.active:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}
+
+.svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sub-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 2px;
+}
+
+/* Select下拉框深度定制 */
+.zone-select-dock,
+.loop-select-dock {
+  width: 105px;
+  margin-right: 2px;
+}
+
+.zone-select-dock :deep(.el-select__wrapper),
+.loop-select-dock :deep(.el-select__wrapper) {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 0 8px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+}
+
+.zone-select-dock :deep(.el-select__placeholder),
+.loop-select-dock :deep(.el-select__placeholder) {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #515154 !important;
+}
+
+.zone-select-dock :deep(.el-select__selected-item),
+.loop-select-dock :deep(.el-select__selected-item) {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #000000 !important;
+}
+
+/* 徽标 */
+.point-count-badge {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.loop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 99px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.link-icon {
+  width: 10px;
+  height: 10px;
+}
+
+/* 视图缩放样式 */
+.view-controls-section {
+  width: 175px;
+}
+
+.view-icon-svg {
+  color: #475569;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.view-slider-dock {
+  width: 60px !important;
+  margin-right: 6px;
+}
+
+.view-slider-dock :deep(.el-slider__runway) {
+  height: 4px !important;
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.view-slider-dock :deep(.el-slider__bar) {
+  height: 4px !important;
+  background-color: #0071e3 !important;
+}
+
+.view-slider-dock :deep(.el-slider__button) {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid #0071e3 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+}
+
+.control-value-dock,
+.zoom-value-dock {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d1d1f;
+  min-width: 24px;
   text-align: right;
 }
 
-.zoom-value {
-  color: #64748b;
+.zoom-value-dock {
+  color: #86868b;
+  min-width: 32px;
 }
 
 .canvas-shell {
   position: relative;
-  min-height: 0;
+  width: 100%;
+  height: 100%;
   overflow: auto;
+  box-sizing: border-box;
   padding: 16px;
   background: #e8eef6;
 }
@@ -1133,6 +1788,15 @@ function segmentTouchesDevice(
   pointer-events: none;
 }
 
+.zone-layer .zone-area {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.zone-layer .zone-area.selected {
+  filter: drop-shadow(0 0 5px rgba(15, 23, 42, 0.28));
+}
+
 .drag-preview-line {
   filter: drop-shadow(0 0 4px rgba(15, 23, 42, 0.18));
 }
@@ -1153,12 +1817,43 @@ function segmentTouchesDevice(
   stroke-width: 1.5;
 }
 
-.device-node.disabled {
-  opacity: 0.45;
-}
-
 .device-node.selected image {
   filter: brightness(1.08) drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-node.disabled image {
+  filter: saturate(0.55) contrast(0.9);
+}
+
+.device-node.inhibited image {
+  filter: saturate(0.75) contrast(0.95);
+}
+
+.device-node.selected.disabled image {
+  filter: saturate(0.55) contrast(0.9) brightness(1.08)
+    drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-node.selected.inhibited image {
+  filter: saturate(0.75) contrast(0.95) brightness(1.08)
+    drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-status-badge {
+  pointer-events: none;
+}
+
+.device-status-badge circle {
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.device-node text.device-status-badge-label {
+  fill: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  paint-order: normal;
+  stroke: none;
 }
 
 .device-node text {
@@ -1168,6 +1863,14 @@ function segmentTouchesDevice(
   paint-order: stroke;
   stroke: #ffffff;
   stroke-width: 3px;
+}
+
+.device-node.disabled .device-address-label {
+  fill: #92400e;
+}
+
+.device-node.inhibited .device-address-label {
+  fill: #4c1d95;
 }
 
 .empty-floor {
