@@ -114,7 +114,6 @@ const getFloorAbbr = (name: string): string => {
   return name.slice(0, 3)
 }
 
-
 // [修改] 初始化时尝试从 Store 恢复上次所在的楼层
 const initDefaultFloor = (): void => {
   // 1. 优先使用记忆的楼层
@@ -907,7 +906,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="floor-navigator-panel" v-if="store.buildings.length > 0 && (store.buildings.length > 1 || sortedFloors.length > 0)">
+    <div
+      class="floor-navigator-panel"
+      v-if="store.buildings.length > 0 && (store.buildings.length > 1 || sortedFloors.length > 0)"
+    >
       <!-- Building Selector: Only display if there are multiple buildings -->
       <div class="building-tabs" v-if="store.buildings.length > 1">
         <button

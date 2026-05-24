@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设备高亮与批量选择效果预览 - 火灾报警模拟器</title>
+  <!-- 引入 Google Fonts (Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #080b11;
+      --panel-bg: rgba(16, 22, 35, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      
+      /* 风格配色 */
+      --color-cyber-selected: #00f0ff;
+      --color-cyber-loop: #ff9900;
+      --color-cyber-zone: #ff4d4f;
+      --color-cyber-group: #722ed1;
+      
+      --color-ind-selected: #fadb14;
+      --color-ind-loop: #fadb14;
+      --color-ind-zone: #fa541c;
+      --color-ind-group: #52c41a;
+      
+      --color-radar-selected: #00ff66;
+      --color-radar-loop: #00ff66;
+      --color-radar-zone: #00ff66;
+      --color-radar-group: #00ff66;
+      
+      --color-hud-selected: #ffffff;
+      --color-hud-loop: #8c9ba5;
+      --color-hud-zone: #ff4d4f;
+      --color-hud-group: #00f0ff;
+      
+      --color-holo-selected: #00a8ff;
+      --color-holo-loop: #00a8ff;
+      --color-holo-zone: #00e5ff;
+      --color-holo-group: #00a8ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #e2e8f0;
+      font-family: var(--font-family);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 顶部导航标题 */
+    header {
+      padding: 15px 30px;
+      background: rgba(10, 15, 26, 0.8);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      backdrop-filter: blur(5px);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 10px #ef4444;
+      animation: pulse-red 1.5s infinite alternate ease-in-out;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    /* 主布局 */
+    .main-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+    }
+
+    /* 控制面板 */
+    .control-panel {
+      width: 320px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border-color);
+      backdrop-filter: blur(15px);
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+      z-index: 5;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 风格按钮组 */
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      padding: 12px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .panel-btn.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(99, 102, 241, 0.15));
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+      font-weight: 600;
+    }
+
+    .btn-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .panel-btn.active .btn-badge {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+    }
+
+    /* 状态切换按钮网格 */
+    .state-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    .state-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .state-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+
+    .state-btn.active {
+      background: #e2e8f0;
+      color: #0f172a;
+      border-color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    .state-btn .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #475569;
+    }
+
+    .state-btn.active .dot {
+      background: #0f172a;
+    }
+
+    /* 自动播放控制器 */
+    .autoplay-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      padding: 15px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+    }
+
+    .autoplay-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .autoplay-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .autoplay-sub {
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    /* Switch 开关 */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .3s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #10b981;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* 预览画布区域 */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background-color: #0b0f19;
+      /* 网格背景图纸 */
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: auto;
+    }
+
+    .canvas {
+      width: 900px;
+      height: 650px;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      background: rgba(10, 15, 30, 0.3);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    /* SVG 覆盖图层（用于连线和区域） */
+    .svg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* 设备节点样式 */
+    .device-node {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .device-icon-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 2px solid #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      position: relative;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .device-icon-wrapper img {
+      width: 30px;
+      height: 30px;
+      opacity: 0.85;
+      transition: opacity 0.3s;
+    }
+
+    .device-node:hover .device-icon-wrapper img {
+      opacity: 1;
+    }
+
+    /* 地址标签 */
+    .device-label {
+      margin-top: 6px;
+      font-size: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      font-family: monospace;
+      color: #94a3b8;
+      transition: all 0.3s;
+    }
+
+    .device-node:hover .device-label {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* SVG 连线公共类 */
+    .connection-line {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0;
+      transition: opacity 0.5s ease, stroke 0.5s ease, stroke-width 0.5s ease;
+    }
+
+    .connection-line.visible {
+      opacity: 1;
+    }
+
+    /* Bounding Boxes / Zone & Group overlays */
+    .zone-overlay, .group-overlay {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.98);
+      transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+      z-index: 0;
+    }
+
+    .zone-overlay.visible, .group-overlay.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .zone-tag, .group-tag {
+      position: absolute;
+      top: -20px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+
+    /* ---------------------------------------------------- */
+    /* 风格 1: Cyber Glow (赛博科技光晕)                   */
+    /* ---------------------------------------------------- */
+    
+    /* 单选高亮 */
+    .style-cyber.device-node.selected .device-icon-wrapper {
+      border-color: var(--color-cyber-selected);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.7), inset 0 0 10px rgba(0, 240, 255, 0.3);
+      animation: cyber-pulse 1.5s infinite alternate ease-in-out;
+      transform: scale(1.1);
+      background: #091724;
+    }
+
+    /* 批量回路高亮 */
+    .style-cyber.device-node.loop-selected .device-icon-wrapper {
+      border-color: var(--color-cyber-loop);
+      box-shadow: 0 0 12px rgba(255, 153, 0, 0.5);
+      background: #251608;
+    }
+
+    .style-cyber.connection-line {
+      stroke: var(--color-cyber-loop);
+      stroke-width: 3px;
+      stroke-dasharray: 8, 8;
+      filter: drop-shadow(0 0 6px rgba(255, 153, 0, 0.6));
+      animation: dash-flow-forward 1s linear infinite;
+    }
+
+    /* 批量Zone高亮 */
+    .style-cyber.device-node.zone-selected .device-icon-wrapper {
+      border-color: var(--color-cyber-zone);
+      box-shadow: 0 0 8px rgba(255, 77, 79, 0.4);
+    }
+
+    .style-cyber.zone-overlay {
+      border: 1px solid rgba(255, 77, 79, 0.5);
+      background: rgba(255, 77, 79, 0.08);
+      box-shadow: 0 0 20px rgba(255, 77, 79, 0.15), inset 0 0 15px rgba(255, 77, 79, 0.05);
+      border-radius: 12px;
+      backdrop-filter: blur(1px);
+    }
+
+    .style-cyber.zone-tag {
+      background: var(--color-cyber-zone);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(255, 77, 79, 0.5);
+    }
+
+    /* 批量Group高亮 */
+    .style-cyber.device-node.group-selected .device-icon-wrapper {
+      border-color: var(--color-cyber-group);
+      box-shadow: 0 0 8px rgba(114, 46, 209, 0.4);
+    }
+
+    .style-cyber.group-overlay {
+      border: 2px dashed rgba(114, 46, 209, 0.5);
+      background: rgba(114, 46, 209, 0.04);
+      border-radius: 8px;
+    }
+
+    .style-cyber.group-tag {
+      background: var(--color-cyber-group);
+      color: #fff;
+    }
+
+    @keyframes cyber-pulse {
+      0% { box-shadow: 0 0 10px rgba(0, 240, 255, 0.5), inset 0 0 5px rgba(0, 240, 255, 0.2); }
+      100% { box-shadow: 0 0 25px rgba(0, 240, 255, 0.9), inset 0 0 15px rgba(0, 240, 255, 0.4); }
+    }
+
+    /* ---------------------------------------------------- */
+    /* 风格 2: Industrial Alert (工业安全警示)               */
+    /* ---------------------------------------------------- */
+
+    /* 单选高亮 */
+    .style-industrial.device-node.selected .device-icon-wrapper {
+      border: 4px solid var(--color-ind-selected);
+      outline: 2px solid #000;
+      box-shadow: 0 0 0 4px var(--color-ind-selected), 0 10px 20px rgba(0,0,0,0.6);
+      transform: scale(1.1) translateY(-2px);
+      background: #25220c;
+    }
+    
+    .style-industrial.device-node.selected::before {
+      content: '';
+      position: absolute;
+      top: -10px; left: -10px; right: -10px; bottom: -10px;
+      border: 2px dashed var(--color-ind-selected);
+      border-radius: 50%;
+      animation: spin-clockwise 25s linear infinite;
+    }
+
+    /* 批量回路高亮 */
+    .style-industrial.device-node.loop-selected .device-icon-wrapper {
+      border: 3px solid var(--color-ind-loop);
+      background: #221f10;
+    }
+
+    .style-industrial.connection-line {
+      stroke: var(--color-ind-loop);
+      stroke-width: 4px;
+      stroke-dasharray: 15, 8;
+      animation: dash-flow-forward 1.5s linear infinite;
+    }
+
+    /* 批量Zone高亮 */
+    .style-industrial.device-node.zone-selected .device-icon-wrapper {
+      border-color: var(--color-ind-zone);
+      border-width: 3px;
+    }
+
+    .style-industrial.zone-overlay {
+      border: 3px double var(--color-ind-zone);
+      background: repeating-linear-gradient(
+        45deg,
+        rgba(250, 84, 28, 0.06),
+        rgba(250, 84, 28, 0.06) 10px,
+        rgba(250, 84, 28, 0.01) 10px,
+        rgba(250, 84, 28, 0.01) 20px
+      );
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+      border-radius: 0; /* 工业感，直角 */
+    }
+
+    .style-industrial.zone-tag {
+      background: var(--color-ind-zone);
+      color: #fff;
+      border-radius: 0;
+      border: 1px solid #000;
+    }
+
+    /* 批量Group高亮 */
+    .style-industrial.device-node.group-selected .device-icon-wrapper {
+      border-color: var(--color-ind-group);
+      border-width: 3px;
+    }
+
+    .style-industrial.group-overlay {
+      border: 2px solid var(--color-ind-group);
+      background: rgba(82, 196, 26, 0.05);
+      border-radius: 0;
+    }
+
+    .style-industrial.group-tag {
+      background: var(--color-ind-group);
+      color: #000;
+      font-weight: 800;
+      border-radius: 0;
+    }
+
+    /* ---------------------------------------------------- */
+    /* 风格 3: Radar Pulse (声呐雷达脉冲)                    */
+    /* ---------------------------------------------------- */
+
+    /* 单选高亮 */
+    .style-radar.device-node.selected .device-icon-wrapper {
+      border-color: var(--color-radar-selected);
+      background: #051a0d;
+      transform: scale(1.1);
+      box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+    }
+
+    .style-radar.device-node.selected::after {
+      content: '';
+      position: absolute;
+      top: -24px; left: -24px; right: -24px; bottom: -24px;
+      border: 2px solid var(--color-radar-selected);
+      border-radius: 50%;
+      opacity: 0;
+      animation: radar-ripple 1.8s infinite ease-out;
+    }
+
+    /* 批量回路高亮 */
+    .style-radar.device-node.loop-selected .device-icon-wrapper {
+      border-color: rgba(0, 255, 102, 0.6);
+      background: rgba(0, 255, 102, 0.05);
+    }
+    
+    .style-radar.device-node.loop-selected::after {
+      content: '';
+      position: absolute;
+      top: -12px; left: -12px; right: -12px; bottom: -12px;
+      border: 1px solid rgba(0, 255, 102, 0.4);
+      border-radius: 50%;
+      opacity: 0;
+      animation: radar-ripple 2.5s infinite ease-out;
+    }
+
+    .style-radar.connection-line {
+      stroke: var(--color-radar-loop);
+      stroke-width: 2px;
+      stroke-dasharray: 5, 250; /* 模拟孤立流光包 */
+      animation: radar-path-flow 2.5s infinite linear;
+    }
+
+    /* 批量Zone高亮 */
+    .style-radar.device-node.zone-selected .device-icon-wrapper {
+      border-color: var(--color-radar-zone);
+    }
+
+    .style-radar.zone-overlay {
+      border: 1px solid rgba(0, 255, 102, 0.4);
+      border-radius: 50% 50% 50% 50%; /* 圆形微波感 */
+      background: radial-gradient(circle, rgba(0, 255, 102, 0.08) 0%, rgba(0, 255, 102, 0) 70%);
+      animation: sweep-opacity 4s infinite alternate ease-in-out;
+    }
+
+    .style-radar.zone-overlay::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: inherit;
+      border: 1px dashed rgba(0, 255, 102, 0.15);
+      animation: spin-clockwise 60s linear infinite;
+    }
+
+    .style-radar.zone-tag {
+      background: #000;
+      color: var(--color-radar-zone);
+      border: 1px solid var(--color-radar-zone);
+    }
+
+    /* 批量Group高亮 */
+    .style-radar.device-node.group-selected .device-icon-wrapper {
+      border-color: var(--color-radar-group);
+    }
+
+    .style-radar.group-overlay {
+      border: 1px dashed rgba(0, 255, 102, 0.3);
+      background: rgba(0, 255, 102, 0.02);
+      border-radius: 24px;
+    }
+
+    .style-radar.group-tag {
+      background: var(--color-radar-group);
+      color: #000;
+      border-radius: 10px;
+    }
+
+    @keyframes radar-ripple {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    @keyframes radar-path-flow {
+      0% { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -255; }
+    }
+
+    @keyframes sweep-opacity {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    /* ---------------------------------------------------- */
+    /* 风格 4: HUD Vector (极简 HUD 矢量拐角)                */
+    /* ---------------------------------------------------- */
+
+    /* 单选高亮 */
+    .style-hud.device-node.selected .device-icon-wrapper {
+      border-color: transparent;
+      background: #111827;
+      box-shadow: none;
+    }
+
+    /* 绘制拐角 */
+    .style-hud.device-node.selected .device-icon-wrapper::before,
+    .style-hud.device-node.selected .device-icon-wrapper::after {
+      content: '';
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      pointer-events: none;
+      transition: all 0.3s;
+    }
+
+    .style-hud.device-node.selected .device-icon-wrapper::before {
+      top: -4px; left: -4px;
+      border-top: 2px solid var(--color-hud-selected);
+      border-left: 2px solid var(--color-hud-selected);
+    }
+
+    .style-hud.device-node.selected .device-icon-wrapper::after {
+      bottom: -4px; right: -4px;
+      border-bottom: 2px solid var(--color-hud-selected);
+      border-right: 2px solid var(--color-hud-selected);
+    }
+
+    /* 批量回路高亮 */
+    .style-hud.device-node.loop-selected .device-icon-wrapper {
+      border-color: rgba(255,255,255,0.15);
+      border-style: dashed;
+    }
+
+    .style-hud.connection-line {
+      stroke: var(--color-hud-loop);
+      stroke-width: 1.5px;
+      stroke-dasharray: 4, 4;
+    }
+
+    /* 批量Zone高亮 */
+    .style-hud.device-node.zone-selected .device-icon-wrapper {
+      border-color: transparent;
+    }
+
+    .style-hud.zone-overlay {
+      border: none;
+      background: transparent;
+    }
+
+    /* 在大遮罩的四个角画出 HUD 拐角 */
+    .style-hud.zone-overlay::before,
+    .style-hud.zone-overlay::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: var(--color-hud-zone);
+      border-style: solid;
+    }
+
+    .style-hud.zone-overlay::before {
+      top: 0; left: 0;
+      border-width: 3px 0 0 3px;
+    }
+
+    .style-hud.zone-overlay::after {
+      bottom: 0; right: 0;
+      border-width: 0 3px 3px 0;
+    }
+
+    /* 辅助另外两只角 */
+    .style-hud.zone-overlay-sub {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+    }
+    
+    .style-hud.zone-overlay-sub::before,
+    .style-hud.zone-overlay-sub::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: var(--color-hud-zone);
+      border-style: solid;
+    }
+
+    .style-hud.zone-overlay-sub::before {
+      top: 0; right: 0;
+      border-width: 3px 3px 0 0;
+    }
+
+    .style-hud.zone-overlay-sub::after {
+      bottom: 0; left: 0;
+      border-width: 0 0 3px 3px;
+    }
+
+    .style-hud.zone-tag {
+      background: transparent;
+      color: var(--color-hud-zone);
+      border-left: 3px solid var(--color-hud-zone);
+      border-radius: 0;
+      font-family: monospace;
+    }
+
+    /* 批量Group高亮 */
+    .style-hud.device-node.group-selected .device-icon-wrapper {
+      border-color: var(--color-hud-group);
+      border-width: 1px;
+    }
+
+    .style-hud.group-overlay {
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 4px;
+    }
+
+    .style-hud.group-tag {
+      background: transparent;
+      color: var(--color-hud-group);
+      border-bottom: 2px solid var(--color-hud-group);
+      border-radius: 0;
+    }
+
+    /* ---------------------------------------------------- */
+    /* 风格 5: Holographic Circuit (全息数字电路)            */
+    /* ---------------------------------------------------- */
+
+    /* 单选高亮 */
+    .style-holo.device-node.selected .device-icon-wrapper {
+      /* 六边形切割 */
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+      background: linear-gradient(135deg, rgba(0, 168, 255, 0.35) 0%, rgba(0, 168, 255, 0.05) 100%);
+      border: 1px solid var(--color-holo-selected);
+      box-shadow: 0 0 15px rgba(0, 168, 255, 0.6);
+      transform: scale(1.15);
+    }
+    
+    .style-holo.device-node.selected .device-icon-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(circle, rgba(0, 168, 255, 0.2) 0%, transparent 80%);
+      animation: holo-flicker 0.15s infinite;
+    }
+
+    /* 批量回路高亮 */
+    .style-holo.device-node.loop-selected .device-icon-wrapper {
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+      border: 1px solid rgba(0, 168, 255, 0.4);
+      background: rgba(0, 168, 255, 0.1);
+    }
+
+    .style-holo.connection-line {
+      stroke: var(--color-holo-loop);
+      stroke-width: 2px;
+      stroke-dasharray: 12, 12;
+      filter: drop-shadow(0 0 4px rgba(0, 168, 255, 0.5));
+      animation: dash-flow-backward 1.2s linear infinite;
+    }
+
+    /* 批量Zone高亮 */
+    .style-holo.device-node.zone-selected .device-icon-wrapper {
+      border-color: var(--color-holo-zone);
+    }
+
+    .style-holo.zone-overlay {
+      border: 1.5px solid var(--color-holo-zone);
+      /* 六边形削角效果 */
+      clip-path: polygon(4% 0%, 96% 0%, 100% 6%, 100% 94%, 96% 100%, 4% 100%, 0% 94%, 0% 6%);
+      /* 蜂窝网格点 */
+      background-image: 
+        radial-gradient(rgba(0, 229, 255, 0.12) 1px, transparent 1px);
+      background-size: 8px 8px;
+      background-color: rgba(0, 229, 255, 0.03);
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.1);
+    }
+
+    .style-holo.zone-tag {
+      background: var(--color-holo-zone);
+      color: #000;
+      clip-path: polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%);
+      font-weight: bold;
+    }
+
+    /* 批量Group高亮 */
+    .style-holo.device-node.group-selected .device-icon-wrapper {
+      border-color: var(--color-holo-group);
+    }
+
+    .style-holo.group-overlay {
+      border: 1px solid rgba(0, 168, 255, 0.35);
+      background: rgba(0, 168, 255, 0.02);
+      border-radius: 4px;
+    }
+    
+    .style-holo.group-overlay::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 1px solid rgba(0, 168, 255, 0.1);
+      margin: 3px;
+    }
+
+    .style-holo.group-tag {
+      background: var(--color-holo-group);
+      color: #fff;
+    }
+
+    @keyframes holo-flicker {
+      0% { opacity: 0.95; }
+      50% { opacity: 1; }
+      100% { opacity: 0.95; }
+    }
+
+    /* ---------------------------------------------------- */
+    /* 通用基础动画定义                                     */
+    /* ---------------------------------------------------- */
+    @keyframes spin-clockwise {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes dash-flow-forward {
+      from { stroke-dashoffset: 24; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    @keyframes dash-flow-backward {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: 24; }
+    }
+
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 4px #ef4444; }
+      100% { box-shadow: 0 0 12px #ef4444, 0 0 20px rgba(239, 68, 68, 0.5); }
+    }
+
+    /* 提示工具框 */
+    .tooltip {
+      position: absolute;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #94a3b8;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      width: 160px;
+      line-height: 1.5;
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .tooltip-title {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 4px;
+    }
+
+    .tooltip span {
+      display: block;
+    }
+
+    .tooltip .highlight-text {
+      color: #38bdf8;
+      font-weight: 500;
+    }
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-title">
+      消防报警设备选择效果方案预览
+    </div>
+    <div class="subtitle">
+      包含 5 种选中高亮风格，支持单选及 Loop / Zone / Group 批量状态切换
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- 左侧控制面板 -->
+    <div class="control-panel">
+      
+      <!-- 风格选择 -->
+      <div>
+        <div class="section-title">
+          <span>选择高亮设计风格</span>
+        </div>
+        <div class="button-group">
+          <button class="panel-btn active" data-style="cyber">
+            <span>风格 1: 赛博科技光晕</span>
+            <span class="btn-badge">Cyber Glow</span>
+          </button>
+          <button class="panel-btn" data-style="industrial">
+            <span>风格 2: 工业安全警示</span>
+            <span class="btn-badge">Industrial</span>
+          </button>
+          <button class="panel-btn" data-style="radar">
+            <span>风格 3: 声呐雷达脉冲</span>
+            <span class="btn-badge">Radar Pulse</span>
+          </button>
+          <button class="panel-btn" data-style="hud">
+            <span>风格 4: 极简 HUD 拐角</span>
+            <span class="btn-badge">HUD Vector</span>
+          </button>
+          <button class="panel-btn" data-style="holo">
+            <span>风格 5: 全息数字电路</span>
+            <span class="btn-badge">Holographic</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 状态选择 -->
+      <div>
+        <div class="section-title">
+          <span>选择选中状态</span>
+        </div>
+        <div class="state-grid">
+          <button class="state-btn active" data-state="none">
+            <span class="dot"></span>
+            <span>无（常规状态）</span>
+          </button>
+          <button class="state-btn" data-state="single">
+            <span class="dot"></span>
+            <span>单设备选中高亮</span>
+          </button>
+          <button class="state-btn" data-state="loop">
+            <span class="dot"></span>
+            <span>回路选中 (Loop Selection) - 批量</span>
+          </button>
+          <button class="state-btn" data-state="zone">
+            <span class="dot"></span>
+            <span>物理分区选中 (Zone Selection) - 批量</span>
+          </button>
+          <button class="state-btn" data-state="group">
+            <span class="dot"></span>
+            <span>逻辑分组选中 (Group Selection) - 批量</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 自动播放 -->
+      <div class="autoplay-card">
+        <div class="autoplay-info">
+          <span class="autoplay-title">自动轮播状态</span>
+          <span class="autoplay-sub">每隔 3 秒自动切换状态进行演示</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autoplay-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+    </div>
+
+    <!-- 右侧渲染画布 -->
+    <div class="canvas-container">
+      <div class="canvas" id="main-canvas">
+        
+        <!-- SVG overlay for wiring paths -->
+        <svg class="svg-overlay">
+          <!-- Loop 1 Path -->
+          <path id="path-loop-1" class="connection-line" d="M 150 150 L 350 150 L 550 150 L 650 320 L 150 150" />
+          
+          <!-- Loop 2 Path -->
+          <path id="path-loop-2" class="connection-line" d="M 450 320 L 250 320 L 150 480 L 350 480" />
+        </svg>
+
+        <!-- Zone 1 Bounding Box -->
+        <div id="box-zone-1" class="zone-overlay" style="left: 100px; top: 90px; width: 500px; height: 120px;">
+          <span class="zone-tag">ZONE 01 - 第一层东区</span>
+          <div class="style-hud zone-overlay-sub"></div>
+        </div>
+
+        <!-- Group A Bounding Box -->
+        <div id="box-group-a" class="group-overlay" style="left: 105px; top: 105px; width: 490px; height: 260px;">
+          <span class="group-tag">GROUP A - 走廊声光联动组</span>
+        </div>
+
+        <!-- Devices -->
+        <!-- Device 1: Smoke Detector (Loop 1, Zone 1, Group A) -->
+        <div class="device-node" id="dev-1" style="left: 150px; top: 150px;" data-id="1" data-name="感烟探测器" data-addr="01.01.001" data-loop="1" data-zone="1" data-group="A">
+          <div class="device-icon-wrapper">
+            <img src="./icons/optical-detector.svg" alt="Smoke">
+          </div>
+          <span class="device-label">01.01.001</span>
+        </div>
+
+        <!-- Device 2: Heat Detector (Loop 1, Zone 1, Group A) -->
+        <div class="device-node" id="dev-2" style="left: 350px; top: 150px;" data-id="2" data-name="感温探测器" data-addr="01.01.002" data-loop="1" data-zone="1" data-group="A">
+          <div class="device-icon-wrapper">
+            <img src="./icons/heat-detector.svg" alt="Heat">
+          </div>
+          <span class="device-label">01.01.002</span>
+        </div>
+
+        <!-- Device 8: Smoke Detector (Loop 1, Zone 1, Group A) -->
+        <div class="device-node" id="dev-8" style="left: 550px; top: 150px;" data-id="8" data-name="感烟探测器" data-addr="01.01.008" data-loop="1" data-zone="1" data-group="A">
+          <div class="device-icon-wrapper">
+            <img src="./icons/optical-detector.svg" alt="Smoke">
+          </div>
+          <span class="device-label">01.01.008</span>
+        </div>
+
+        <!-- Device 3: Manual Call Point (Loop 1, Zone 2, Group B) -->
+        <div class="device-node" id="dev-3" style="left: 650px; top: 320px;" data-id="3" data-name="手动报警按钮" data-addr="01.01.003" data-loop="1" data-zone="2" data-group="B">
+          <div class="device-icon-wrapper">
+            <img src="./icons/manual-call-point.svg" alt="MCP">
+          </div>
+          <span class="device-label">01.01.003</span>
+        </div>
+
+        <!-- Device 5: Input-Output Module (Loop 2, Zone 3, Group A) -->
+        <div class="device-node" id="dev-5" style="left: 250px; top: 320px;" data-id="5" data-name="输入输出模块" data-addr="01.02.005" data-loop="2" data-zone="3" data-group="A">
+          <div class="device-icon-wrapper">
+            <img src="./icons/input-output.svg" alt="IO">
+          </div>
+          <span class="device-label">01.02.005</span>
+        </div>
+
+        <!-- Device 4: Sounder (Loop 2, Zone 2, Group B) -->
+        <div class="device-node" id="dev-4" style="left: 450px; top: 320px;" data-id="4" data-name="声光警报器" data-addr="01.02.004" data-loop="2" data-zone="2" data-group="B">
+          <div class="device-icon-wrapper">
+            <img src="./icons/sounder.svg" alt="Sounder">
+          </div>
+          <span class="device-label">01.02.004</span>
+        </div>
+
+        <!-- Device 6: Smoke Detector (Loop 2, Zone 3, Group C) -->
+        <div class="device-node" id="dev-6" style="left: 150px; top: 480px;" data-id="6" data-name="感烟探测器" data-addr="01.02.006" data-loop="2" data-zone="3" data-group="C">
+          <div class="device-icon-wrapper">
+            <img src="./icons/optical-detector.svg" alt="Smoke">
+          </div>
+          <span class="device-label">01.02.006</span>
+        </div>
+
+        <!-- Device 7: Sounder (Loop 2, Zone 3, Group C) -->
+        <div class="device-node" id="dev-7" style="left: 350px; top: 480px;" data-id="7" data-name="声光警报器" data-addr="01.02.007" data-loop="2" data-zone="3" data-group="C">
+          <div class="device-icon-wrapper">
+            <img src="./icons/sounder.svg" alt="Sounder">
+          </div>
+          <span class="device-label">01.02.007</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Tooltip -->
+  <div class="tooltip" id="device-tooltip">
+    <div class="tooltip-title" id="tt-name">设备详情</div>
+    <span>物理地址: <span id="tt-addr" class="highlight-text">--</span></span>
+    <span>所属回路: <span id="tt-loop" class="highlight-text">--</span></span>
+    <span>防火分区: <span id="tt-zone" class="highlight-text">--</span></span>
+    <span>联动分组: <span id="tt-group" class="highlight-text">--</span></span>
+  </div>
+
+  <script>
+    // 状态定义
+    let currentStyle = 'cyber'; // cyber, industrial, radar, hud, holo
+    let currentState = 'none';   // none, single, loop, zone, group
+    let activeSingleDeviceId = '1'; // 默认单设备选中的ID
+    let autoplayInterval = null;
+
+    // 获取 DOM 元素
+    const styleButtons = document.querySelectorAll('[data-style]');
+    const stateButtons = document.querySelectorAll('[data-state]');
+    const deviceNodes = document.querySelectorAll('.device-node');
+    const pathLoop1 = document.getElementById('path-loop-1');
+    const pathLoop2 = document.getElementById('path-loop-2');
+    const boxZone1 = document.getElementById('box-zone-1');
+    const boxGroupA = document.getElementById('box-group-a');
+    const tooltip = document.getElementById('device-tooltip');
+    const autoplayToggle = document.getElementById('autoplay-toggle');
+    const mainCanvas = document.getElementById('main-canvas');
+
+    // 初始化界面效果
+    applyVisualClasses();
+
+    // 风格选择点击事件
+    styleButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        styleButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentStyle = btn.getAttribute('data-style');
+        applyVisualClasses();
+      });
+    });
+
+    // 选中状态点击事件
+    stateButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        stateButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentState = btn.getAttribute('data-state');
+        applyVisualClasses();
+        
+        // 如果手动切换状态，则关闭自动轮播
+        if (autoplayToggle.checked) {
+          autoplayToggle.checked = false;
+          stopAutoplay();
+        }
+      });
+    });
+
+    // 自动轮播控制器
+    autoplayToggle.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        startAutoplay();
+      } else {
+        stopAutoplay();
+      }
+    });
+
+    // 点击设备交互
+    deviceNodes.forEach(node => {
+      node.addEventListener('click', () => {
+        const devId = node.getAttribute('data-id');
+        activeSingleDeviceId = devId;
+        
+        // 自动切入“单设备选中”状态，让用户看到选中的设备变化
+        currentState = 'single';
+        stateButtons.forEach(btn => {
+          btn.classList.remove('active');
+          if(btn.getAttribute('data-state') === 'single') {
+            btn.classList.add('active');
+          }
+        });
+        
+        if (autoplayToggle.checked) {
+          autoplayToggle.checked = false;
+          stopAutoplay();
+        }
+        
+        applyVisualClasses();
+      });
+
+      // Hover 提示框处理
+      node.addEventListener('mouseenter', (e) => {
+        const name = node.getAttribute('data-name');
+        const addr = node.getAttribute('data-addr');
+        const loop = node.getAttribute('data-loop');
+        const zone = node.getAttribute('data-zone');
+        const group = node.getAttribute('data-group');
+
+        document.getElementById('tt-name').innerText = name;
+        document.getElementById('tt-addr').innerText = addr;
+        document.getElementById('tt-loop').innerText = `Loop ${loop}`;
+        document.getElementById('tt-zone').innerText = `Zone ${zone}`;
+        document.getElementById('tt-group').innerText = `Group ${group}`;
+
+        // 定位 Tooltip
+        const rect = node.getBoundingClientRect();
+        const canvasRect = mainCanvas.getBoundingClientRect();
+        
+        tooltip.style.left = `${rect.left - canvasRect.left + 80}px`;
+        tooltip.style.top = `${rect.top - canvasRect.top - 10}px`;
+        tooltip.classList.add('visible');
+      });
+
+      node.addEventListener('mouseleave', () => {
+        tooltip.classList.remove('visible');
+      });
+    });
+
+    // 应用所有的选中及风格类
+    function applyVisualClasses() {
+      // 1. 清空所有节点的所有状态/风格类
+      deviceNodes.forEach(node => {
+        node.className = 'device-node';
+        // 添加当前风格类
+        node.classList.add(`style-${currentStyle}`);
+      });
+
+      // 清空 SVG、盒子等类的风格
+      pathLoop1.className = 'connection-line';
+      pathLoop2.className = 'connection-line';
+      pathLoop1.classList.add(`style-${currentStyle}`);
+      pathLoop2.classList.add(`style-${currentStyle}`);
+
+      boxZone1.className = 'zone-overlay';
+      boxZone1.classList.add(`style-${currentStyle}`);
+      
+      boxGroupA.className = 'group-overlay';
+      boxGroupA.classList.add(`style-${currentStyle}`);
+
+      // 2. 根据当前 state 给对应节点加上 selected/loop-selected 等类
+      if (currentState === 'single') {
+        const selectedNode = document.getElementById(`dev-${activeSingleDeviceId}`);
+        if (selectedNode) {
+          selectedNode.classList.add('selected');
+        }
+      } 
+      else if (currentState === 'loop') {
+        // 我们演示 Loop 1 被选择状态
+        deviceNodes.forEach(node => {
+          if (node.getAttribute('data-loop') === '1') {
+            node.classList.add('loop-selected');
+          }
+        });
+        // 物理导线点亮
+        pathLoop1.classList.add('visible');
+      } 
+      else if (currentState === 'zone') {
+        // 演示 Zone 1 被选择状态
+        deviceNodes.forEach(node => {
+          if (node.getAttribute('data-zone') === '1') {
+            node.classList.add('zone-selected');
+          }
+        });
+        // 区域遮罩点亮
+        boxZone1.classList.add('visible');
+      } 
+      else if (currentState === 'group') {
+        // 演示 Group A 被选中状态
+        deviceNodes.forEach(node => {
+          if (node.getAttribute('data-group') === 'A') {
+            node.classList.add('group-selected');
+          }
+        });
+        // 逻辑分组线/标记显现
+        boxGroupA.classList.add('visible');
+      }
+    }
+
+    // 自动轮播播放器
+    function startAutoplay() {
+      const states = ['none', 'single', 'loop', 'zone', 'group'];
+      let idx = states.indexOf(currentState);
+      
+      autoplayInterval = setInterval(() => {
+        idx = (idx + 1) % states.length;
+        currentState = states[idx];
+        
+        // 更新按钮 active
+        stateButtons.forEach(btn => {
+          btn.classList.remove('active');
+          if (btn.getAttribute('data-state') === currentState) {
+            btn.classList.add('active');
+          }
+        });
+        
+        applyVisualClasses();
+      }, 3000);
+    }
+
+    function stopAutoplay() {
+      if (autoplayInterval) {
+        clearInterval(autoplayInterval);
+        autoplayInterval = null;
+      }
+    }
+
+  </script>
+</body>
+</html>

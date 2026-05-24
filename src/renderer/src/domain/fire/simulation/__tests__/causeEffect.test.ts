@@ -161,7 +161,9 @@ describe('cause and effect resolution', () => {
   it('activates programmed stage 1 Zone outputs', () => {
     const input = device({ id: 'input-1', zoneNumber: 1 })
 
-    expect(outputIds(outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input]))).toEqual([
+    const outputs = outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input])
+
+    expect(outputIds(outputs)).toEqual([
       'fire-brigade:panel-1',
       'io-group:panel-1:3',
       'io-group:panel-1:5',
@@ -169,6 +171,18 @@ describe('cause and effect resolution', () => {
       'io-group:panel-1:7',
       'sounder-group:panel-1:1'
     ])
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'sounder-group:panel-1:1',
+        reason: 'zone-non-delayed-sounders'
+      })
+    )
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'io-group:panel-1:3',
+        reason: 'io'
+      })
+    )
   })
 
   it('activates programmed stage 2 Zone outputs when a double-knock Zone has two alarms', () => {
@@ -218,6 +232,76 @@ describe('cause and effect resolution', () => {
 
     expect(outputIds(outputs)).toContain('device:sounder-1')
     expect(outputIds(outputs)).toContain('non-addressable-sounder:nas-1')
+  })
+
+  it('activates all enabled Network sounders from manual evacuate', () => {
+    const input = device({ id: 'input-1', zoneNumber: 1 })
+    const firstSounder = device({
+      id: 'sounder-1',
+      address: 90,
+      type: 'sounder',
+      friendlyTypeName: 'Sounder',
+      isInputCapable: false,
+      isOutputCapable: true,
+      isSounder: true
+    })
+    const secondSounder = device({
+      id: 'sounder-2',
+      address: 91,
+      type: 'wireless_sounder',
+      friendlyTypeName: 'Wireless Sounder',
+      isInputCapable: false,
+      isOutputCapable: true,
+      isSounder: true,
+      isWirelessType: true
+    })
+    const disabledSounder = device({
+      id: 'sounder-disabled',
+      address: 92,
+      type: 'sounder',
+      friendlyTypeName: 'Sounder',
+      isInputCapable: false,
+      isOutputCapable: true,
+      isSounder: true,
+      disabled: true
+    })
+
+    const outputs = resolveCauseAndEffect({
+      network: network(),
+      devices: [input, firstSounder, secondSounder, disabledSounder],
+      nonAddressablePoints: [],
+      activeInputAlarms: [],
+      evacuateActive: true
+    })
+
+    expect(outputIds(outputs)).toContain('device:sounder-1')
+    expect(outputIds(outputs)).toContain('device:sounder-2')
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'device:sounder-disabled',
+        state: 'disabled',
+        reason: 'disabled-output'
+      })
+    )
+    expect(outputs.systemState).toBe('evacuate')
+  })
+
+  it('keeps programmed alarms CPD-configured instead of activating every sounder', () => {
+    const input = device({ id: 'input-1', zoneNumber: 1 })
+    const unrelatedSounder = device({
+      id: 'sounder-1',
+      address: 90,
+      type: 'sounder',
+      friendlyTypeName: 'Sounder',
+      isInputCapable: false,
+      isOutputCapable: true,
+      isSounder: true
+    })
+
+    const outputs = outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input, unrelatedSounder])
+
+    expect(outputIds(outputs)).toContain('sounder-group:panel-1:1')
+    expect(outputIds(outputs)).not.toContain('device:sounder-1')
   })
 
   it('keeps I/O config-driven in Preset mode', () => {
@@ -361,6 +445,53 @@ describe('cause and effect resolution', () => {
         outputId: 'fault-io-group:panel-1:3',
         state: 'disabled',
         reason: 'disabled-output'
+      })
+    )
+  })
+
+  it('does not delay sounders when the alarm Zone has delayed sounders disabled', () => {
+    const input = device({ id: 'input-1', zoneNumber: 1 })
+    const net = network()
+    net.panels[0].general.sounderDelaySeconds = 90
+    net.panels[0].zones[0].delayedSounders = false
+
+    expect(outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input], net)).toContainEqual(
+      expect.objectContaining({
+        outputId: 'sounder-group:panel-1:1',
+        state: 'active',
+        remainingDelaySeconds: 0
+      })
+    )
+  })
+
+  it('uses device delay override fields for sounder and I/O outputs', () => {
+    const input = device({
+      id: 'input-1',
+      zoneNumber: 1,
+      overrideDelays: true,
+      ioOverrideDelay: true
+    })
+    const net = network()
+    net.panels[0].general.sounderDelaySeconds = 90
+    net.panels[0].general.inputOutputDelaySeconds = 60
+    net.panels[0].zones[0].delayedSounders = true
+
+    const outputs = outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input], net)
+
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'sounder-group:panel-1:1',
+        state: 'active',
+        remainingDelaySeconds: 0,
+        reason: 'device-override-delay'
+      })
+    )
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'io-group:panel-1:3',
+        state: 'active',
+        remainingDelaySeconds: 0,
+        reason: 'io-override-delay'
       })
     )
   })

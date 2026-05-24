@@ -19,6 +19,9 @@ const { t } = useI18n()
 const { project, selectedNetworkId, simulationMode, simulationState } = storeToRefs(store)
 
 let tickTimer: number | undefined
+let audioContext: AudioContext | null = null
+let oscillator: OscillatorNode | null = null
+let gainNode: GainNode | null = null
 
 const currentNetwork = computed(
   () =>
@@ -50,6 +53,41 @@ const faultIOOutput = computed(() =>
   simulationState.value.outputs.find((output) => output.outputId.startsWith('fault-io-group:'))
 )
 const recentEvents = computed(() => simulationState.value.eventLog.slice(-20).reverse())
+const soundEnabled = computed({
+  get: () => project.value.simulationSettings.soundEnabled,
+  set: (enabled: boolean) => store.setSimulationSoundEnabled(enabled)
+})
+const shouldPlaySimulationAudio = computed(() => {
+  if (
+    !simulationMode.value ||
+    !soundEnabled.value ||
+    simulationState.value.soundState === 'silent'
+  ) {
+    return false
+  }
+
+  if (simulationState.value.soundState === 'fault') {
+    return true
+  }
+
+  return simulationState.value.outputs.some((output) => {
+    if (output.state !== 'active') return false
+    if (
+      output.outputId.startsWith('sounder-group:') ||
+      output.outputId.startsWith('non-addressable-sounder:') ||
+      output.outputId.startsWith('evacuate:')
+    ) {
+      return true
+    }
+
+    if (output.outputId.startsWith('device:')) {
+      const deviceId = output.outputId.slice('device:'.length)
+      return deviceById.value.get(deviceId)?.isSounder === true
+    }
+
+    return false
+  })
+})
 
 const timeScaleOptions = [
   { label: '1x', value: 1 },
@@ -75,7 +113,18 @@ watch(
   { immediate: true }
 )
 
-onUnmounted(stopTicking)
+watch(
+  [shouldPlaySimulationAudio, () => simulationState.value.soundState],
+  ([shouldPlay, soundState]) => {
+    syncSimulationAudio(shouldPlay, soundState)
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  stopTicking()
+  stopSimulationAudio()
+})
 
 function setSimulationEnabled(enabled: boolean): void {
   if (enabled) {
@@ -105,6 +154,53 @@ function setTimeScale(value: number): void {
   if (value === 1 || value === 5 || value === 10 || value === 30) {
     store.setSimulationTimeScale(value)
   }
+}
+
+function syncSimulationAudio(shouldPlay: boolean, soundState: string): void {
+  if (!shouldPlay) {
+    stopSimulationAudio()
+    return
+  }
+
+  const context = ensureAudioContext()
+  if (!context) return
+
+  if (!oscillator || !gainNode) {
+    oscillator = context.createOscillator()
+    gainNode = context.createGain()
+    oscillator.type = soundState === 'fault' ? 'sawtooth' : 'square'
+    gainNode.gain.value = 0.035
+    oscillator.connect(gainNode)
+    gainNode.connect(context.destination)
+    oscillator.start()
+  }
+
+  oscillator.frequency.setTargetAtTime(
+    soundState === 'fault' ? 420 : 880,
+    context.currentTime,
+    0.02
+  )
+}
+
+function ensureAudioContext(): AudioContext | null {
+  if (audioContext) return audioContext
+
+  const AudioContextCtor =
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AudioContextCtor) return null
+
+  audioContext = new AudioContextCtor()
+  void audioContext.resume()
+  return audioContext
+}
+
+function stopSimulationAudio(): void {
+  oscillator?.stop()
+  oscillator?.disconnect()
+  gainNode?.disconnect()
+  oscillator = null
+  gainNode = null
 }
 
 function deviceLabel(deviceId: string): string {
@@ -181,6 +277,10 @@ function stopTicking(): void {
           :value="option.value"
         />
       </el-select>
+      <label class="sound-toggle">
+        <span>{{ t('fire.simulation.soundEnabled') }}</span>
+        <el-switch v-model="soundEnabled" size="small" />
+      </label>
     </section>
 
     <section class="state-grid">
@@ -329,6 +429,20 @@ p {
 
 .control-grid :deep(.el-button) {
   margin: 0;
+}
+
+.sound-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 0 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .state-grid {

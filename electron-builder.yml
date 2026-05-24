@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: numens-mesh-studio
+appId: com.numens.fire-alarm-simulator
+productName: Numens Fire Alarm Simulator
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: numens-mesh-studio
+  executableName: Numens Fire Alarm Simulator
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

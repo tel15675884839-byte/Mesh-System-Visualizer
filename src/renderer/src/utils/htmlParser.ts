@@ -7,20 +7,22 @@ export interface IParsedData {
 
 export function parseOpenThreadHtml(htmlContent: string): IParsedData {
   try {
-    const nodesMatch = 
-      htmlContent.match(/(?:var|let|const)?\s*nodes\s*=\s*new\s+vis\.DataSet\s*\(\s*(\[[\s\S]*?\])\s*\)/) || 
-      htmlContent.match(/(?:var|let|const)?\s*nodes\s*=\s*(\[[\s\S]*?\])\s*;?/)
+    const nodesMatch =
+      htmlContent.match(
+        /(?:var|let|const)?\s*nodes\s*=\s*new\s+vis\.DataSet\s*\(\s*(\[[\s\S]*?\])\s*\)/
+      ) || htmlContent.match(/(?:var|let|const)?\s*nodes\s*=\s*(\[[\s\S]*?\])\s*;?/)
 
-    const edgesMatch = 
-      htmlContent.match(/(?:var|let|const)?\s*edges\s*=\s*new\s+vis\.DataSet\s*\(\s*(\[[\s\S]*?\])\s*\)/) || 
-      htmlContent.match(/(?:var|let|const)?\s*edges\s*=\s*(\[[\s\S]*?\])\s*;?/)
+    const edgesMatch =
+      htmlContent.match(
+        /(?:var|let|const)?\s*edges\s*=\s*new\s+vis\.DataSet\s*\(\s*(\[[\s\S]*?\])\s*\)/
+      ) || htmlContent.match(/(?:var|let|const)?\s*edges\s*=\s*(\[[\s\S]*?\])\s*;?/)
 
     if (!nodesMatch || !edgesMatch) {
       throw new Error('无法在 HTML 中找到 nodes 或 edges 数据定义')
     }
 
-    const nodesRaw = new Function("return " + nodesMatch[1])()
-    const edgesRaw = new Function("return " + edgesMatch[1])()
+    const nodesRaw = new Function('return ' + nodesMatch[1])()
+    const edgesRaw = new Function('return ' + edgesMatch[1])()
 
     if (!Array.isArray(nodesRaw) || !Array.isArray(edgesRaw)) {
       throw new Error('解析出的数据不是有效的数组格式')
@@ -41,9 +43,12 @@ export function parseOpenThreadHtml(htmlContent: string): IParsedData {
 export function extractMac(node: any): string {
   if (node.mac) return node.mac.toLowerCase()
   const macRegex = /([0-9a-fA-F]{16})/
-  if (typeof node.id === 'string' && node.id.match(macRegex)) return node.id.match(macRegex)[0].toLowerCase()
-  if (typeof node.label === 'string' && node.label.match(macRegex)) return node.label.match(macRegex)[0].toLowerCase()
-  if (node.title && typeof node.title === 'string' && node.title.match(macRegex)) return node.title.match(macRegex)[0].toLowerCase()
+  if (typeof node.id === 'string' && node.id.match(macRegex))
+    return node.id.match(macRegex)[0].toLowerCase()
+  if (typeof node.label === 'string' && node.label.match(macRegex))
+    return node.label.match(macRegex)[0].toLowerCase()
+  if (node.title && typeof node.title === 'string' && node.title.match(macRegex))
+    return node.title.match(macRegex)[0].toLowerCase()
   return String(node.id).toLowerCase()
 }
 

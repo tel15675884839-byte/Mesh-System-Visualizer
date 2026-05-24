@@ -5,7 +5,7 @@ import type {
   FireZone,
   NonAddressableSounderPoint
 } from '../types'
-import { createDelayedActivation } from './delays'
+import { createDelayedActivation, type DelayReason } from './delays'
 import type {
   ActiveFault,
   ActiveInputAlarm,
@@ -97,6 +97,7 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
   }
 
   if (input.evacuateActive) {
+    addEvacuateSounders(outputs, input)
     const maxDelaySeconds = Math.max(
       ...input.network.panels.map((panel) => panel.general.evacuateDelaySeconds),
       0
@@ -184,6 +185,42 @@ function addPresetSounders(
   addProgrammedZoneOutputs(outputs, input.devices, alarm, [alarm])
 }
 
+function addEvacuateSounders(
+  outputs: Map<string, OutputActivation>,
+  input: CauseEffectInput
+): void {
+  for (const sounder of input.devices.filter((device) => device.isSounder)) {
+    if (sounder.disabled) {
+      upsertOutput(outputs, {
+        outputId: `device:${sounder.id}`,
+        state: 'disabled',
+        causes: ['manual-evacuate'],
+        remainingDelaySeconds: 0,
+        reason: 'disabled-output'
+      })
+      continue
+    }
+
+    upsertOutput(outputs, {
+      outputId: `device:${sounder.id}`,
+      state: 'active',
+      causes: ['manual-evacuate'],
+      remainingDelaySeconds: 0,
+      reason: 'evacuate'
+    })
+  }
+
+  for (const point of input.nonAddressablePoints) {
+    upsertOutput(outputs, {
+      outputId: `non-addressable-sounder:${point.id}`,
+      state: 'active',
+      causes: ['manual-evacuate'],
+      remainingDelaySeconds: 0,
+      reason: 'evacuate'
+    })
+  }
+}
+
 function addSounderGroupOutput(
   outputs: Map<string, OutputActivation>,
   alarm: EffectiveAlarm,
@@ -221,8 +258,8 @@ function addSounderGroupOutput(
     createDelayedActivation(
       `sounder-group:${alarm.panel.id}:${groupId}`,
       [alarm.device.id],
-      alarm.panel.general.sounderDelaySeconds,
-      'general-sounder'
+      getSounderDelaySeconds(alarm),
+      getSounderDelayReason(alarm)
     )
   )
 }
@@ -259,8 +296,8 @@ function addDeviceSounderOutput(
     createDelayedActivation(
       `device:${sounder.id}`,
       [alarm.device.id],
-      alarm.panel.general.sounderDelaySeconds,
-      'general-sounder'
+      getSounderDelaySeconds(alarm),
+      getSounderDelayReason(alarm)
     )
   )
 }
@@ -302,8 +339,8 @@ function addIOGroupOutput(
     createDelayedActivation(
       `io-group:${alarm.panel.id}:${groupId}`,
       [alarm.device.id],
-      alarm.panel.general.inputOutputDelaySeconds,
-      'io'
+      getIODelaySeconds(alarm),
+      getIODelayReason(alarm)
     )
   )
 }
@@ -375,10 +412,50 @@ function addFireBrigadeOutput(outputs: Map<string, OutputActivation>, alarm: Eff
     createDelayedActivation(
       `fire-brigade:${alarm.panel.id}`,
       [alarm.device.id],
-      alarm.panel.general.fireBrigadeDelaySeconds,
-      'fire-brigade'
+      alarm.device.overrideDelays ? 0 : alarm.panel.general.fireBrigadeDelaySeconds,
+      alarm.device.overrideDelays ? 'device-override-delay' : 'fire-brigade'
     )
   )
+}
+
+function getSounderDelaySeconds(alarm: EffectiveAlarm): number {
+  if (alarm.device.overrideDelays || alarm.zone?.delayedSounders === false) {
+    return 0
+  }
+
+  return alarm.panel.general.sounderDelaySeconds
+}
+
+function getSounderDelayReason(alarm: EffectiveAlarm): DelayReason {
+  if (alarm.device.overrideDelays) {
+    return 'device-override-delay'
+  }
+
+  if (alarm.zone?.delayedSounders === false) {
+    return 'zone-non-delayed-sounders'
+  }
+
+  return 'general-sounder'
+}
+
+function getIODelaySeconds(alarm: EffectiveAlarm): number {
+  if (alarm.device.ioOverrideDelay || alarm.device.overrideDelays) {
+    return 0
+  }
+
+  return alarm.panel.general.inputOutputDelaySeconds
+}
+
+function getIODelayReason(alarm: EffectiveAlarm): DelayReason {
+  if (alarm.device.ioOverrideDelay) {
+    return 'io-override-delay'
+  }
+
+  if (alarm.device.overrideDelays) {
+    return 'device-override-delay'
+  }
+
+  return 'io'
 }
 
 function upsertOutput(outputs: Map<string, OutputActivation>, next: OutputActivation): void {

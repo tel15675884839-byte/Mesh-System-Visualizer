@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FireDevice, FireLoop } from '../types'
 import {
+  buildAdjacentCurrentFloorLoopSegments,
   buildCurrentFloorLoopSegments,
   buildLoopSegments,
   getEffectiveLoopOrder
@@ -20,7 +21,7 @@ function createLoop(overrides: Partial<FireLoop> = {}): FireLoop {
   }
 }
 
-function createDevice(id: string, floorId?: string): FireDevice {
+function createDevice(id: string, floorId?: string, placementOrder?: number): FireDevice {
   return {
     id,
     networkId: 'network-1',
@@ -44,12 +45,13 @@ function createDevice(id: string, floorId?: string): FireDevice {
     setEvacuateTimer: false,
     overrideDelays: false,
     placement: floorId
-      ? {
+      ? ({
           status: 'placed',
           buildingId: 'building-1',
           floorId,
-          position: { x: 0, y: 0, z: 0 }
-        }
+          position: { x: 0, y: 0, z: 0 },
+          order: placementOrder
+        } as FireDevice['placement'])
       : { status: 'unplaced' },
     raw: {}
   }
@@ -65,28 +67,50 @@ describe('loop wiring', () => {
     expect(getEffectiveLoopOrder(loop)).toEqual(['device-c', 'device-a'])
   })
 
-  it('uses configured order when manual order is empty', () => {
+  it('uses placed device order when manual order is empty', () => {
     const loop = createLoop({
-      configuredDeviceOrder: ['device-b', 'device-a', 'device-c'],
+      configuredDeviceOrder: ['device-a', 'device-b', 'device-c'],
       manualDeviceOrder: []
     })
+    const devices = [
+      createDevice('device-a', 'floor-1', 20),
+      createDevice('device-b', 'floor-1', 10),
+      createDevice('device-c', 'floor-1', 30)
+    ]
 
-    expect(getEffectiveLoopOrder(loop)).toEqual(['device-b', 'device-a', 'device-c'])
+    expect(getEffectiveLoopOrder(loop, devices)).toEqual(['device-b', 'device-a', 'device-c'])
   })
 
-  it('builds 2D segments only for same-floor placed device pairs', () => {
+  it('builds 2D segments only for adjacent same-floor pairs in placed order', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c', 'device-d']
     })
     const devices = [
-      createDevice('device-a', 'floor-1'),
-      createDevice('device-b', 'floor-1'),
-      createDevice('device-c', 'floor-2'),
-      createDevice('device-d', 'floor-1')
+      createDevice('device-a', 'floor-1', 40),
+      createDevice('device-b', 'floor-1', 10),
+      createDevice('device-c', 'floor-2', 20),
+      createDevice('device-d', 'floor-1', 30)
     ]
 
     expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
-      segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-b' }],
+      segments: [{ fromDeviceId: 'device-d', toDeviceId: 'device-a' }],
+      skippedSegments: []
+    })
+  })
+
+  it('does not connect placed devices by configured order when placement order differs', () => {
+    const loop = createLoop({
+      configuredDeviceOrder: ['device-a', 'device-b', 'device-c', 'device-d']
+    })
+    const devices = [
+      createDevice('device-a', 'floor-1', 1),
+      createDevice('device-b'),
+      createDevice('device-c'),
+      createDevice('device-d', 'floor-1', 2)
+    ]
+
+    expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
+      segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-d' }],
       skippedSegments: []
     })
   })
@@ -108,6 +132,7 @@ describe('loop wiring', () => {
       },
       {
         ...createDevice('device-c', 'floor-1'),
+        loopId: 2,
         zoneNumber: 1,
         sounderGroupId: 3,
         ioGroupId: 4
@@ -116,6 +141,30 @@ describe('loop wiring', () => {
 
     expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
       segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-b' }],
+      skippedSegments: []
+    })
+  })
+
+  it('builds only adjacent current-floor segments for a dragged Loop device', () => {
+    const loop = createLoop({
+      configuredDeviceOrder: ['device-a', 'device-b', 'device-c', 'device-d']
+    })
+    const devices = [
+      createDevice('device-a', 'floor-1'),
+      createDevice('device-b', 'floor-1'),
+      createDevice('device-c', 'floor-1'),
+      createDevice('device-d', 'floor-2')
+    ]
+
+    expect(buildAdjacentCurrentFloorLoopSegments(loop, devices, 'floor-1', 'device-b')).toEqual({
+      segments: [
+        { fromDeviceId: 'device-a', toDeviceId: 'device-b' },
+        { fromDeviceId: 'device-b', toDeviceId: 'device-c' }
+      ],
+      skippedSegments: []
+    })
+    expect(buildAdjacentCurrentFloorLoopSegments(loop, devices, 'floor-1', 'device-c')).toEqual({
+      segments: [{ fromDeviceId: 'device-b', toDeviceId: 'device-c' }],
       skippedSegments: []
     })
   })
@@ -141,7 +190,8 @@ describe('loop wiring', () => {
 
   it('skips segments with unplaced or unknown devices and reports the skipped count', () => {
     const loop = createLoop({
-      configuredDeviceOrder: ['device-a', 'device-b', 'device-missing', 'device-c']
+      configuredDeviceOrder: ['device-a', 'device-c'],
+      manualDeviceOrder: ['device-a', 'device-b', 'device-missing', 'device-c']
     })
     const devices = [
       createDevice('device-a', 'floor-1'),

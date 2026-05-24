@@ -82,11 +82,16 @@ const { t } = useI18n()
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
   min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .zone-select {
-  width: 190px;
+  width: 138px;
 }
 
 .point-count {

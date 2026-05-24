@@ -47,6 +47,17 @@ describe('project asset runtime paths', () => {
     expect(href).not.toContain('file://')
     expect(href).not.toContain('C:')
   })
+
+  it('normalizes package paths when no runtime path is available', () => {
+    const href = getFireAssetHref({
+      id: 'map-1',
+      kind: 'map',
+      name: 'floor.png',
+      packagePath: '\\assets\\maps\\floor.png'
+    })
+
+    expect(href).toBe('assets/maps/floor.png')
+  })
 })
 
 function makeProjectWithAsset(asset: FireProjectDocument['assets'][number]): FireProjectDocument {

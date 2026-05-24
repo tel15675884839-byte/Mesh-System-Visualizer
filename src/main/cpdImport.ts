@@ -59,21 +59,7 @@ async function buildExtractorCommand(
   cpdPath: string,
   jsonPath: string
 ): Promise<ExtractorCommand> {
-  const cmdPath = join(extractorDir, 'CpdExtractor.cmd')
-  if (await pathExists(cmdPath)) {
-    return {
-      command: process.env.ComSpec || 'cmd.exe',
-      args: [
-        '/d',
-        '/s',
-        '/c',
-        `call ${quoteForCmd(cmdPath)} ${quoteForCmd(cpdPath)} ${quoteForCmd(jsonPath)}`
-      ],
-      cwd: extractorDir,
-      displayName: 'CpdExtractor.cmd'
-    }
-  }
-
+  // Prefer PowerShell (.ps1) over cmd (.cmd) to avoid Unicode path encoding issues
   const ps1Path = join(extractorDir, 'CpdExtractor.ps1')
   if (await pathExists(ps1Path)) {
     return {
@@ -91,6 +77,21 @@ async function buildExtractorCommand(
       ],
       cwd: extractorDir,
       displayName: 'CpdExtractor.ps1'
+    }
+  }
+
+  const cmdPath = join(extractorDir, 'CpdExtractor.cmd')
+  if (await pathExists(cmdPath)) {
+    return {
+      command: process.env.ComSpec || 'cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        `call ${quoteForCmd(cmdPath)} ${quoteForCmd(cpdPath)} ${quoteForCmd(jsonPath)}`
+      ],
+      cwd: extractorDir,
+      displayName: 'CpdExtractor.cmd'
     }
   }
 

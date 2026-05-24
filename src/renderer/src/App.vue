@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  ArrowLeft,
+  ArrowRight,
   DocumentAdd,
   FolderOpened,
   Refresh,
@@ -12,6 +14,7 @@ import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
 import { adaptCpdExport } from './domain/fire/cpdAdapter'
+import { createFireProjectSavePayload } from './domain/fire/projectPackagePayload'
 import { resolveOpenedProjectAssetRuntimePaths } from './domain/fire/projectAssets'
 import DeviceTree from './components/fire/DeviceTree.vue'
 import Planner2D from './components/fire/Planner2D.vue'
@@ -25,13 +28,24 @@ type ViewMode = '2d' | '3d'
 type RightPanelTab = 'properties' | 'group' | 'simulation'
 
 const store = useFireProjectStore()
-const { project, pendingCpdDiff } = storeToRefs(store)
+const { project, pendingCpdDiff, selectedDeviceId } = storeToRefs(store)
 const { t } = useI18n()
 const viewMode = ref<ViewMode>('2d')
 const rightPanelTab = ref<RightPanelTab>('properties')
+const isRightPanelOpen = ref(false)
 
 const hasProject = computed(() => project.value.networks.length > 0)
 const projectTitle = computed(() => project.value.name || t('fire.app.name'))
+
+watch(selectedDeviceId, (deviceId) => {
+  isRightPanelOpen.value = Boolean(deviceId)
+})
+
+watch(viewMode, (mode) => {
+  if (mode === '2d' && rightPanelTab.value === 'simulation') {
+    rightPanelTab.value = 'properties'
+  }
+})
 
 async function newFromCpd(): Promise<void> {
   try {
@@ -75,19 +89,7 @@ async function openFireProject(): Promise<void> {
 
 async function saveFireProject(): Promise<void> {
   try {
-    await window.fireApi.saveFireProject({
-      metadata: {
-        schemaVersion: 1,
-        appName: 'Numens Fire Alarm Simulator',
-        exportedAt: new Date().toISOString(),
-        language: project.value.language
-      },
-      project: project.value,
-      assetPaths: project.value.assets.flatMap((asset) =>
-        asset.runtimePath ? [{ packagePath: asset.packagePath, sourcePath: asset.runtimePath }] : []
-      ),
-      suggestedFileName: `${project.value.name || 'fire-project'}.fireproj`
-    })
+    await window.fireApi.saveFireProject(createFireProjectSavePayload(project.value))
   } catch (error) {
     ElMessage.error(`${t('fire.app.saveFailed')}: ${errorMessage(error)}`)
   }
@@ -141,6 +143,17 @@ function errorMessage(error: unknown): string {
               {{ t('fire.app.view3d') }}
             </el-radio-button>
           </el-radio-group>
+          <el-tooltip
+            :content="isRightPanelOpen ? t('fire.app.hidePanel') : t('fire.app.showPanel')"
+            placement="bottom"
+          >
+            <el-button
+              class="panel-toggle"
+              :icon="isRightPanelOpen ? ArrowRight : ArrowLeft"
+              size="small"
+              @click="isRightPanelOpen = !isRightPanelOpen"
+            />
+          </el-tooltip>
         </div>
 
         <Planner2D
@@ -148,22 +161,41 @@ function errorMessage(error: unknown): string {
           @open-properties="rightPanelTab = 'properties'"
           @locate-device="store.selectDevice($event)"
         />
-        <Viewer3D v-else />
+        <Viewer3D
+          v-else
+          @open-properties="rightPanelTab = 'properties'"
+          @locate-device="store.selectDevice($event)"
+        />
       </section>
 
-      <aside class="right-pane">
-        <el-tabs v-model="rightPanelTab" stretch>
-          <el-tab-pane :label="t('fire.app.properties')" name="properties">
-            <PropertyPanel />
-          </el-tab-pane>
-          <el-tab-pane :label="t('fire.app.group')" name="group">
-            <GroupInspector />
-          </el-tab-pane>
-          <el-tab-pane :label="t('fire.app.simulation')" name="simulation">
-            <SimulationPanel />
-          </el-tab-pane>
-        </el-tabs>
-      </aside>
+      <Transition name="right-panel-slide">
+        <aside v-if="isRightPanelOpen" class="right-pane">
+          <el-tooltip :content="t('fire.app.hidePanel')" placement="left">
+            <el-button
+              class="right-pane-close"
+              :icon="ArrowRight"
+              size="small"
+              @click="isRightPanelOpen = false"
+            />
+          </el-tooltip>
+
+          <el-tabs v-model="rightPanelTab" stretch>
+            <el-tab-pane :label="t('fire.app.properties')" name="properties">
+              <PropertyPanel />
+            </el-tab-pane>
+            <el-tab-pane :label="t('fire.app.group')" name="group">
+              <GroupInspector />
+            </el-tab-pane>
+            <el-tab-pane
+              v-if="viewMode === '3d'"
+              :label="t('fire.app.simulation')"
+              name="simulation"
+            >
+              <SimulationPanel />
+            </el-tab-pane>
+          </el-tabs>
+        </aside>
+      </Transition>
     </section>
 
     <section v-else class="empty-state">
@@ -238,9 +270,11 @@ function errorMessage(error: unknown): string {
 }
 
 .workspace {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
 }
 
 .device-tree-pane,
@@ -258,7 +292,9 @@ function errorMessage(error: unknown): string {
 
 .view-tabs {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid #d8dee8;
   background: #ffffff;
@@ -270,16 +306,40 @@ function errorMessage(error: unknown): string {
   gap: 5px;
 }
 
+.panel-toggle {
+  flex: 0 0 auto;
+}
+
 .right-pane {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: clamp(320px, 28vw, 380px);
+  max-width: calc(100% - 280px);
   overflow: hidden;
   border-left: 1px solid #d8dee8;
   background: #ffffff;
+  box-shadow: -18px 0 34px rgb(15 23 42 / 0.14);
+  will-change: transform, opacity;
+}
+
+.right-pane-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
 }
 
 .right-pane :deep(.el-tabs) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
+}
+
+.right-pane :deep(.el-tabs__header) {
+  padding-right: 42px;
 }
 
 .right-pane :deep(.el-tabs__content),
@@ -292,6 +352,32 @@ function errorMessage(error: unknown): string {
 .right-pane :deep(.group-inspector),
 .right-pane :deep(.simulation-panel) {
   border-left: 0;
+}
+
+.right-panel-slide-enter-active,
+.right-panel-slide-leave-active {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+}
+
+.right-panel-slide-enter-from,
+.right-panel-slide-leave-to {
+  opacity: 0;
+  transform: translateX(18px);
+}
+
+.right-panel-slide-enter-to,
+.right-panel-slide-leave-from {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .right-panel-slide-enter-active,
+  .right-panel-slide-leave-active {
+    transition: none;
+  }
 }
 
 .empty-state {

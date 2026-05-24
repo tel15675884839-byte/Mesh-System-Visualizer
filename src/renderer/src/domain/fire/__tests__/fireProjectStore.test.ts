@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { FireDevice, FireLoop, FireNetwork, FireProject, FireZone } from '../types'
+import {
+  DEFAULT_FLOOR_HEIGHT_3D,
+  MAX_FLOOR_HEIGHT_3D,
+  MIN_FLOOR_HEIGHT_3D
+} from '../viewer3DGeometry'
 import { useFireProjectStore } from '../../../stores/fireProjectStore'
 
 describe('fire project store', () => {
@@ -28,6 +33,45 @@ describe('fire project store', () => {
     expect(store.selectedPanelId).toBe('panel-1')
   })
 
+  it('restores missing panel zones from device zone assignments when loading old projects', () => {
+    const store = useFireProjectStore()
+    const project = makeProject()
+    project.networks[0].panels[0].zones = []
+    project.devices = [
+      makeDevice('device-1', 'network-1', 'panel-1', 1),
+      makeDevice('device-2', 'network-1', 'panel-1', 2),
+      makeDevice('device-3', 'network-1', 'panel-1', 3)
+    ]
+
+    store.loadFireProject(project)
+
+    expect(store.project.networks[0].panels[0].zones).toMatchObject([
+      { zoneNumber: 1, text: 'Zone 1' },
+      { zoneNumber: 2, text: 'Zone 2' },
+      { zoneNumber: 3, text: 'Zone 3' }
+    ])
+  })
+
+  it('restores missing panel sounder and I/O groups from device group assignments', () => {
+    const store = useFireProjectStore()
+    const project = makeProject()
+    project.networks[0].panels[0].sounderGroups = []
+    project.networks[0].panels[0].ioGroups = []
+    project.devices = [
+      makeDevice('device-1', 'network-1', 'panel-1', 1, 1, 2),
+      makeDevice('device-2', 'network-1', 'panel-1', 1, 3, 4)
+    ]
+
+    store.loadFireProject(project)
+
+    expect(store.project.networks[0].panels[0].sounderGroups.map((group) => group.groupId)).toEqual(
+      [1, 3]
+    )
+    expect(store.project.networks[0].panels[0].ioGroups.map((group) => group.groupId)).toEqual([
+      2, 4
+    ])
+  })
+
   it('places devices in a grid and supports undo and redo', () => {
     const store = useFireProjectStore()
     const project = makeProject()
@@ -44,6 +88,9 @@ describe('fire project store', () => {
       { x: 58, y: 20, z: 0 },
       { x: 106, y: 20, z: 0 }
     ])
+    expect(
+      store.project.devices.map((device) => (device.placement as { order?: number }).order)
+    ).toEqual([1, 2, 3])
     expect(store.canUndo).toBe(true)
 
     store.undo()
@@ -67,6 +114,9 @@ describe('fire project store', () => {
     expect(building?.name).toBe('Building 1')
     expect(building?.floors.map((floor) => floor.id)).toContain(floorId)
     expect(building?.floors).toHaveLength(2)
+    expect(building?.floors.every((floor) => floor.floorHeight3D === DEFAULT_FLOOR_HEIGHT_3D)).toBe(
+      true
+    )
     expect(store.canUndo).toBe(true)
   })
 
@@ -144,6 +194,59 @@ describe('fire project store', () => {
     store.setDeviceIconScale2D(0)
     expect(store.project.viewSettings.deviceIconScale2D).toBe(0.4)
   })
+
+  it('updates global 3D floor spacing within usable bounds', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    store.setFloorSpacing3D(48)
+    expect(store.project.viewSettings.floorSpacing3D).toBe(48)
+
+    store.setFloorSpacing3D(999)
+    expect(store.project.viewSettings.floorSpacing3D).toBe(MAX_FLOOR_HEIGHT_3D)
+
+    store.setFloorSpacing3D(0)
+    expect(store.project.viewSettings.floorSpacing3D).toBe(MIN_FLOOR_HEIGHT_3D)
+  })
+
+  it('updates the simulation sound setting', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    store.setSimulationSoundEnabled(false)
+    expect(store.project.simulationSettings.soundEnabled).toBe(false)
+
+    store.setSimulationSoundEnabled(true)
+    expect(store.project.simulationSettings.soundEnabled).toBe(true)
+  })
+
+  it('records one undo snapshot for a completed device move', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+    store.placeDevices(['device-1'], 'building-1', 'floor-1', { x: 10, y: 20, z: 0 })
+    store.undo()
+    store.redo()
+
+    store.moveDevice('device-1', { x: 80, y: 90, z: 0 })
+
+    expect(store.project.devices[0].placement.position).toEqual({ x: 80, y: 90, z: 0 })
+    expect((store.project.devices[0].placement as { order?: number }).order).toBe(1)
+    store.undo()
+    expect(store.project.devices[0].placement.position).toEqual({ x: 10, y: 20, z: 0 })
+  })
+
+  it('assigns a new placement order when an unplaced device is placed again', () => {
+    const store = useFireProjectStore()
+    store.loadFireProject(makeProject())
+
+    store.placeDevices(['device-1', 'device-2'], 'building-1', 'floor-1', { x: 10, y: 20, z: 0 })
+    store.removeDeviceFromDrawing('device-1')
+    store.placeDevices(['device-1'], 'building-1', 'floor-1', { x: 80, y: 90, z: 0 })
+
+    expect(
+      store.project.devices.map((device) => (device.placement as { order?: number }).order)
+    ).toEqual([3, 2, undefined])
+  })
 })
 
 function makeProject(): FireProject & { devices: FireDevice[] } {
@@ -162,6 +265,7 @@ function makeProject(): FireProject & { devices: FireDevice[] } {
     viewSettings: {
       deviceIconScale2D: 1,
       deviceIconScale3D: 1,
+      floorSpacing3D: DEFAULT_FLOOR_HEIGHT_3D,
       mapOpacity: 1,
       labelColor: '#111827',
       showLoopLines: true,
@@ -237,7 +341,14 @@ function makeNetwork(id: string): FireNetwork {
   }
 }
 
-function makeDevice(id: string, networkId: string, panelId: string): FireDevice {
+function makeDevice(
+  id: string,
+  networkId: string,
+  panelId: string,
+  zoneNumber?: number,
+  sounderGroupId?: number,
+  ioGroupId?: number
+): FireDevice {
   return {
     id,
     networkId,
@@ -247,6 +358,9 @@ function makeDevice(id: string, networkId: string, panelId: string): FireDevice 
     address: Number(id.replace('device-', '')),
     type: 'manual_call_point',
     friendlyTypeName: 'Manual Call Point',
+    zoneNumber,
+    sounderGroupId,
+    ioGroupId,
     isInputCapable: true,
     isOutputCapable: false,
     isSounder: false,

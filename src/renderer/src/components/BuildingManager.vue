@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { } from 'vue'
-import { Plus, Delete, Upload } from '@element-plus/icons-vue'
+import {} from 'vue'
+import { Plus, Delete, Upload, OfficeBuilding } from '@element-plus/icons-vue'
 import type { IBuilding, IFloor } from '../types'
 
 // 接收父组件传递的建筑数据 (v-model)
@@ -10,13 +10,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: IBuilding[]): void
-  (e: 'mapResolutionChange', payload: {
-    floorId: string,
-    oldWidth: number,
-    oldHeight: number,
-    newWidth: number,
-    newHeight: number
-  }): void
+  (
+    e: 'mapResolutionChange',
+    payload: {
+      floorId: string
+      oldWidth: number
+      oldHeight: number
+      newWidth: number
+      newHeight: number
+    }
+  ): void
 }>()
 
 // 获取数据的副本引用 (Vue 3 props 是只读的，但数组内部对象可变，这里直接操作数组元素是可行的，
@@ -57,7 +60,7 @@ const addFloor = (building: IBuilding) => {
       nextFloorNum = building.floors.length + 1
     }
   }
-  
+
   const newFloor: IFloor = {
     id: `flr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     name: `${nextFloorNum}F`,
@@ -86,7 +89,7 @@ const handleMapUpload = (file: any, floor: IFloor) => {
       img.onload = () => {
         floor.mapWidth = img.width
         floor.mapHeight = img.height
-        
+
         // 如果旧的分辨率存在且不等于新的，触发事件
         if (oldWidth && oldHeight && (oldWidth !== img.width || oldHeight !== img.height)) {
           emit('mapResolutionChange', {
@@ -103,6 +106,39 @@ const handleMapUpload = (file: any, floor: IFloor) => {
   }
   reader.readAsDataURL(file.raw)
 }
+
+// 批量上传图纸
+const handleBatchMapUpload = (file: any, building: IBuilding) => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    if (e.target?.result) {
+      const result = e.target.result as string
+      const img = new Image()
+      img.onload = () => {
+        building.floors.forEach((floor) => {
+          const oldWidth = floor.mapWidth
+          const oldHeight = floor.mapHeight
+
+          floor.mapPath = result
+          floor.mapWidth = img.width
+          floor.mapHeight = img.height
+
+          if (oldWidth && oldHeight && (oldWidth !== img.width || oldHeight !== img.height)) {
+            emit('mapResolutionChange', {
+              floorId: floor.id,
+              oldWidth,
+              oldHeight,
+              newWidth: img.width,
+              newHeight: img.height
+            })
+          }
+        })
+      }
+      img.src = result
+    }
+  }
+  reader.readAsDataURL(file.raw)
+}
 </script>
 
 <template>
@@ -112,42 +148,81 @@ const handleMapUpload = (file: any, floor: IFloor) => {
         <div class="bld-title">
           <el-icon><OfficeBuilding /></el-icon>
           <!-- 建筑名称 -->
-          <el-input v-model="bld.name" style="width: 120px; margin-left: 8px;" size="small" />
+          <el-input v-model="bld.name" style="width: 120px; margin-left: 8px" size="small" />
         </div>
         <!-- 只有多于1个建筑时才允许删除 -->
-        <el-button type="danger" link :icon="Delete" @click="removeBuilding(bIndex)" v-if="modelValue.length > 1"/>
+        <el-button
+          v-if="modelValue.length > 1"
+          type="danger"
+          link
+          :icon="Delete"
+          @click="removeBuilding(bIndex)"
+        />
       </div>
 
       <div class="floor-list">
         <div v-for="(floor, fIndex) in bld.floors" :key="floor.id" class="floor-item">
           <span class="floor-drag-handle">::</span>
           <!-- 楼层名称 -->
-          <el-input v-model="floor.name" style="width: 80px;" size="small" />
-          
+          <el-input v-model="floor.name" style="width: 80px" size="small" />
+
           <!-- 图纸上传 -->
           <el-upload
             action="#"
             :auto-upload="false"
             :show-file-list="false"
             accept="image/*"
-            @change="(file) => handleMapUpload(file, floor)"
             class="upload-btn"
+            @change="(file) => handleMapUpload(file, floor)"
           >
             <el-button size="small" :type="floor.mapPath ? 'success' : 'info'" plain :icon="Upload">
               {{ floor.mapPath ? '更换图纸' : '上传平面图' }}
             </el-button>
           </el-upload>
-          
+
           <el-button type="danger" link :icon="Delete" @click="removeFloor(bld, fIndex)" />
         </div>
-        
-        <el-button class="add-floor-btn" size="small" plain @click="addFloor(bld)">
-          <el-icon><Plus /></el-icon> 添加楼层
-        </el-button>
+
+        <div style="display: flex; gap: 10px">
+          <el-button
+            class="add-floor-btn"
+            size="small"
+            plain
+            style="flex: 1"
+            @click="addFloor(bld)"
+          >
+            <el-icon><Plus /></el-icon> 添加楼层
+          </el-button>
+
+          <el-upload
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            accept="image/*"
+            style="flex: 1"
+            class="upload-btn"
+            @change="(file: any) => handleBatchMapUpload(file, bld)"
+          >
+            <el-button size="small" type="primary" plain :icon="Upload" style="width: 100%">
+              批量设置图纸
+            </el-button>
+          </el-upload>
+        </div>
       </div>
     </div>
 
-    <el-button type="primary" plain style="width: 100%; margin-top: 10px; border-style: dashed;" @click="addBuilding">
+    <el-button
+      type="primary"
+      style="
+        width: 100%;
+        margin-top: 10px;
+        border-style: dashed;
+        font-weight: bold;
+        --el-button-text-color: #ffffff;
+        --el-button-hover-text-color: #ffffff;
+      "
+      @click="addBuilding"
+    >
       <el-icon><Plus /></el-icon> 添加新建筑
     </el-button>
   </div>
@@ -161,19 +236,38 @@ const handleMapUpload = (file: any, floor: IFloor) => {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 15px;
-  background: rgba(0,0,0,0.02);
+  background: rgba(0, 0, 0, 0.02);
 }
 .building-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 12px;
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
   border-bottom: 1px solid var(--border-color);
 }
-.bld-title { display: flex; align-items: center; }
+.bld-title {
+  display: flex;
+  align-items: center;
+}
 
-.floor-list { padding: 10px; }
-.floor-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.floor-drag-handle { cursor: grab; color: #999; }
-.upload-btn { display: inline-flex; }
-.add-floor-btn { width: 100%; }
+.floor-list {
+  padding: 10px;
+}
+.floor-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.floor-drag-handle {
+  cursor: grab;
+  color: #999;
+}
+.upload-btn {
+  display: inline-flex;
+}
+.add-floor-btn {
+  width: 100%;
+}
 </style>

@@ -251,6 +251,236 @@ describe('adaptCpdExport', () => {
     })
   })
 
+  it('normalizes CPD relation fields from raw and legacy group member tables', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          {
+            panelNumber: 1,
+            loopId: 1,
+            address: 20,
+            type: 'manual_call_point',
+            raw: {
+              Zone: 6,
+              SounderGroup: 12,
+              IOGroup: 14,
+              InhibitIO: true,
+              OverrideDelays: true
+            }
+          }
+        ],
+        zones: [
+          {
+            panelNumber: 1,
+            zoneNumber: 6,
+            text: 'Raw zone links',
+            raw: {
+              SounderGroupAlarm1: 12,
+              IOGroup1Alarm1: 14,
+              DelayedSounders: true,
+              ZoneEnabled: true
+            }
+          }
+        ],
+        sounderGroups: [
+          {
+            panelNumber: 1,
+            groupId: 12,
+            GDataDetail: [{ Loop: 1, PhysicalAddress: 20, Description: 'Legacy SG member' }],
+            raw: { source: 'GDataDetail' }
+          }
+        ],
+        ioGroups: [
+          {
+            panelNumber: 1,
+            groupId: 14,
+            GDataDetail: [{ LoopID: 1, Address: 20, Description: 'Legacy IO member' }],
+            raw: { source: 'GDataDetail' }
+          }
+        ]
+      },
+      1234
+    )
+
+    const panel = result.network.panels[0]
+
+    expect(result.devices[0]).toMatchObject({
+      zoneNumber: 6,
+      sounderGroupId: 12,
+      ioGroupId: 14,
+      inhibitIO: true,
+      overrideDelays: true
+    })
+    expect(panel.zones[0]).toMatchObject({
+      zoneNumber: 6,
+      delayedSounders: true,
+      sounderGroupAlarm1: 12,
+      ioGroup1Alarm1: 14
+    })
+    expect(panel.sounderGroups[0].addressableMembers).toEqual([
+      expect.objectContaining({
+        loopId: 1,
+        physicalAddress: 20,
+        description: 'Legacy SG member'
+      })
+    ])
+    expect(panel.ioGroups[0].members).toEqual([
+      expect.objectContaining({
+        loopId: 1,
+        physicalAddress: 20,
+        description: 'Legacy IO member'
+      })
+    ])
+  })
+
+  it('keeps extractor Zone and Group rows when only the single panel is present', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        zones: [
+          {
+            zoneNumber: 1,
+            text: '1st Floor',
+            enabled: true,
+            delayedSounders: false,
+            sounderGroupAlarm1: 1,
+            sounderGroupAlarm2: 10,
+            ioGroup1Alarm1: 1,
+            ioGroup1Alarm2: 2,
+            raw: {}
+          },
+          {
+            zoneNumber: 2,
+            text: '2nd Floor',
+            enabled: true,
+            delayedSounders: false,
+            sounderGroupAlarm1: 2,
+            raw: {}
+          }
+        ],
+        sounderGroups: [
+          {
+            groupId: 10,
+            title: 'All Evacuation',
+            members: [{ panelNumber: 1, loopId: 1, physicalAddress: 94, raw: {} }],
+            raw: {}
+          }
+        ],
+        ioGroups: [
+          {
+            groupId: 1,
+            members: [{ panelNumber: 1, entry: 1, loopId: 1, physicalAddress: 7, raw: {} }],
+            raw: {}
+          }
+        ]
+      },
+      1234
+    )
+
+    const panel = result.network.panels[0]
+    expect(panel.zones).toMatchObject([
+      {
+        zoneNumber: 1,
+        text: '1st Floor',
+        sounderGroupAlarm1: 1,
+        sounderGroupAlarm2: 10,
+        ioGroup1Alarm1: 1,
+        ioGroup1Alarm2: 2
+      },
+      {
+        zoneNumber: 2,
+        text: '2nd Floor',
+        sounderGroupAlarm1: 2
+      }
+    ])
+    expect(panel.sounderGroups.map((group) => group.groupId)).toEqual([7, 10])
+    expect(panel.sounderGroups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          groupId: 10,
+          addressableMembers: [expect.objectContaining({ loopId: 1, physicalAddress: 94 })]
+        })
+      ])
+    )
+    expect(panel.ioGroups.map((group) => group.groupId)).toEqual([1, 9])
+    expect(panel.ioGroups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          groupId: 1,
+          members: [expect.objectContaining({ loopId: 1, physicalAddress: 7 })]
+        })
+      ])
+    )
+  })
+
+  it('keeps only configured or device-referenced CPD zones', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          { ...fixture.devices[0], zone: 1 },
+          { ...fixture.devices[1], zone: 3 }
+        ],
+        zones: [
+          { ...fixture.zones[0], zoneNumber: 1, text: '1st Floor' },
+          { ...fixture.zones[0], zoneNumber: 2, text: '2nd Floor' },
+          { ...fixture.zones[0], zoneNumber: 3, text: '3rd Floor' },
+          { ...fixture.zones[0], zoneNumber: 4, text: '' },
+          { ...fixture.zones[0], zoneNumber: 5, text: '' }
+        ]
+      },
+      1234
+    )
+
+    expect(result.network.panels[0].zones.map((zone) => zone.zoneNumber)).toEqual([1, 2, 3])
+  })
+
+  it('synthesizes panel zones from device zone assignments when CPD zone rows are missing', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        zones: [],
+        devices: [
+          { ...fixture.devices[0], zone: 1 },
+          { ...fixture.devices[1], zone: 3 }
+        ]
+      },
+      1234
+    )
+
+    expect(result.network.panels[0].zones).toMatchObject([
+      { zoneNumber: 1, text: 'Zone 1' },
+      { zoneNumber: 3, text: 'Zone 3' }
+    ])
+  })
+
+  it('adds device-assigned sounder and I/O groups when CPD group rows are missing', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        sounderGroups: [{ ...fixture.sounderGroups[0], groupId: 10, members: [] }],
+        ioGroups: [],
+        devices: [
+          { ...fixture.devices[0], sounderGroup: 1, ioGroup: 2 },
+          { ...fixture.devices[1], sounderGroup: 3, ioGroup: 4 }
+        ]
+      },
+      1234
+    )
+
+    const panel = result.network.panels[0]
+    expect(panel.sounderGroups.map((group) => group.groupId)).toEqual([1, 3, 10])
+    expect(panel.sounderGroups.find((group) => group.groupId === 1)).toMatchObject({
+      title: 'Sounder Group 1',
+      addressableMembers: [{ loopId: 1, physicalAddress: 10 }]
+    })
+    expect(panel.ioGroups.map((group) => group.groupId)).toEqual([2, 4])
+    expect(panel.ioGroups.find((group) => group.groupId === 4)).toMatchObject({
+      members: [{ loopId: 1, physicalAddress: 11 }]
+    })
+  })
+
   it('extracts valid non-zero Zone, Sounder Group, and I/O Group values from CPD-like strings', () => {
     const result = adaptCpdExport(
       {
@@ -340,10 +570,7 @@ describe('adaptCpdExport', () => {
     )
 
     expect(result.devices.map((device) => device.zoneNumber)).toEqual([undefined, undefined])
-    expect(result.devices.map((device) => device.sounderGroupId)).toEqual([
-      undefined,
-      undefined
-    ])
+    expect(result.devices.map((device) => device.sounderGroupId)).toEqual([undefined, undefined])
     expect(result.devices.map((device) => device.ioGroupId)).toEqual([undefined, undefined])
     expect(result.network.panels[0].zones).toHaveLength(1)
     expect(result.network.panels[0].zones[0]).toMatchObject({

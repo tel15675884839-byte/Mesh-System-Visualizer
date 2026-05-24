@@ -1,28 +1,90 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useProjectStore } from '../stores/projectStore'
-import { Moon, Sunny, Operation, VideoCamera, MapLocation, FolderOpened } from '@element-plus/icons-vue'
+import {
+  Moon,
+  Sunny,
+  Operation,
+  VideoCamera,
+  MapLocation,
+  FolderOpened,
+  Plus,
+  DocumentChecked,
+  Download,
+  SwitchButton,
+  Check,
+  RefreshLeft
+} from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
+import logoImg from '../assets/logo.svg'
 
 const store = useProjectStore()
 
-const handleMenuCommand = async (command: string): Promise<void> => {
-  switch (command) {
-    case 'save':
-    case 'save-as':
-      await store.saveToDisk()
-      break
-    case 'open':
-      await store.loadFromDisk()
-      break
-    case 'exit':
-      store.closeProject() 
-      break
-    case 'new':
-      store.closeProject() 
-      break
-    case 'config-building':
-      store.toggleBuildingEditor(true)
-      break
+const confirmAndNew = async (): Promise<void> => {
+  try {
+    const action = await ElMessageBox({
+      title: '确认新建',
+      message: '新建工程将关闭当前项目。是否保存当前更改后再继续？',
+      confirmButtonText: '保存并继续',
+      cancelButtonText: '直接继续',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      type: 'warning'
+    })
+    if (action === 'confirm') await store.saveToDisk()
+    store.closeProject()
+  } catch (action) {
+    if (action === 'cancel') store.closeProject()
   }
+}
+
+const confirmAndOpen = async (): Promise<void> => {
+  try {
+    const action = await ElMessageBox({
+      title: '确认打开',
+      message: '打开新工程将关闭当前项目。是否保存当前更改后再继续？',
+      confirmButtonText: '保存并继续',
+      cancelButtonText: '直接继续',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      type: 'warning'
+    })
+    if (action === 'confirm') await store.saveToDisk()
+    await store.loadFromDisk()
+  } catch (action) {
+    if (action === 'cancel') await store.loadFromDisk()
+  }
+}
+
+const confirmAndClose = async (): Promise<void> => {
+  try {
+    const action = await ElMessageBox({
+      title: '确认退出',
+      message: '确定要退出当前项目吗？您可以选择保存当前更改或直接退出。',
+      confirmButtonText: '保存并退出',
+      cancelButtonText: '直接退出',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      type: 'warning'
+    })
+    if (action === 'confirm') await store.saveToDisk()
+    store.closeProject()
+  } catch (action) {
+    if (action === 'cancel') store.closeProject()
+  }
+}
+
+// [新增] 拓扑变动待确认的回路
+const pendingLoops = computed(() => {
+  return store.loops.filter((l) => store.hasPendingChanges(l.id))
+})
+
+const handleConfirmTopology = (loopId: string): void => {
+  store.commitTopologyChanges(loopId)
+}
+
+const handleDiscardTopology = (loopId: string): void => {
+  store.discardTopologyChanges(loopId)
 }
 </script>
 
@@ -30,39 +92,17 @@ const handleMenuCommand = async (command: string): Promise<void> => {
   <div class="menubar-container">
     <div class="top-menu-row">
       <div class="logo-area">
-        <span class="app-icon">🧊</span>
+        <img :src="logoImg" alt="Logo" class="header-logo" />
         <span class="app-title">Numens Mesh Studio</span>
         <span v-if="store.projectInfo.filePath" class="project-name">
           - {{ store.projectInfo.name }}
         </span>
       </div>
-      
-      <div v-if="store.isProjectLoaded" class="menus">
-        <el-dropdown trigger="click" @command="handleMenuCommand">
-          <span class="menu-item">文件 (File)</span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="new">新建工程</el-dropdown-item>
-              <el-dropdown-item command="open" :icon="FolderOpened">打开工程...</el-dropdown-item>
-              <el-dropdown-item command="save" divided>保存</el-dropdown-item>
-              <el-dropdown-item command="save-as">另存为...</el-dropdown-item>
-              <el-dropdown-item command="exit" divided>关闭项目</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
 
-        <el-dropdown trigger="click" @command="handleMenuCommand">
-          <span class="menu-item">编辑 (Edit)</span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="config-building" :icon="Operation">
-                建筑与图纸配置...
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+      <div v-if="store.isProjectLoaded" class="menus">
+        <!-- 菜单已移至下方工具栏 -->
       </div>
-      
+
       <div class="window-controls">
         <el-switch
           v-model="store.isDark"
@@ -75,24 +115,86 @@ const handleMenuCommand = async (command: string): Promise<void> => {
     </div>
 
     <div v-if="store.isProjectLoaded" class="toolbar-row">
-      <el-button-group class="tool-group">
+      <div class="tool-group">
+        <el-tooltip content="新建项目" placement="bottom">
+          <el-button class="square-btn" size="small" :icon="Plus" @click="confirmAndNew" />
+        </el-tooltip>
+        <el-tooltip content="打开项目" placement="bottom">
+          <el-button class="square-btn" size="small" :icon="FolderOpened" @click="confirmAndOpen" />
+        </el-tooltip>
         <el-tooltip content="保存当前更改" placement="bottom">
-          <el-button size="small" @click="store.saveToDisk">💾</el-button>
+          <el-button
+            class="square-btn"
+            size="small"
+            :icon="DocumentChecked"
+            @click="store.saveToDisk(false)"
+          />
         </el-tooltip>
-        
+        <el-tooltip content="另存为..." placement="bottom">
+          <el-button
+            class="square-btn"
+            size="small"
+            :icon="Download"
+            @click="store.saveToDisk(true)"
+          />
+        </el-tooltip>
         <el-tooltip content="配置建筑与图纸" placement="bottom">
-          <el-button size="small" :icon="Operation" @click="store.toggleBuildingEditor(true)" />
+          <el-button
+            class="square-btn"
+            size="small"
+            :icon="Operation"
+            @click="store.toggleBuildingEditor(true)"
+          />
         </el-tooltip>
-      </el-button-group>
+        <el-tooltip content="退出当前项目" placement="bottom">
+          <el-button
+            class="square-btn"
+            size="small"
+            type="danger"
+            plain
+            :icon="SwitchButton"
+            @click="confirmAndClose"
+          />
+        </el-tooltip>
+      </div>
 
       <el-divider direction="vertical" />
 
       <div class="tool-group">
         <el-radio-group v-model="store.currentViewMode" size="small" class="view-switch">
-          <el-radio-button label="2D"><el-icon><MapLocation /></el-icon> 2D</el-radio-button>
-          <el-radio-button label="3D"><el-icon><VideoCamera /></el-icon> 3D</el-radio-button>
+          <el-radio-button value="2D"
+            ><el-icon><MapLocation /></el-icon> 2D</el-radio-button
+          >
+          <el-radio-button value="3D"
+            ><el-icon><VideoCamera /></el-icon> 3D</el-radio-button
+          >
         </el-radio-group>
       </div>
+
+      <!-- [新增] 拓扑预览确认胶囊 (位置对应用户图示红框) -->
+      <transition name="review-fade">
+        <div v-if="pendingLoops.length > 0" class="review-capsule">
+          <div v-for="loop in pendingLoops" :key="loop.id" class="review-item">
+            <span class="review-text">预览: {{ loop.name }} 变更</span>
+            <el-divider direction="vertical" />
+            <el-button
+              type="success"
+              size="small"
+              circle
+              :icon="Check"
+              @click="handleConfirmTopology(loop.id)"
+            />
+            <el-button
+              type="info"
+              size="small"
+              circle
+              plain
+              :icon="RefreshLeft"
+              @click="handleDiscardTopology(loop.id)"
+            />
+          </div>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -128,8 +230,10 @@ const handleMenuCommand = async (command: string): Promise<void> => {
   gap: 8px;
 }
 
-.app-icon {
-  font-size: 18px;
+.header-logo {
+  width: 20px;
+  height: auto;
+  user-select: none;
 }
 
 .project-name {
@@ -181,13 +285,34 @@ html.dark .menu-item:hover {
 .tool-group {
   display: flex;
   align-items: center;
+  gap: 0.5px; /* 增加图标之间的间距 */
+}
+
+.square-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px !important; /* 圆角正方形 */
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.square-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .view-switch :deep(.el-radio-button__inner) {
   border-radius: 8px !important;
-  margin: 0 2px;
+  margin: 0 4px; /* 增加间距 */
   border: none !important;
   background: rgba(0, 0, 0, 0.05);
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 html.dark .view-switch :deep(.el-radio-button__inner) {
@@ -203,5 +328,42 @@ html.dark .view-switch :deep(.el-radio-button__inner) {
 .el-divider--vertical {
   height: 24px;
   border-color: var(--border-color);
+}
+
+/* Review Capsule Styles */
+.review-capsule {
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.review-item {
+  display: flex;
+  align-items: center;
+  background: rgba(103, 194, 58, 0.1);
+  border: 1px solid rgba(103, 194, 58, 0.3);
+  padding: 2px 12px;
+  border-radius: 20px;
+  height: 32px;
+}
+
+.review-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #67c23a;
+  margin-right: 4px;
+}
+
+/* Animations */
+.review-fade-enter-active,
+.review-fade-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.review-fade-enter-from,
+.review-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
 }
 </style>

@@ -11,7 +11,7 @@ const store = useProjectStore()
       <span>设备列表 ({{ store.deviceCounts.total }})</span>
       <el-button size="small" circle text title="刷新">🔄</el-button>
     </div>
-    
+
     <!-- 替换为 DeviceTree 组件 -->
     <div class="list-body">
       <DeviceTree />

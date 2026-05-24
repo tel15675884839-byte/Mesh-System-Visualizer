@@ -11,6 +11,7 @@ import type {
   FireFloor,
   FireLoop,
   FirePanel,
+  FireZone,
   Vector3
 } from '../../domain/fire/types'
 import { buildLoopSegments } from '../../domain/fire/loopWiring'
@@ -27,6 +28,7 @@ import { getDeviceSimulationOutputState } from '../../domain/fire/simulationOutp
 import {
   getViewer3DDeviceHighlightAppearance,
   getViewer3DHighlightOptions,
+  isDeviceHighlighted,
   isZoneHighlighted,
   type Viewer3DHighlightKind,
   type Viewer3DHighlightSelection
@@ -36,6 +38,14 @@ import {
   type Viewer3DDeviceOutputState
 } from '../../domain/fire/viewer3DSimulationVisual'
 import { getFireAssetHref } from '../../domain/fire/projectAssets'
+import {
+  getViewer3DMapOpacity,
+  shouldRenderViewer3DDevice,
+  shouldRenderViewer3DFloor,
+  type Viewer3DScopeKind,
+  type Viewer3DScopeSelection
+} from '../../domain/fire/viewer3DViewState'
+import { resolveViewer3DZoneAreas } from '../../domain/fire/viewer3DZoneArea'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 
 const store = useFireProjectStore()
@@ -48,6 +58,9 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement | null>(null)
 const highlightKind = ref<Viewer3DHighlightKind>('none')
 const highlightTargetId = ref<string | null>(null)
+const viewScopeKind = ref<Viewer3DScopeKind>('all')
+const viewScopeTargetId = ref<string | null>(null)
+const opacityFloorId = ref<string | null>(null)
 const contextMenu = ref({ visible: false, x: 0, y: 0, deviceId: null as string | null })
 
 let scene: THREE.Scene | null = null
@@ -93,8 +106,65 @@ const floorSpacing3D = computed({
   get: () => getEffectiveFloorHeight3D(project.value.viewSettings.floorSpacing3D),
   set: (value: number) => store.setFloorSpacing3D(value)
 })
+const mapOpacity3D = computed({
+  get: () => project.value.viewSettings.mapOpacity3D ?? 1,
+  set: (value: number) => store.setMapOpacity3D(value)
+})
+const buildingScopeOptions = computed(() =>
+  project.value.buildings.map((building) => ({
+    id: building.id,
+    label: building.name
+  }))
+)
+const floorScopeOptions = computed(() =>
+  project.value.buildings.flatMap((building) =>
+    building.floors.map((floor) => ({
+      id: floor.id,
+      label: `${building.name} / ${floor.name}`
+    }))
+  )
+)
+const scopeOptions = computed(() => {
+  if (viewScopeKind.value === 'building') {
+    return buildingScopeOptions.value
+  }
+
+  if (viewScopeKind.value === 'floor') {
+    return floorScopeOptions.value
+  }
+
+  return []
+})
+const showScopeTargetPicker = computed(() => viewScopeKind.value !== 'all')
+const viewScopeSelection = computed<Viewer3DScopeSelection>(() => ({
+  kind: viewScopeKind.value,
+  targetId: viewScopeTargetId.value
+}))
+const opacityFloor = computed(() =>
+  project.value.buildings
+    .flatMap((building) => building.floors)
+    .find((floor) => floor.id === opacityFloorId.value)
+)
+const floorMapOpacity3D = computed({
+  get: () => opacityFloor.value?.mapOpacity3D ?? mapOpacity3D.value,
+  set: (value: number) => {
+    if (!opacityFloorId.value) return
+    store.setFloorMapOpacity3D(opacityFloorId.value, value)
+  }
+})
 const highlightOptions = computed(() =>
   getViewer3DHighlightOptions(project.value, highlightKind.value)
+)
+const hasHighlightTargets = computed(() => highlightOptions.value.length > 0)
+const showHighlightTargetPicker = computed(() => highlightKind.value !== 'none')
+const highlightTargetLabel = computed(() =>
+  highlightKind.value === 'zone' ? t('fire.viewer3d.zoneTarget') : t('fire.viewer3d.target')
+)
+const highlightTargetPlaceholder = computed(() =>
+  highlightKind.value === 'zone' ? t('fire.viewer3d.selectZone') : t('fire.viewer3d.selectTarget')
+)
+const highlightTargetEmptyText = computed(() =>
+  highlightKind.value === 'zone' ? t('fire.viewer3d.noZones') : t('fire.viewer3d.noTargets')
 )
 const deviceById = computed(
   () => new Map(project.value.devices.map((device) => [device.id, device]))
@@ -106,6 +176,29 @@ const highlightSelection = computed<Viewer3DHighlightSelection>(() => ({
   kind: highlightKind.value,
   targetId: highlightTargetId.value
 }))
+const relationContextDeviceIds = computed(() => {
+  if (
+    highlightKind.value === 'none' ||
+    highlightKind.value === 'type' ||
+    !highlightTargetId.value
+  ) {
+    return new Set<string>()
+  }
+
+  return new Set(
+    project.value.devices
+      .filter((device) => isDeviceHighlighted(project.value, highlightSelection.value, device))
+      .map((device) => device.id)
+  )
+})
+const relationContextFloorIds = computed(() => {
+  const deviceIds = relationContextDeviceIds.value
+  return new Set(
+    project.value.devices.flatMap((device) =>
+      deviceIds.has(device.id) && device.placement.floorId ? [device.placement.floorId] : []
+    )
+  )
+})
 onMounted(() => {
   initScene()
   rebuildScene()
@@ -125,7 +218,15 @@ onUnmounted(() => {
 })
 
 watch(
-  [project, selectedDeviceId, simulationState, highlightKind, highlightTargetId],
+  [
+    project,
+    selectedDeviceId,
+    simulationState,
+    highlightKind,
+    highlightTargetId,
+    viewScopeKind,
+    viewScopeTargetId
+  ],
   () => {
     rebuildScene()
   },
@@ -133,8 +234,51 @@ watch(
 )
 
 watch(
+  viewScopeKind,
+  () => {
+    if (viewScopeKind.value === 'all') {
+      viewScopeTargetId.value = null
+      return
+    }
+
+    viewScopeTargetId.value = scopeOptions.value[0]?.id ?? null
+  },
+  { flush: 'post' }
+)
+
+watch(
+  scopeOptions,
+  (options) => {
+    if (viewScopeKind.value === 'all') {
+      viewScopeTargetId.value = null
+      return
+    }
+
+    if (!options.some((option) => option.id === viewScopeTargetId.value)) {
+      viewScopeTargetId.value = options[0]?.id ?? null
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  floorScopeOptions,
+  (options) => {
+    if (!options.some((option) => option.id === opacityFloorId.value)) {
+      opacityFloorId.value = options[0]?.id ?? null
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   highlightKind,
   () => {
+    if (highlightKind.value === 'none' || highlightKind.value === 'zone') {
+      highlightTargetId.value = null
+      return
+    }
+
     highlightTargetId.value = highlightOptions.value[0]?.id ?? null
   },
   { flush: 'post' }
@@ -149,11 +293,27 @@ watch(
     }
 
     if (!options.some((option) => option.id === highlightTargetId.value)) {
-      highlightTargetId.value = options[0]?.id ?? null
+      highlightTargetId.value = highlightKind.value === 'zone' ? null : (options[0]?.id ?? null)
     }
   },
   { immediate: true }
 )
+
+watch([highlightKind, highlightTargetId], () => {
+  if (highlightKind.value !== 'zone' || !highlightTargetId.value) {
+    return
+  }
+
+  requestAnimationFrame(() => focusSelectedZone())
+})
+
+function clearFloorMapOpacity3D(): void {
+  if (!opacityFloorId.value) {
+    return
+  }
+
+  store.setFloorMapOpacity3D(opacityFloorId.value, null)
+}
 
 function initScene(): void {
   const container = containerRef.value
@@ -214,7 +374,13 @@ function rebuildScene(): void {
         renderLoop(loop, deviceObjects)
       }
       for (const zone of panel.zones) {
-        for (const area of zone.visualAreas) {
+        const areas = resolveViewer3DZoneAreas({
+          zone,
+          devices: project.value.devices,
+          includeTemporary: isZoneHighlighted(highlightSelection.value, panel, zone.zoneNumber)
+        })
+
+        for (const area of areas) {
           renderZoneArea(
             panel,
             area.zoneNumber,
@@ -232,15 +398,32 @@ function rebuildScene(): void {
 
 function renderBuilding(building: FireBuilding, buildingIndex: number): void {
   for (const floor of building.floors) {
+    if (
+      !shouldRenderViewer3DFloor({
+        floor,
+        scope: viewScopeSelection.value,
+        relationContextFloorIds: relationContextFloorIds.value
+      })
+    ) {
+      continue
+    }
+
     const origin = getFloorOrigin(building, buildingIndex, floor)
     const width = (floor.mapWidth ?? DEFAULT_FLOOR_WIDTH) * PLAN_SCALE
     const depth = (floor.mapHeight ?? DEFAULT_FLOOR_DEPTH) * PLAN_SCALE
     const geometry = new THREE.PlaneGeometry(width, depth)
+    const floorOpacity = getViewer3DMapOpacity(
+      project.value.viewSettings.mapOpacity3D ?? 1,
+      floor.mapOpacity3D
+    )
     const material = new THREE.MeshStandardMaterial({
       color: '#f8fafc',
       roughness: 0.72,
       metalness: 0,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      transparent: floorOpacity < 1,
+      opacity: floorOpacity,
+      depthWrite: floorOpacity >= 1
     })
     const asset = floor.mapAssetId
       ? project.value.assets.find((candidate) => candidate.id === floor.mapAssetId)
@@ -251,6 +434,9 @@ function renderBuilding(building: FireBuilding, buildingIndex: number): void {
       material.map = new THREE.TextureLoader().load(assetHref)
       material.map.colorSpace = THREE.SRGBColorSpace
       material.color = new THREE.Color('#ffffff')
+      material.transparent = floorOpacity < 1
+      material.opacity = floorOpacity
+      material.depthWrite = floorOpacity >= 1
       material.needsUpdate = true
     }
 
@@ -262,7 +448,11 @@ function renderBuilding(building: FireBuilding, buildingIndex: number): void {
 
     const edge = new THREE.LineSegments(
       new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: '#64748b' })
+      new THREE.LineBasicMaterial({
+        color: '#64748b',
+        transparent: floorOpacity < 1,
+        opacity: Math.max(0.24, floorOpacity)
+      })
     )
     edge.rotation.x = -Math.PI / 2
     edge.position.copy(floorMesh.position)
@@ -307,7 +497,7 @@ function renderDevice(device: FireDevice, point: THREE.Vector3): void {
 
   if (isSelectedOrHighlighted) {
     // 3D 声呐雷达波纹颜色：单选选中为绿色，回路等批量高亮为浅绿色
-    const rippleColor = (device.id === selectedDeviceId.value) ? '#00ff66' : '#52c41a'
+    const rippleColor = device.id === selectedDeviceId.value ? '#00ff66' : '#52c41a'
     // 渲染 3D 声呐雷达 3层水波纹扩散环
     for (let i = 0; i < 3; i++) {
       const rippleMat = new THREE.MeshBasicMaterial({
@@ -327,11 +517,7 @@ function renderDevice(device: FireDevice, point: THREE.Vector3): void {
         deviceSize: size
       })
     }
-  } else if (
-    hasActiveInput(device.id) ||
-    hasActiveFault(device.id) ||
-    outputState !== null
-  ) {
+  } else if (hasActiveInput(device.id) || hasActiveFault(device.id) || outputState !== null) {
     ringMaterial = new THREE.MeshBasicMaterial({
       color: deviceColor,
       transparent: true,
@@ -434,6 +620,16 @@ function getDevicePoint(device: FireDevice): THREE.Vector3 | null {
     return null
   }
 
+  if (
+    !shouldRenderViewer3DDevice({
+      device,
+      scope: viewScopeSelection.value,
+      relationContextDeviceIds: relationContextDeviceIds.value
+    })
+  ) {
+    return null
+  }
+
   const buildingIndex = project.value.buildings.findIndex(
     (building) => building.id === placement.buildingId
   )
@@ -482,7 +678,103 @@ function getDeviceColor(device: FireDevice): THREE.ColorRepresentation {
   return '#ffffff'
 }
 
+function focusSelectedZone(): void {
+  if (!camera || !controls || highlightKind.value !== 'zone' || !highlightTargetId.value) {
+    return
+  }
 
+  const bounds = getSelectedZoneBounds()
+  if (!bounds || bounds.isEmpty()) {
+    return
+  }
+
+  const sphere = bounds.getBoundingSphere(new THREE.Sphere())
+  const radius = Math.max(sphere.radius, 14)
+  const target = sphere.center
+  const direction = camera.position.clone().sub(controls.target)
+  if (direction.lengthSq() < 0.001) {
+    direction.set(1, 1.1, 1)
+  }
+  direction.normalize()
+
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov)
+  const fitDistance = radius / Math.sin(verticalFov / 2)
+  camera.position.copy(target.clone().add(direction.multiplyScalar(fitDistance * 1.15)))
+  camera.near = Math.max(0.1, fitDistance / 100)
+  camera.far = Math.max(10000, fitDistance * 100)
+  camera.updateProjectionMatrix()
+  controls.target.copy(target)
+  controls.update()
+}
+
+function getSelectedZoneBounds(): THREE.Box3 | null {
+  const selected = findSelectedZone()
+  if (!selected) {
+    return null
+  }
+
+  const bounds = new THREE.Box3()
+  for (const area of selected.zone.visualAreas) {
+    includeZoneAreaBounds(bounds, area.buildingId, area.floorId, area.points)
+  }
+
+  const selection = highlightSelection.value
+  for (const device of project.value.devices) {
+    if (!isDeviceHighlighted(project.value, selection, device)) {
+      continue
+    }
+
+    const point = getDevicePoint(device)
+    if (!point) {
+      continue
+    }
+
+    const size = getRenderedDeviceWorldSize(device)
+    bounds.expandByPoint(point.clone().add(new THREE.Vector3(-size, -size, -size)))
+    bounds.expandByPoint(point.clone().add(new THREE.Vector3(size, size, size)))
+  }
+
+  return bounds.isEmpty() ? null : bounds
+}
+
+function includeZoneAreaBounds(
+  bounds: THREE.Box3,
+  buildingId: string,
+  floorId: string,
+  points: Array<{ x: number; y: number }>
+): void {
+  const buildingIndex = project.value.buildings.findIndex((building) => building.id === buildingId)
+  const building = project.value.buildings[buildingIndex]
+  const floor = building?.floors.find((candidate) => candidate.id === floorId)
+  if (!building || !floor || points.length === 0) {
+    return
+  }
+
+  const origin = getFloorOrigin(building, Math.max(0, buildingIndex), floor)
+  for (const point of points) {
+    bounds.expandByPoint(
+      new THREE.Vector3(origin.x + point.x * PLAN_SCALE, origin.y, origin.z + point.y * PLAN_SCALE)
+    )
+  }
+}
+
+function findSelectedZone(): { panel: FirePanel; zone: FireZone } | null {
+  const targetId = highlightTargetId.value
+  if (!targetId) {
+    return null
+  }
+
+  for (const network of project.value.networks) {
+    for (const panel of network.panels) {
+      const zone = panel.zones.find((candidate) => candidate.id === targetId)
+      if (zone) {
+        return { panel, zone }
+      }
+    }
+  }
+
+  return null
+}
 
 function hasActiveInput(deviceId: string): boolean {
   return simulationState.value.activeInputAlarms.some((alarm) => alarm.deviceId === deviceId)
@@ -609,7 +901,7 @@ function updateRadarHighlightAnimations(time: number, deltaMs: number): void {
     }
     const scale = 0.5 + ripple.progress * 1.8
     ripple.mesh.scale.setScalar(scale)
-    
+
     const mat = ripple.mesh.material as THREE.MeshBasicMaterial
     mat.opacity = 0.85 * (1.0 - ripple.progress) // 随半径增大而渐淡
   })
@@ -625,7 +917,7 @@ function updateRadarHighlightAnimations(time: number, deltaMs: number): void {
 function animate(): void {
   animationFrame = requestAnimationFrame(animate)
   controls?.update()
-  
+
   const now = performance.now()
   const deltaMs = lastTime === 0 ? 0 : now - lastTime
   lastTime = now
@@ -686,32 +978,117 @@ function disposeMaterial(material: THREE.Material): void {
         <span class="toolbar-value">{{ floorSpacing3D }}</span>
       </div>
 
-      <div class="toolbar-row highlight-row">
-        <span class="toolbar-label">{{ t('fire.viewer3d.highlight') }}</span>
-        <el-radio-group v-model="highlightKind" size="small">
-          <el-radio-button value="none">{{ t('fire.viewer3d.none') }}</el-radio-button>
-          <el-radio-button value="loop">{{ t('fire.viewer3d.loop') }}</el-radio-button>
-          <el-radio-button value="zone">{{ t('fire.viewer3d.zone') }}</el-radio-button>
-          <el-radio-button value="sounderGroup">{{
-            t('fire.viewer3d.sounderGroup')
-          }}</el-radio-button>
-          <el-radio-button value="ioGroup">{{ t('fire.viewer3d.ioGroup') }}</el-radio-button>
-        </el-radio-group>
+      <div class="toolbar-row opacity-row">
+        <span class="toolbar-label">{{ t('fire.viewer3d.mapOpacity') }}</span>
+        <el-slider
+          v-model="mapOpacity3D"
+          class="opacity-slider"
+          size="small"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          :show-tooltip="false"
+        />
+        <span class="toolbar-value">{{ Math.round(mapOpacity3D * 100) }}%</span>
         <el-select
-          v-if="highlightKind !== 'none'"
-          v-model="highlightTargetId"
-          class="highlight-select"
+          v-model="opacityFloorId"
+          class="floor-override-select"
           size="small"
           filterable
-          :placeholder="t('fire.viewer3d.target')"
+          :placeholder="t('fire.viewer3d.floorOverride')"
         >
           <el-option
-            v-for="option in highlightOptions"
+            v-for="option in floorScopeOptions"
             :key="option.id"
             :label="option.label"
             :value="option.id"
           />
         </el-select>
+        <el-slider
+          v-model="floorMapOpacity3D"
+          class="opacity-slider"
+          size="small"
+          :disabled="!opacityFloorId"
+          :min="0"
+          :max="1"
+          :step="0.05"
+          :show-tooltip="false"
+        />
+        <el-button size="small" :disabled="!opacityFloorId" @click="clearFloorMapOpacity3D">
+          {{ t('fire.viewer3d.useGlobal') }}
+        </el-button>
+      </div>
+
+      <div class="toolbar-row scope-row">
+        <span class="toolbar-label">{{ t('fire.viewer3d.scope') }}</span>
+        <el-radio-group v-model="viewScopeKind" size="small">
+          <el-radio-button label="all">{{ t('fire.viewer3d.all') }}</el-radio-button>
+          <el-radio-button label="building">{{ t('fire.viewer3d.building') }}</el-radio-button>
+          <el-radio-button label="floor">{{ t('fire.viewer3d.floor') }}</el-radio-button>
+        </el-radio-group>
+        <el-select
+          v-if="showScopeTargetPicker"
+          v-model="viewScopeTargetId"
+          class="scope-select"
+          size="small"
+          filterable
+          :placeholder="t('fire.viewer3d.selectScope')"
+          :empty-text="t('fire.viewer3d.noTargets')"
+        >
+          <el-option
+            v-for="option in scopeOptions"
+            :key="option.id"
+            :label="option.label"
+            :value="option.id"
+          />
+        </el-select>
+      </div>
+
+      <div class="toolbar-row highlight-row">
+        <span class="toolbar-label">{{ t('fire.viewer3d.highlight') }}</span>
+        <el-radio-group v-model="highlightKind" size="small">
+          <el-radio-button label="none">{{ t('fire.viewer3d.none') }}</el-radio-button>
+          <el-radio-button label="type">{{ t('fire.viewer3d.type') }}</el-radio-button>
+          <el-radio-button label="loop">{{ t('fire.viewer3d.loop') }}</el-radio-button>
+          <el-radio-button label="zone">{{ t('fire.viewer3d.zone') }}</el-radio-button>
+          <el-radio-button label="sounderGroup">{{
+            t('fire.viewer3d.sounderGroup')
+          }}</el-radio-button>
+          <el-radio-button label="ioGroup">{{ t('fire.viewer3d.ioGroup') }}</el-radio-button>
+        </el-radio-group>
+        <div
+          v-if="showHighlightTargetPicker"
+          class="target-picker"
+          :class="{ 'needs-target': highlightKind === 'zone' && !highlightTargetId }"
+        >
+          <span class="target-label">{{ highlightTargetLabel }}</span>
+          <el-select
+            v-model="highlightTargetId"
+            class="highlight-select"
+            size="small"
+            filterable
+            clearable
+            :disabled="!hasHighlightTargets"
+            :placeholder="highlightTargetPlaceholder"
+            :empty-text="highlightTargetEmptyText"
+          >
+            <el-option
+              v-for="option in highlightOptions"
+              :key="option.id"
+              :label="option.label"
+              :value="option.id"
+            />
+          </el-select>
+          <span
+            v-if="highlightKind === 'zone' && hasHighlightTargets && !highlightTargetId"
+            class="target-hint"
+          >
+            {{ t('fire.viewer3d.chooseZoneHint') }}
+          </span>
+          <span v-else-if="!hasHighlightTargets" class="target-hint">
+            {{ highlightTargetEmptyText }}
+          </span>
+        </div>
       </div>
     </div>
   </section>
@@ -760,7 +1137,7 @@ function disposeMaterial(material: THREE.Material): void {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(620px, calc(100% - 24px));
+  width: min(920px, calc(100% - 24px));
   padding: 8px 10px;
   border: 1px solid rgba(148, 163, 184, 0.42);
   border-radius: 8px;
@@ -788,6 +1165,15 @@ function disposeMaterial(material: THREE.Material): void {
   width: 210px;
 }
 
+.opacity-slider {
+  width: 120px;
+}
+
+.floor-override-select,
+.scope-select {
+  width: 210px;
+}
+
 .toolbar-value {
   flex: 0 0 34px;
   color: #0f172a;
@@ -800,8 +1186,44 @@ function disposeMaterial(material: THREE.Material): void {
   flex-wrap: wrap;
 }
 
+.opacity-row,
+.scope-row {
+  flex-wrap: wrap;
+}
+
+.target-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.target-picker.needs-target {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: #eff6ff;
+}
+
+.target-label {
+  flex: 0 0 auto;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .highlight-select {
-  width: 220px;
+  width: 260px;
+}
+
+.target-hint {
+  flex: 0 1 auto;
+  min-width: 110px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .viewer-3d :deep(canvas) {
@@ -822,9 +1244,17 @@ function disposeMaterial(material: THREE.Material): void {
   }
 
   .floor-slider,
+  .opacity-slider,
+  .floor-override-select,
+  .scope-select,
   .highlight-select {
     width: 100%;
     min-width: 180px;
+  }
+
+  .target-picker {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
 </style>

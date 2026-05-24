@@ -128,6 +128,7 @@ export interface DevicePlacement {
   floorId?: string
   position?: Vector3
   rotation?: number
+  order?: number
 }
 
 export interface FireZone {
@@ -227,6 +228,7 @@ export interface FireFloor {
   mapAssetId?: string
   mapWidth?: number
   mapHeight?: number
+  mapOpacity3D?: number
   camera2D?: { x: number; y: number; scale: number }
   floorScale3D?: number
   floorHeight3D?: number
@@ -244,7 +246,9 @@ export interface FireAsset {
 export interface FireViewSettings {
   deviceIconScale2D: number
   deviceIconScale3D: number
+  floorSpacing3D?: number
   mapOpacity: number
+  mapOpacity3D?: number
   labelColor: string
   showLoopLines: boolean
   showGroupHelperLines: boolean

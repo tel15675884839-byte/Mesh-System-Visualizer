@@ -211,7 +211,9 @@ watch(
         </el-form-item>
 
         <div v-if="selectedNode.diffStatus === 'missing'" class="status-card missing">
-          <div class="card-title"><el-icon><Warning /></el-icon> 设备缺失</div>
+          <div class="card-title">
+            <el-icon><Warning /></el-icon> 设备缺失
+          </div>
           <div class="card-desc">该设备在最新导入的拓扑中已不存在。</div>
         </div>
 
@@ -229,7 +231,13 @@ watch(
           </div>
 
           <div class="loc-tools">
-            <el-button type="primary" size="small" style="width: 100%" :icon="Aim" @click="handleLocate">
+            <el-button
+              type="primary"
+              size="small"
+              style="width: 100%"
+              :icon="Aim"
+              @click="handleLocate"
+            >
               定位并高亮
             </el-button>
           </div>

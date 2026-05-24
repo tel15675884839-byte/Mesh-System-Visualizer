@@ -6,6 +6,9 @@ export type DelayReason =
   | 'fire-brigade'
   | 'evacuate'
   | 'zone-delayed-sounders'
+  | 'zone-non-delayed-sounders'
+  | 'device-override-delay'
+  | 'io-override-delay'
 
 export function createDelayedActivation(
   outputId: string,

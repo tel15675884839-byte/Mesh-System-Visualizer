@@ -34,5 +34,5 @@ export const Log = {
   debug: (msg: string, details?: any) => {
     useLoggerStore().addLog(msg, 'debug', 'Renderer', details)
     sendToTerminal('debug', msg, details)
-  },
+  }
 }

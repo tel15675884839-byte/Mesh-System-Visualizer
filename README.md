@@ -1,6 +1,6 @@
-# numens-mesh-studio
+# Numens Fire Alarm Simulator
 
-An Electron application with Vue and TypeScript
+An Electron, Vue, TypeScript, and Three.js desktop application for CPD-driven 2D/3D fire alarm planning and simulation.
 
 ## Recommended IDE Setup
 

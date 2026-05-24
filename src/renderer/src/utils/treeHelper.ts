@@ -5,7 +5,7 @@ export interface ITreeNode {
   id: string
   label: string
   type: 'loop' | 'device' | 'orphan-group'
-  role?: string 
+  role?: string
   children?: ITreeNode[]
   isLeaf?: boolean
   data?: INode
@@ -15,32 +15,28 @@ export interface ITreeNode {
  * 构建逻辑层级树：扁平化骨干网，层级化终端
  * 结构：Leader -> [Direct Children] + [All Routers -> Their Children]
  */
-export function buildTopologyTree(
-  nodes: INode[],
-  edges: IEdge[],
-  loops: ILoop[]
-): ITreeNode[] {
+export function buildTopologyTree(nodes: INode[], edges: IEdge[], loops: ILoop[]): ITreeNode[] {
   const treeData: ITreeNode[] = []
 
   // 1. 预处理：构建邻接表，方便查找 Child 连接了谁
   // Map<ChildID, Set<ParentID>>
   const connections = new Map<string, Set<string>>()
-  
-  edges.forEach(edge => {
+
+  edges.forEach((edge) => {
     if (!edge.sourceId || !edge.targetId) return
-    
+
     // 记录双向连接
     if (!connections.has(edge.sourceId)) connections.set(edge.sourceId, new Set())
     if (!connections.has(edge.targetId)) connections.set(edge.targetId, new Set())
-    
+
     connections.get(edge.sourceId)?.add(edge.targetId)
     connections.get(edge.targetId)?.add(edge.sourceId)
   })
 
   // 2. 遍历每个 Loop
-  loops.forEach(loop => {
-    const loopNodes = nodes.filter(n => n.loopId === loop.id)
-    
+  loops.forEach((loop) => {
+    const loopNodes = nodes.filter((n) => n.loopId === loop.id)
+
     const loopRoot: ITreeNode = {
       id: `loop-root-${loop.id}`,
       label: loop.name || `Loop ${loop.id}`,
@@ -54,24 +50,26 @@ export function buildTopologyTree(
     }
 
     // 3. 角色分类
-    const leaders = loopNodes.filter(n => n.role === DeviceRole.LEADER)
-    const routers = loopNodes.filter(n => n.role === DeviceRole.ROUTER)
-    const children = loopNodes.filter(n => n.role !== DeviceRole.LEADER && n.role !== DeviceRole.ROUTER)
+    const leaders = loopNodes.filter((n) => n.role === DeviceRole.LEADER)
+    const routers = loopNodes.filter((n) => n.role === DeviceRole.ROUTER)
+    const children = loopNodes.filter(
+      (n) => n.role !== DeviceRole.LEADER && n.role !== DeviceRole.ROUTER
+    )
 
     // 4. 建立逻辑归属关系 (Child -> ParentID)
     const parentMap = new Map<string, string>() // ChildID -> ParentID
     const assignedChildren = new Set<string>()
 
-    children.forEach(child => {
+    children.forEach((child) => {
       const neighbors = connections.get(child.id)
       if (!neighbors) return // 孤儿
 
       let chosenParentId: string | null = null
-      
+
       // 优先级检查：
       // 1. 优先找 Leader
       for (const neighborId of neighbors) {
-        const neighbor = loopNodes.find(n => n.id === neighborId)
+        const neighbor = loopNodes.find((n) => n.id === neighborId)
         if (neighbor && neighbor.role === DeviceRole.LEADER) {
           chosenParentId = neighbor.id
           break // 找到 Leader 就定下来
@@ -81,7 +79,7 @@ export function buildTopologyTree(
       // 2. 没连 Leader，找任意 Router
       if (!chosenParentId) {
         for (const neighborId of neighbors) {
-          const neighbor = loopNodes.find(n => n.id === neighborId)
+          const neighbor = loopNodes.find((n) => n.id === neighborId)
           if (neighbor && neighbor.role === DeviceRole.ROUTER) {
             chosenParentId = neighbor.id
             break // 找到第一个 Router 就定下来 (简化逻辑)
@@ -109,24 +107,26 @@ export function buildTopologyTree(
     const sortNodes = (a: ITreeNode, b: ITreeNode) => a.label.localeCompare(b.label)
 
     // 5. 组装树结构
-    
+
     // A. 处理 Routers 及其下级
     // 先把所有 Router 包装成树节点，并填入它们的 Child
-    const routerTreeNodes = routers.map(r => {
-      const rNode = createTreeNode(r)
-      // 找到归属这个 Router 的 Children
-      const myChildren = children.filter(c => parentMap.get(c.id) === r.id)
-      rNode.children = myChildren.map(createTreeNode).sort(sortNodes)
-      return rNode
-    }).sort(sortNodes)
+    const routerTreeNodes = routers
+      .map((r) => {
+        const rNode = createTreeNode(r)
+        // 找到归属这个 Router 的 Children
+        const myChildren = children.filter((c) => parentMap.get(c.id) === r.id)
+        rNode.children = myChildren.map(createTreeNode).sort(sortNodes)
+        return rNode
+      })
+      .sort(sortNodes)
 
     // B. 处理 Leader 及其下级
     if (leaders.length > 0) {
-      leaders.forEach(leader => {
+      leaders.forEach((leader) => {
         const leaderNode = createTreeNode(leader)
-        
+
         // 1. 先加：直连 Leader 的 Children
-        const directChildren = children.filter(c => parentMap.get(c.id) === leader.id)
+        const directChildren = children.filter((c) => parentMap.get(c.id) === leader.id)
         const directChildrenNodes = directChildren.map(createTreeNode).sort(sortNodes)
         leaderNode.children!.push(...directChildrenNodes)
 
@@ -142,7 +142,7 @@ export function buildTopologyTree(
     }
 
     // C. 处理孤岛 (既没连 Leader 也没连 Router)
-    const orphans = children.filter(c => !assignedChildren.has(c.id))
+    const orphans = children.filter((c) => !assignedChildren.has(c.id))
     if (orphans.length > 0) {
       const orphanGroup: ITreeNode = {
         id: `orphan-${loop.id}`,

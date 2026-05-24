@@ -8,7 +8,7 @@ const store = useProjectStore()
 // 画布配置
 const canvasSize = 800
 const PIXELS_PER_METER = 10
-const worldSize = 800
+const worldSize = 3000
 const scale = computed(() => canvasSize / worldSize)
 
 const isDragging = ref(false)
@@ -24,7 +24,7 @@ const initBuildings = (): void => {
     if (!b.position) {
       b.position = { x: index * 150 - 150, y: 0 }
     }
-    
+
     const baseFloor = b.floors.find((f) => f.mapWidth && f.mapHeight)
     if (baseFloor) {
       b.size = {
@@ -32,7 +32,7 @@ const initBuildings = (): void => {
         depth: baseFloor.mapHeight! / PIXELS_PER_METER
       }
     } else if (!b.size) {
-      b.size = { width: 100, depth: 70 } 
+      b.size = { width: 100, depth: 70 }
     }
 
     if (b.rotation === undefined) {
@@ -41,9 +41,12 @@ const initBuildings = (): void => {
   })
 }
 
-watch(() => store.isLayoutEditorVisible, (val) => {
-  if (val) initBuildings()
-})
+watch(
+  () => store.isLayoutEditorVisible,
+  (val) => {
+    if (val) initBuildings()
+  }
+)
 
 const isRotating = ref(false)
 
@@ -52,31 +55,32 @@ const startRotate = (e: MouseEvent, building: IBuilding): void => {
   e.stopPropagation()
   isRotating.value = true
   activeBuildingId.value = building.id
-  
+
   const proxyEl = (e.currentTarget as HTMLElement).parentElement
   if (!proxyEl) return
-  
+
   const rect = proxyEl.getBoundingClientRect()
   const centerX = rect.left + rect.width / 2
   const centerY = rect.top + rect.height / 2
-  
+
   const startMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI)
   const initialRotation = building.rotation ?? 0
 
   const onRotate = (moveEvent: MouseEvent): void => {
     if (!isRotating.value) return
-    const currentMouseAngle = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * (180 / Math.PI)
+    const currentMouseAngle =
+      Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * (180 / Math.PI)
     let deltaAngle = currentMouseAngle - startMouseAngle
     let newRotation = initialRotation + deltaAngle
-    
+
     const snap = 90
     const threshold = 5
     const nearestSnap = Math.round(newRotation / snap) * snap
     if (Math.abs(newRotation - nearestSnap) < threshold) {
       newRotation = nearestSnap
     }
-    
-    building.rotation = (newRotation % 360 + 360) % 360
+
+    building.rotation = ((newRotation % 360) + 360) % 360
   }
 
   const stopRotate = (): void => {
@@ -98,7 +102,7 @@ const startDrag = (e: MouseEvent, building: IBuilding): void => {
   if (!building.position) building.position = { x: 0, y: 0 }
   isDragging.value = true
   activeBuildingId.value = building.id
-  
+
   dragOffset.value = { x: e.clientX, y: e.clientY }
   const startX = building.position.x
   const startY = building.position.y
@@ -124,10 +128,10 @@ const startDrag = (e: MouseEvent, building: IBuilding): void => {
 const getBuildingStyle = (b: IBuilding): Record<string, string> => {
   const x = b.position?.x ?? 0
   const y = b.position?.y ?? 0
-  
+
   const baseFloor = b.floors.find((f) => f.mapWidth && f.mapHeight)
-  const w = baseFloor ? (baseFloor.mapWidth! / PIXELS_PER_METER) : (b.size?.width ?? 100)
-  const d = baseFloor ? (baseFloor.mapHeight! / PIXELS_PER_METER) : (b.size?.depth ?? 70)
+  const w = baseFloor ? baseFloor.mapWidth! / PIXELS_PER_METER : (b.size?.width ?? 100)
+  const d = baseFloor ? baseFloor.mapHeight! / PIXELS_PER_METER : (b.size?.depth ?? 70)
   const r = b.rotation ?? 0
 
   return {
@@ -157,7 +161,10 @@ onMounted(() => {
     class="layout-modal"
   >
     <div class="editor-layout">
-      <div class="layout-container" :style="{ width: `${canvasSize}px`, height: `${canvasSize}px` }">
+      <div
+        class="layout-container"
+        :style="{ width: `${canvasSize}px`, height: `${canvasSize}px` }"
+      >
         <div class="grid-bg"></div>
         <div class="axis x-axis"></div>
         <div class="axis y-axis"></div>
@@ -206,9 +213,8 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
-    linear-gradient(#333 1px, transparent 1px),
-    linear-gradient(90deg, #333 1px, transparent 1px);
+  background-image:
+    linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px);
   background-size: 40px 40px;
   opacity: 0.5;
   pointer-events: none;
@@ -243,7 +249,9 @@ onMounted(() => {
   justify-content: center;
   cursor: grab;
   border-radius: 4px;
-  transition: box-shadow 0.2s, background-color 0.2s;
+  transition:
+    box-shadow 0.2s,
+    background-color 0.2s;
   overflow: visible;
 }
 

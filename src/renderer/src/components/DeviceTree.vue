@@ -11,19 +11,24 @@ const treeRef = ref()
 
 const expandedKeys = ref<string[]>([])
 const selectedIds = ref<Set<string>>(new Set())
-const lastFocusedId = ref<string | null>(null) 
+const lastFocusedId = ref<string | null>(null)
+let isInternalChange = false // [新增] 用于阻止外部 Watcher 干扰本地多选状态
 
 const treeData = shallowRef<ITreeNode[]>([])
 
-watch(() => store.structureVersion, async () => {
-  treeData.value = buildTopologyTree(store.nodes, store.edges, store.loops)
-  // [关键修复] 树结构重建后，Element Plus 会丢失当前的 selection 状态
-  // 需要在下个 tick 重新设置一次当前 Key，确保高亮和内部状态同步
-  await nextTick()
-  if (store.selectedNodeId) {
-    treeRef.value?.setCurrentKey(store.selectedNodeId)
-  }
-}, { immediate: true })
+watch(
+  () => store.structureVersion,
+  async () => {
+    treeData.value = buildTopologyTree(store.nodes, store.edges, store.loops)
+    // [关键修复] 树结构重建后，Element Plus 会丢失当前的 selection 状态
+    // 需要在下个 tick 重新设置一次当前 Key，确保高亮和内部状态同步
+    await nextTick()
+    if (store.selectedNodeId) {
+      treeRef.value?.setCurrentKey(store.selectedNodeId)
+    }
+  },
+  { immediate: true }
+)
 
 watch(filterText, (val) => {
   treeRef.value!.filter(val)
@@ -36,10 +41,10 @@ const filterNode = (value: string, data: any): boolean => {
   return matchLabel || matchId
 }
 
-const handleNodeExpand = (data: any): void => { 
-  if (!expandedKeys.value.includes(data.id)) expandedKeys.value.push(data.id) 
+const handleNodeExpand = (data: any): void => {
+  if (!expandedKeys.value.includes(data.id)) expandedKeys.value.push(data.id)
 }
-const handleNodeCollapse = (data: any): void => { 
+const handleNodeCollapse = (data: any): void => {
   const idx = expandedKeys.value.indexOf(data.id)
   if (idx > -1) expandedKeys.value.splice(idx, 1)
 }
@@ -47,7 +52,7 @@ const handleNodeCollapse = (data: any): void => {
 const getVisibleFlatNodes = (): ITreeNode[] => {
   const flatList: ITreeNode[] = []
   const expandedSet = new Set(expandedKeys.value)
-  
+
   const traverse = (nodes: ITreeNode[]) => {
     for (const node of nodes) {
       flatList.push(node)
@@ -60,50 +65,70 @@ const getVisibleFlatNodes = (): ITreeNode[] => {
   return flatList
 }
 
-const handleNodeClick = (data: any, _node: any, _prop: any, e: MouseEvent): void => {
-  if (data.type !== 'device') return
-
+const handleNodeClick = (data: ITreeNode, _node: any, _prop: any, e: MouseEvent): void => {
+  // --- Windows 风格选择逻辑 ---
   if (e && e.shiftKey && lastFocusedId.value) {
+    // 1. Shift 连选：基于视觉上的扁平顺序
     const flatNodes = getVisibleFlatNodes()
-    const startIndex = flatNodes.findIndex(n => n.id === lastFocusedId.value)
-    const endIndex = flatNodes.findIndex(n => n.id === data.id)
+    const startIndex = flatNodes.findIndex((n) => n.id === lastFocusedId.value)
+    const endIndex = flatNodes.findIndex((n) => n.id === data.id)
 
     if (startIndex !== -1 && endIndex !== -1) {
       const min = Math.min(startIndex, endIndex)
       const max = Math.max(startIndex, endIndex)
-      
-      if (!e.ctrlKey) {
+
+      // 如果没有按住 Ctrl，Shift 连选会清空之前的选择
+      if (!e.ctrlKey && !e.metaKey) {
         selectedIds.value.clear()
       }
 
       for (let i = min; i <= max; i++) {
-        const curr = flatNodes[i]
-        if (curr.type === 'device') {
-          selectedIds.value.add(curr.id)
-        }
+        selectedIds.value.add(flatNodes[i].id)
       }
     }
-  }
-  else if (e && (e.ctrlKey || e.metaKey)) {
+  } else if (e && (e.ctrlKey || e.metaKey)) {
+    // 2. Ctrl 多选：切换当前项状态
     if (selectedIds.value.has(data.id)) {
       selectedIds.value.delete(data.id)
     } else {
       selectedIds.value.add(data.id)
+      lastFocusedId.value = data.id
     }
-    lastFocusedId.value = data.id 
-  } 
-  else {
+  } else {
+    // 3. 普通点击：单选
     selectedIds.value.clear()
     selectedIds.value.add(data.id)
-    lastFocusedId.value = data.id 
+    lastFocusedId.value = data.id
   }
 
-  if (selectedIds.value.size === 1) {
-    store.selectNode([...selectedIds.value][0])
-  } else if (selectedIds.value.size > 1) {
-    store.selectNode(data.id) 
+  // --- 同步到 Store ---
+  isInternalChange = true
+  if (data.type === 'device') {
+    // 如果当前点击的节点被包含在选中集合中，则设为焦点
+    if (selectedIds.value.has(data.id)) {
+      store.selectNode(data.id)
+    } else {
+      // 如果发生减选（Ctrl点击已选中的），且该节点是当前焦点，则需要转移焦点或置空
+      // 简单策略：如果还有其他选中项，取最后一个；否则置空
+      if (selectedIds.value.size > 0) {
+        store.selectNode([...selectedIds.value][selectedIds.value.size - 1])
+      } else {
+        store.selectNode(null)
+      }
+    }
   } else {
     store.selectNode(null)
+  }
+  // 异步重置标志位
+  nextTick(() => {
+    isInternalChange = false
+  })
+}
+
+// [新增] 双击定位功能
+const handleNodeDblClick = (data: ITreeNode) => {
+  if (data.type === 'device') {
+    store.triggerFocus(data.id)
   }
 }
 
@@ -123,13 +148,20 @@ const getIconColor = (role: string, isPlaced: boolean, diffStatus: string): stri
   if (diffStatus === 'missing') return '#909399'
   if (isPlaced) return '#909399'
   switch (role) {
-    case DeviceRole.LEADER: return '#ff4d4f'
-    case DeviceRole.ROUTER: return '#1890ff'
-    default: return '#52c41a'
+    case DeviceRole.LEADER:
+      return '#ff4d4f'
+    case DeviceRole.ROUTER:
+      return '#1890ff'
+    default:
+      return '#52c41a'
   }
 }
 
-const findPathToNode = (nodes: ITreeNode[], targetId: string, path: string[] = []): string[] | null => {
+const findPathToNode = (
+  nodes: ITreeNode[],
+  targetId: string,
+  path: string[] = []
+): string[] | null => {
   for (const node of nodes) {
     if (node.id === targetId) return path
     if (node.children) {
@@ -140,79 +172,91 @@ const findPathToNode = (nodes: ITreeNode[], targetId: string, path: string[] = [
   return null
 }
 
-watch(() => store.selectedNodeId, (nodeId) => {
-  if (!nodeId) {
-    selectedIds.value.clear()
-    return
-  }
-  
-  selectedIds.value.clear()
-  selectedIds.value.add(nodeId)
-  lastFocusedId.value = nodeId
+watch(
+  () => store.selectedNodeId,
+  (nodeId) => {
+    // 如果是内部点击触发的变更，跳过重置逻辑，保留多选状态
+    if (isInternalChange) return
 
-  const path = findPathToNode(treeData.value, nodeId)
-  if (path) {
-    path.forEach(key => {
-      if (!expandedKeys.value.includes(key)) {
-        expandedKeys.value.push(key)
-      }
-    })
-    
-    nextTick(() => {
-      treeRef.value?.setCurrentKey(nodeId)
-      const el = document.querySelector('.is-selected')
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-  }
-}, { immediate: true })
+    if (!nodeId) {
+      selectedIds.value.clear()
+      return
+    }
+
+    selectedIds.value.clear()
+    selectedIds.value.add(nodeId)
+    lastFocusedId.value = nodeId
+
+    const path = findPathToNode(treeData.value, nodeId)
+    if (path) {
+      path.forEach((key) => {
+        if (!expandedKeys.value.includes(key)) {
+          expandedKeys.value.push(key)
+        }
+      })
+
+      nextTick(() => {
+        treeRef.value?.setCurrentKey(nodeId)
+        const el = document.querySelector('.is-selected')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    }
+  },
+  { immediate: true }
+)
 
 // [新增] 专门处理树聚焦请求（如从2D视图双击触发）
-watch(() => store.treeFocusRequest, (req) => {
-  if (!req) return
-  const { nodeId } = req
-  
-  // 同步本地选择状态
-  selectedIds.value.clear()
-  selectedIds.value.add(nodeId)
-  lastFocusedId.value = nodeId
+watch(
+  () => store.treeFocusRequest,
+  (req) => {
+    if (!req) return
+    const { nodeId } = req
 
-  // 确保 Store 状态也同步
-  if (store.selectedNodeId !== nodeId) {
-    store.selectNode(nodeId)
-  }
+    // 同步本地选择状态
+    selectedIds.value.clear()
+    selectedIds.value.add(nodeId)
+    lastFocusedId.value = nodeId
 
-  // 展开路径并滚动到视图中心
-  const path = findPathToNode(treeData.value, nodeId)
-  if (path) {
-    path.forEach(key => {
-      if (!expandedKeys.value.includes(key)) {
-        expandedKeys.value.push(key)
-      }
-    })
-    
-    nextTick(() => {
-      treeRef.value?.setCurrentKey(nodeId)
-      // 给一点延迟或者多次尝试，确保 Element Plus 渲染完成
-      setTimeout(() => {
-        const el = document.querySelector('.el-tree-node.is-current') || document.querySelector('.is-selected')
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // 确保 Store 状态也同步
+    if (store.selectedNodeId !== nodeId) {
+      store.selectNode(nodeId)
+    }
+
+    // 展开路径并滚动到视图中心
+    const path = findPathToNode(treeData.value, nodeId)
+    if (path) {
+      path.forEach((key) => {
+        if (!expandedKeys.value.includes(key)) {
+          expandedKeys.value.push(key)
         }
-      }, 100)
-    })
+      })
+
+      nextTick(() => {
+        treeRef.value?.setCurrentKey(nodeId)
+        // 给一点延迟或者多次尝试，确保 Element Plus 渲染完成
+        setTimeout(() => {
+          const el =
+            document.querySelector('.el-tree-node.is-current') ||
+            document.querySelector('.is-selected')
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }, 100)
+      })
+    }
   }
-})
+)
 </script>
 
 <template>
   <div class="device-tree-wrapper">
     <div class="search-box">
-      <el-input 
-        v-model="filterText" 
-        placeholder="搜索设备..." 
-        size="small" 
-        :prefix-icon="Search" 
-        clearable 
+      <el-input
+        v-model="filterText"
+        placeholder="搜索设备..."
+        size="small"
+        :prefix-icon="Search"
+        clearable
         class="ios-search"
       />
     </div>
@@ -225,38 +269,48 @@ watch(() => store.treeFocusRequest, (req) => {
         :default-expanded-keys="expandedKeys"
         :filter-node-method="filterNode"
         :expand-on-click-node="false"
-        :highlight-current="false" 
+        :highlight-current="false"
         @node-click="handleNodeClick"
         @node-expand="handleNodeExpand"
         @node-collapse="handleNodeCollapse"
       >
         <template #default="{ node, data }">
-          <div 
+          <div
             class="custom-tree-node"
             :class="{ 'is-selected': selectedIds.has(data.id) }"
             :draggable="data.type === 'device'"
             @dragstart="(e) => handleDragStart(node, e)"
+            @dblclick="handleNodeDblClick(data)"
           >
             <span v-if="data.type === 'loop'" class="loop-label">📁 {{ node.label }}</span>
-            <span v-else-if="data.type === 'orphan-group'" class="orphan-label">{{ node.label }}</span>
-            <span v-else class="device-item" :class="{ 'is-missing': data.data?.diffStatus === 'missing' }">
+            <span v-else-if="data.type === 'orphan-group'" class="orphan-label">{{
+              node.label
+            }}</span>
+            <span
+              v-else
+              class="device-item"
+              :class="{ 'is-missing': data.data?.diffStatus === 'missing' }"
+            >
               <el-icon v-if="data.data?.isPlaced" class="placed-icon"><Check /></el-icon>
-              
-              <span 
-                class="status-dot" 
-                :style="{ color: getIconColor(data.role, data.data?.isPlaced, data.data?.diffStatus) }"
-              >●</span>
-              
-              <span 
-                class="device-label" 
-                :class="{ 
+
+              <span
+                class="status-dot"
+                :style="{
+                  color: getIconColor(data.role, data.data?.isPlaced, data.data?.diffStatus)
+                }"
+                >●</span
+              >
+
+              <span
+                class="device-label"
+                :class="{
                   'is-leader': data.role === DeviceRole.LEADER,
-                  'is-placed': data.data?.isPlaced 
+                  'is-placed': data.data?.isPlaced
                 }"
               >
                 {{ node.label }}
               </span>
-              
+
               <span v-if="data.data?.diffStatus === 'new'" class="new-dot"></span>
             </span>
           </div>
@@ -267,15 +321,15 @@ watch(() => store.treeFocusRequest, (req) => {
 </template>
 
 <style scoped>
-.device-tree-wrapper { 
-  display: flex; 
-  flex-direction: column; 
-  height: 100%; 
-  background-color: transparent; 
+.device-tree-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: transparent;
 }
-.search-box { 
-  padding: 10px 16px; 
-  flex-shrink: 0; 
+.search-box {
+  padding: 10px 16px;
+  flex-shrink: 0;
 }
 :deep(.ios-search .el-input__wrapper) {
   background-color: rgba(0, 0, 0, 0.05) !important;
@@ -287,10 +341,10 @@ html.dark :deep(.ios-search .el-input__wrapper) {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-.tree-content { 
-  flex: 1; 
-  overflow-y: auto; 
-  min-height: 0; 
+.tree-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
   padding: 0 8px;
 }
 
@@ -308,84 +362,86 @@ html.dark :deep(.el-tree) {
 }
 
 .custom-tree-node {
-  display: flex; 
-  align-items: center; 
-  font-size: 13px; 
-  width: 100%; 
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  width: 100%;
   overflow: hidden;
-  padding: 6px 10px; 
-  cursor: pointer; 
-  border-radius: 8px; 
-  transition: background-color 0.2s, color 0.2s;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
   margin: 1px 0;
 }
-.custom-tree-node.is-selected { 
-  background-color: #007aff !important; 
+.custom-tree-node.is-selected {
+  background-color: #007aff !important;
   color: #ffffff !important;
 }
 
-.loop-label { 
-  font-weight: 600; 
-  color: var(--text-color); 
+.loop-label {
+  font-weight: 600;
+  color: var(--text-color);
 }
-.custom-tree-node.is-selected .loop-label { 
-  color: #ffffff; 
-}
-
-.orphan-label { 
-  color: #909399; 
-  font-style: italic; 
+.custom-tree-node.is-selected .loop-label {
+  color: #ffffff;
 }
 
-.device-item { 
-  display: flex; 
-  align-items: center; 
-  width: 100%; 
-}
-.device-item.is-missing { 
-  opacity: 0.6; 
-  text-decoration: line-through; 
+.orphan-label {
+  color: #909399;
+  font-style: italic;
 }
 
-.status-dot { 
-  margin-right: 8px; 
-  font-size: 10px; 
-  line-height: 1; 
+.device-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
-.device-label { 
-  margin-right: 8px; 
-  white-space: nowrap; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  font-weight: 400; 
-}
-.device-label.is-leader { 
-  font-weight: 600; 
-}
-.device-label.is-placed { 
-  color: #909399; 
-  opacity: 0.7; 
-} 
-.custom-tree-node.is-selected .device-label.is-placed { 
-  color: rgba(255, 255, 255, 0.8); 
+.device-item.is-missing {
+  opacity: 0.6;
+  text-decoration: line-through;
 }
 
-.placed-icon { 
-  font-size: 12px; 
-  color: #34c759; 
-  margin-right: 6px; 
+.status-dot {
+  margin-right: 8px;
+  font-size: 10px;
+  line-height: 1;
+}
+.device-label {
+  margin-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+.device-label.is-leader {
+  font-weight: 600;
+}
+.device-label.is-placed {
+  color: #909399;
+  opacity: 0.7;
+}
+.custom-tree-node.is-selected .device-label.is-placed {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.placed-icon {
+  font-size: 12px;
+  color: #34c759;
+  margin-right: 6px;
 }
 .custom-tree-node.is-selected .status-dot,
-.custom-tree-node.is-selected .placed-icon { 
-  color: #ffffff !important; 
+.custom-tree-node.is-selected .placed-icon {
+  color: #ffffff !important;
 }
 
-.new-dot { 
-  width: 6px; 
-  height: 6px; 
-  background-color: #34c759; 
-  border-radius: 50%; 
-  margin-left: auto; 
-  margin-right: 2px; 
+.new-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #34c759;
+  border-radius: 50%;
+  margin-left: auto;
+  margin-right: 2px;
 }
 </style>

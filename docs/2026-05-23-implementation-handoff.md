@@ -4,7 +4,7 @@ Date: 2026-05-23
 
 ## Status
 
-The implementation plan for the Numens Fire Alarm Simulator has been executed through Task 20. The active application shell is now the Fire Alarm Simulator workflow, not the old Mesh Studio workflow.
+The implementation plan for the Numens Fire Alarm Simulator has been executed through Task 35. The active application shell is now the Fire Alarm Simulator workflow, not the old Mesh Studio workflow.
 
 Latest implementation commits:
 
@@ -53,6 +53,23 @@ UI:
 - Property panel, group inspector, simulation panel, and CPD re-import diff dialog.
 - English and Chinese i18n files are wired through `vue-i18n`.
 
+## Stability Pass Completed
+
+The 2026-05-23 stability tasks are complete:
+
+- CPD group parsing now treats `0`, empty, missing, and unparseable group values as unassigned.
+- Device Tree grouping no longer renders Zone/Sounder/I/O group `0` or unassigned buckets for those grouped views.
+- 2D Loop lines are confirmed to come only from effective Loop order.
+- 2D drag movement is preview-only until mouse release, with only adjacent Loop preview lines updated.
+- 2D selected-device styling no longer uses an outer ring; selection is icon-only.
+- 2D planner toolbar controls are compact grouped icon/select controls and fit the 1280px planner harness without overflow.
+- 3D floor maps use the same resolved asset href path as 2D, including managed `fire-asset://local/...` paths.
+- 3D floor spacing was increased, device sprite size follows the global 2D icon scale, and the visible reference grid was removed.
+- Simulation cause/effect was rechecked from input trigger to CPD Zone/Sounder Group/I/O Group outputs.
+- Simulation delay handling now uses parsed `delayedSounders`, `overrideDelays`, and `ioOverrideDelay` fields.
+- 2D and 3D simulation visuals distinguish active input, fault, active sounder, active I/O, delayed output, and disabled states.
+- Simulation Panel audio feedback is gated by Simulation Mode, the project sound setting, and active audible outputs, with one oscillator stopped on silence/reset/restore/exit.
+
 ## Verification Completed
 
 Final verification commands run successfully:
@@ -66,8 +83,16 @@ npm run build
 
 Observed final test result:
 
-- 11 test files passed.
-- 70 tests passed.
+- 14 test files passed.
+- 90 tests passed.
+
+Runtime UI review:
+
+- A local Planner2D harness rendered a nonblank canvas with 4 devices and 3 Loop lines.
+- Browser console error log was empty.
+- No Mesh/RSSI/Leader/Router/HTML topology text appeared in the harness.
+- Selected-device review showed 1 selected device, 0 visible selected rings, and icon-only shadow highlighting.
+- Toolbar review at 1280px reported `scrollWidth == clientWidth`, so the compact toolbar did not require horizontal overflow in the harness.
 
 The active fire code was also searched for old product concepts. No old Mesh, RSSI, Leader, Router, or HTML topology product workflow remains exposed in the active Fire Simulator code. The only remaining `Mesh` matches in active fire files are Three.js class names such as `THREE.Mesh` in the 3D viewer.
 
@@ -77,6 +102,7 @@ The active fire code was also searched for old product concepts. No old Mesh, RS
 - PDF drawing import supports `pdfPage` at the API level, but the current 2D planner toolbar imports the default first page until a fuller map import dialog is added.
 - The old top-level Mesh UI files still exist in the repository but are retired from the active `App.vue` workflow. ESLint now excludes these retired top-level legacy renderer files so lint reflects the active Fire Alarm app.
 - The worktree contains unrelated or pre-existing modified/untracked files. They were intentionally preserved and not reverted.
+- Runtime review used a local planner harness for fast UI validation. The full Electron native file-dialog workflow still needs real operator/customer sample files for an end-to-end manual run.
 
 ## Current Dirty Worktree Notes
 

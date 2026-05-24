@@ -7,7 +7,12 @@ export const useLoggerStore = defineStore('logger', () => {
   const isOpen = ref(false) // 控制台是否展开
 
   // 添加日志的核心动作
-  function addLog(message: string, level: LogLevel = 'info', source: 'Renderer' | 'Main' = 'Renderer', details?: any) {
+  function addLog(
+    message: string,
+    level: LogLevel = 'info',
+    source: 'Renderer' | 'Main' = 'Renderer',
+    details?: any
+  ) {
     const entry: ILogEntry = {
       id: crypto.randomUUID(),
       timestamp: new Date().toLocaleTimeString(),

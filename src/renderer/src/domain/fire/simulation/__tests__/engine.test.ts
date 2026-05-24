@@ -243,6 +243,7 @@ describe('simulation engine reducer', () => {
 
   it('preserves reduced delay remaining seconds across non-tick actions', () => {
     const net = network({ sounderDelaySeconds: 90 })
+    net.panels[0].zones[0].delayedSounders = true
     const active = reduceSimulation(createInitialSimulationState(), engineInput(undefined, net), {
       type: 'activate-input',
       deviceId: 'input-1',
