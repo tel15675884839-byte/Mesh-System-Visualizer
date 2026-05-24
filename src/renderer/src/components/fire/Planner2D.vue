@@ -961,7 +961,16 @@ function segmentTouchesDevice(
           <div class="btn-group">
             <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
               <button class="toolbar-btn" @click="importDrawingForCurrentFloor">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
@@ -969,8 +978,21 @@ function segmentTouchesDevice(
               </button>
             </el-tooltip>
             <el-tooltip :content="t('fire.planner.clearDrawing')" placement="bottom">
-              <button class="toolbar-btn" :disabled="!currentFloor?.mapAssetId" @click="clearDrawing">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+              <button
+                class="toolbar-btn"
+                :disabled="!currentFloor?.mapAssetId"
+                @click="clearDrawing"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <path d="m20 20-5-5" />
                   <path d="M12 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.5" />
                   <path d="m8.5 12.5 4-4" />
@@ -980,7 +1002,16 @@ function segmentTouchesDevice(
             </el-tooltip>
             <el-tooltip :content="t('fire.planner.addBuilding')" placement="bottom">
               <button class="toolbar-btn" @click="addBuilding">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <rect x="4" y="2" width="8" height="20" rx="1" />
                   <rect x="12" y="8" width="8" height="14" rx="1" />
                   <line x1="6" y1="6" x2="6.01" y2="6" />
@@ -1002,8 +1033,21 @@ function segmentTouchesDevice(
               </button>
             </el-tooltip>
             <el-tooltip :content="t('fire.planner.deleteBuilding')" placement="bottom">
-              <button class="toolbar-btn danger" :disabled="!currentBuilding" @click="deleteBuilding">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+              <button
+                class="toolbar-btn danger"
+                :disabled="!currentBuilding"
+                @click="deleteBuilding"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <rect x="4" y="2" width="8" height="20" rx="1" />
                   <rect x="12" y="8" width="8" height="14" rx="1" />
                   <line x1="6" y1="6" x2="6.01" y2="6" />
@@ -1025,7 +1069,16 @@ function segmentTouchesDevice(
             </el-tooltip>
             <el-tooltip :content="t('fire.planner.addFloor')" placement="bottom">
               <button class="toolbar-btn" @click="addFloor">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <polygon points="12 2 2 7 12 12 22 7 12 2" />
                   <polyline points="2 17 12 22 22 17" />
                   <polyline points="2 12 12 17 22 12" />
@@ -1037,7 +1090,16 @@ function segmentTouchesDevice(
             </el-tooltip>
             <el-tooltip :content="t('fire.planner.deleteFloor')" placement="bottom">
               <button class="toolbar-btn danger" :disabled="!currentFloor" @click="deleteFloor">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <polygon points="12 2 2 7 12 12 22 7 12 2" />
                   <polyline points="2 17 12 22 22 17" />
                   <polyline points="2 12 12 17 22 12" />
@@ -1061,7 +1123,7 @@ function segmentTouchesDevice(
               class="zone-select-dock"
               :placeholder="t('fire.zoneToolbar.zone')"
               clearable
-              @update:model-value="(value) => selectedZoneId = value || null"
+              @update:model-value="(value) => (selectedZoneId = value || null)"
             >
               <el-option
                 v-for="zone in zones"
@@ -1076,7 +1138,16 @@ function segmentTouchesDevice(
                 :class="['toolbar-btn', { active: activeTool === 'select' }]"
                 @click="store.activeTool = 'select'"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
                   <path d="m13 13 6 6" />
                 </svg>
@@ -1088,7 +1159,16 @@ function segmentTouchesDevice(
                 :class="['toolbar-btn', { active: activeTool === 'zoneRectangle' }]"
                 @click="store.activeTool = 'zoneRectangle'"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3" />
                 </svg>
               </button>
@@ -1099,8 +1179,19 @@ function segmentTouchesDevice(
                 :class="['toolbar-btn', { active: activeTool === 'zonePolygon' }]"
                 @click="store.activeTool = 'zonePolygon'"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
-                  <path d="m12 3-1.912 5.886L4 10.077l5.318 4.38L7.18 21 12 17.562 16.82 21l-2.138-6.543L20 10.077l-6.088-.191L12 3z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <path
+                    d="m12 3-1.912 5.886L4 10.077l5.318 4.38L7.18 21 12 17.562 16.82 21l-2.138-6.543L20 10.077l-6.088-.191L12 3z"
+                  />
                 </svg>
               </button>
             </el-tooltip>
@@ -1111,14 +1202,25 @@ function segmentTouchesDevice(
                 :disabled="polygonDraft.length === 0"
                 @click="polygonDraft = []"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </el-tooltip>
 
-            <span v-if="polygonDraft.length > 0" class="point-count-badge">{{ polygonDraft.length }}</span>
+            <span v-if="polygonDraft.length > 0" class="point-count-badge">{{
+              polygonDraft.length
+            }}</span>
 
             <!-- Zone Area Controls -->
             <template v-if="selectedZoneAreaId">
@@ -1128,20 +1230,37 @@ function segmentTouchesDevice(
                   :class="['toolbar-btn', { active: replacingZoneAreaId === selectedZoneAreaId }]"
                   @click="startReplaceSelectedZoneArea"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
                     <path d="M12 20h9" />
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                   </svg>
                 </button>
               </el-tooltip>
               <el-tooltip :content="t('fire.planner.deleteZoneArea')" placement="bottom">
-                <button
-                  class="toolbar-btn danger"
-                  @click="deleteSelectedZoneArea"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <button class="toolbar-btn danger" @click="deleteSelectedZoneArea">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
                     <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <path
+                      d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                    />
                     <line x1="10" y1="11" x2="10" y2="17" />
                     <line x1="14" y1="11" x2="14" y2="17" />
                   </svg>
@@ -1163,7 +1282,7 @@ function segmentTouchesDevice(
               class="loop-select-dock"
               :placeholder="t('fire.loopToolbar.loop')"
               clearable
-              @update:model-value="(value) => selectedLoopId = value || null"
+              @update:model-value="(value) => (selectedLoopId = value || null)"
             >
               <el-option
                 v-for="loop in loops"
@@ -1178,8 +1297,19 @@ function segmentTouchesDevice(
                 :class="['toolbar-btn', { active: activeTool === 'manualLoopWiring' }]"
                 @click="store.activeTool = 'manualLoopWiring'"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
-                  <path d="M18 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <path
+                    d="M18 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"
+                  />
                   <circle cx="9" cy="9" r="2" />
                   <circle cx="15" cy="15" r="2" />
                   <path d="M9 11v2a2 2 0 0 0 2 2h2" />
@@ -1193,7 +1323,16 @@ function segmentTouchesDevice(
                 :disabled="draftLoopOrder.length < 2"
                 @click="saveManualLoopOrder"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </button>
@@ -1205,20 +1344,36 @@ function segmentTouchesDevice(
                 :disabled="draftLoopOrder.length === 0"
                 @click="draftLoopOrder = []"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <path
+                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                  />
                 </svg>
               </button>
             </el-tooltip>
 
             <el-tooltip :content="t('fire.loopToolbar.restore')" placement="bottom">
-              <button
-                class="toolbar-btn"
-                :disabled="!selectedLoopId"
-                @click="restoreDefaultLoop"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon">
+              <button class="toolbar-btn" :disabled="!selectedLoopId" @click="restoreDefaultLoop">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                   <polyline points="3 3 3 8 8 8" />
                 </svg>
@@ -1226,7 +1381,16 @@ function segmentTouchesDevice(
             </el-tooltip>
 
             <span class="loop-badge">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon link-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="svg-icon link-icon"
+              >
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
@@ -1238,10 +1402,22 @@ function segmentTouchesDevice(
         <div class="toolbar-divider"></div>
 
         <!-- 4. 视图缩放 (Viewport) -->
-        <div class="toolbar-section view-controls-section" :aria-label="t('fire.planner.iconScale')">
+        <div
+          class="toolbar-section view-controls-section"
+          :aria-label="t('fire.planner.iconScale')"
+        >
           <span class="section-tag">视图缩放</span>
           <div class="btn-group">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon view-icon-svg">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="svg-icon view-icon-svg"
+            >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
               <line x1="11" y1="8" x2="11" y2="14" />
@@ -1451,7 +1627,17 @@ function segmentTouchesDevice(
         <p>{{ t('fire.planner.noFloor') }}</p>
         <div>
           <el-button type="primary" @click="addBuilding">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon btn-inline-svg" style="margin-right: 6px; width: 14px; height: 14px;">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="svg-icon btn-inline-svg"
+              style="margin-right: 6px; width: 14px; height: 14px"
+            >
               <rect x="4" y="2" width="8" height="20" rx="1" />
               <rect x="12" y="8" width="8" height="14" rx="1" />
               <line x1="6" y1="6" x2="6.01" y2="6" />
@@ -1470,7 +1656,17 @@ function segmentTouchesDevice(
             {{ t('fire.planner.addBuilding') }}
           </el-button>
           <el-button @click="importDrawingForCurrentFloor">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="svg-icon btn-inline-svg" style="margin-right: 6px; width: 14px; height: 14px;">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="svg-icon btn-inline-svg"
+              style="margin-right: 6px; width: 14px; height: 14px"
+            >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
@@ -1830,8 +2026,7 @@ function segmentTouchesDevice(
 }
 
 .device-node.selected.disabled image {
-  filter: saturate(0.55) contrast(0.9) brightness(1.08)
-    drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+  filter: saturate(0.55) contrast(0.9) brightness(1.08) drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
 }
 
 .device-node.selected.inhibited image {
