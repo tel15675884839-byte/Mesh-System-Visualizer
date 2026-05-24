@@ -114,12 +114,6 @@ const getFloorAbbr = (name: string): string => {
   return name.slice(0, 3)
 }
 
-// Temporary references to prevent unused compiler errors in Task 1
-Log.debug('Floor helpers initialized', {
-  isMultiColumn: isMultiColumn.value,
-  sortedFloors: sortedFloors.value,
-  getFloorAbbr
-})
 
 // [修改] 初始化时尝试从 Store 恢复上次所在的楼层
 const initDefaultFloor = (): void => {
@@ -913,7 +907,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="floor-navigator-panel" v-if="store.buildings.length > 0">
+    <div class="floor-navigator-panel" v-if="store.buildings.length > 0 && (store.buildings.length > 1 || sortedFloors.length > 0)">
       <!-- Building Selector: Only display if there are multiple buildings -->
       <div class="building-tabs" v-if="store.buildings.length > 1">
         <button
@@ -1159,7 +1153,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.floor-btn:hover {
+.floor-btn:hover:not(.active) {
   background: #f5f5f7;
   transform: scale(1.05);
 }
