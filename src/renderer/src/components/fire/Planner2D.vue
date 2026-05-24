@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { OfficeBuilding, Plus, Upload } from '@element-plus/icons-vue'
+import { OfficeBuilding, Plus, Upload, ZoomIn } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice, FireFloor, FirePanel, Vector2 } from '../../domain/fire/types'
-import { buildCurrentFloorLoopSegments } from '../../domain/fire/loopWiring'
+import {
+  buildAdjacentCurrentFloorLoopSegments,
+  buildCurrentFloorLoopSegments
+} from '../../domain/fire/loopWiring'
 import { createPolygonArea, createRectangleArea } from '../../domain/fire/zoneGeometry'
 import { getDeviceIconHrefByType } from '../../domain/fire/deviceIcons'
+import { getDeviceIconPlanSize } from '../../domain/fire/deviceSizing'
 import { getFireAssetHref } from '../../domain/fire/projectAssets'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 import ZoneToolbar from './ZoneToolbar.vue'
@@ -20,15 +24,8 @@ const emit = defineEmits<{
 
 const store = useFireProjectStore()
 const { t } = useI18n()
-const {
-  project,
-  selectedNetworkId,
-  selectedPanelId,
-  selectedDeviceId,
-  simulationMode,
-  simulationState,
-  activeTool
-} = storeToRefs(store)
+const { project, selectedNetworkId, selectedPanelId, selectedDeviceId, activeTool } =
+  storeToRefs(store)
 
 const svgRef = ref<SVGSVGElement | null>(null)
 const selectedBuildingId = ref<string | null>(null)
@@ -74,6 +71,43 @@ const currentFloor = computed<FireFloor | undefined>(() => {
   return building.floors.find((floor) => floor.id === selectedFloorId.value) ?? building.floors[0]
 })
 
+const isMultiColumn = computed(() => {
+  return (currentBuilding.value?.floors.length ?? 0) > 8
+})
+
+const sortedFloors = computed(() => {
+  if (!currentBuilding.value) return []
+  return [...currentBuilding.value.floors].sort((a, b) => (b.levelIndex ?? 0) - (a.levelIndex ?? 0))
+})
+
+const getFloorAbbr = (name: string): string => {
+  const lower = name.toLowerCase()
+  if (lower.includes('basement') || lower.includes('地下') || lower.startsWith('b')) {
+    const match = name.match(/\d+/)
+    if (match) return `B${match[0]}`
+    if (lower.includes('一层') || lower.includes('一')) return 'B1'
+    if (lower.includes('二层') || lower.includes('二')) return 'B2'
+    if (lower.includes('三层') || lower.includes('三')) return 'B3'
+    return 'B'
+  }
+  
+  const match = name.match(/\d+/)
+  if (match) return `${match[0]}F`
+  
+  if (lower.includes('一层') || lower.includes('一')) return '1F'
+  if (lower.includes('二层') || lower.includes('二')) return '2F'
+  if (lower.includes('三层') || lower.includes('三')) return '3F'
+  if (lower.includes('四层') || lower.includes('四')) return '4F'
+  if (lower.includes('五层') || lower.includes('五')) return '5F'
+  if (lower.includes('六层') || lower.includes('六')) return '6F'
+  if (lower.includes('七层') || lower.includes('七')) return '7F'
+  if (lower.includes('八层') || lower.includes('八')) return '8F'
+  if (lower.includes('九层') || lower.includes('九')) return '9F'
+  if (lower.includes('十层') || lower.includes('十')) return '10F'
+  
+  return name.slice(0, 3)
+}
+
 const currentDevices = computed(() => {
   const floor = currentFloor.value
   if (!floor) return []
@@ -96,15 +130,14 @@ const selectedLoop = computed(() => loops.value.find((loop) => loop.id === selec
 const mapWidth = computed(() => currentFloor.value?.mapWidth ?? 1200)
 const mapHeight = computed(() => currentFloor.value?.mapHeight ?? 800)
 const viewBox = computed(
-  () =>
-    `${viewport.value.x} ${viewport.value.y} ${viewport.value.width} ${viewport.value.height}`
+  () => `${viewport.value.x} ${viewport.value.y} ${viewport.value.width} ${viewport.value.height}`
 )
 const mapZoomPercent = computed(() => Math.round((mapWidth.value / viewport.value.width) * 100))
 const deviceIconScale2D = computed({
   get: () => project.value.viewSettings.deviceIconScale2D ?? 1,
   set: (scale: number) => store.setDeviceIconScale2D(scale)
 })
-const deviceIconSize = computed(() => 24 * deviceIconScale2D.value)
+const deviceIconSize = computed(() => getDeviceIconPlanSize(deviceIconScale2D.value))
 const deviceIconOffset = computed(() => -deviceIconSize.value / 2)
 const deviceRingRadius = computed(() => deviceIconSize.value / 2 + 5)
 const deviceLabelOffset = computed(() => deviceIconSize.value / 2 + 14)
@@ -134,10 +167,15 @@ const zoneAreas = computed(() => {
 const loopLines = computed(() => {
   const floor = currentFloor.value
   if (!floor) return []
+  const previewDeviceId = dragPreview.value?.deviceId
 
   return loops.value.flatMap((loop) => {
     const result = buildCurrentFloorLoopSegments(loop, panelDevices.value, floor.id)
     return result.segments.flatMap((segment) => {
+      if (previewDeviceId && segmentTouchesDevice(segment, previewDeviceId)) {
+        return []
+      }
+
       const from = deviceById.value.get(segment.fromDeviceId)
       const to = deviceById.value.get(segment.toDeviceId)
       if (!from?.placement.position || !to?.placement.position) return []
@@ -149,6 +187,40 @@ const loopLines = computed(() => {
           y1: from.placement.position.y,
           x2: to.placement.position.x,
           y2: to.placement.position.y
+        }
+      ]
+    })
+  })
+})
+
+const dragPreviewLoopLines = computed(() => {
+  const floor = currentFloor.value
+  const preview = dragPreview.value
+  if (!floor || !preview) return []
+
+  return loops.value.flatMap((loop) => {
+    const result = buildAdjacentCurrentFloorLoopSegments(
+      loop,
+      panelDevices.value,
+      floor.id,
+      preview.deviceId
+    )
+
+    return result.segments.flatMap((segment) => {
+      const from = deviceById.value.get(segment.fromDeviceId)
+      const to = deviceById.value.get(segment.toDeviceId)
+      if (!from?.placement.position || !to?.placement.position) return []
+
+      const fromPoint = devicePoint(from)
+      const toPoint = devicePoint(to)
+      return [
+        {
+          id: `drag-preview:${loop.id}:${segment.fromDeviceId}:${segment.toDeviceId}`,
+          color: loop.color,
+          x1: fromPoint.x,
+          y1: fromPoint.y,
+          x2: toPoint.x,
+          y2: toPoint.y
         }
       ]
     })
@@ -338,8 +410,12 @@ function handleCanvasWheel(event: WheelEvent): void {
 }
 
 function handleCanvasClick(event: MouseEvent): void {
-  if (activeTool.value !== 'zonePolygon' || !selectedZone.value) return
-  polygonDraft.value = [...polygonDraft.value, toSvgPoint(event)]
+  if (activeTool.value === 'zonePolygon' && selectedZone.value) {
+    polygonDraft.value = [...polygonDraft.value, toSvgPoint(event)]
+    return
+  }
+
+  store.selectDevice(null)
 }
 
 function handleCanvasDoubleClick(event: MouseEvent): void {
@@ -372,17 +448,6 @@ function handleDeviceClick(device: FireDevice, event: MouseEvent): void {
   }
 
   store.selectDevice(device.id)
-}
-
-function handleDeviceDoubleClick(device: FireDevice, event: MouseEvent): void {
-  event.stopPropagation()
-  if (!simulationMode.value || !device.isInputCapable) return
-  const now = Date.now()
-  store.dispatchSimulationAction({
-    type: hasActiveInput(device.id) ? 'restore-input' : 'activate-input',
-    deviceId: device.id,
-    at: now
-  })
 }
 
 function showDeviceContextMenu(device: FireDevice, event: MouseEvent): void {
@@ -496,33 +561,9 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 }
 
-function hasActiveInput(deviceId: string): boolean {
-  return simulationState.value.activeInputAlarms.some((alarm) => alarm.deviceId === deviceId)
-}
-
-function hasActiveFault(deviceId: string): boolean {
-  return simulationState.value.activeFaults.some((fault) => fault.deviceId === deviceId)
-}
-
-function hasActiveOutput(device: FireDevice): boolean {
-  return simulationState.value.outputs.some((output) => {
-    if (output.state !== 'active' && output.state !== 'delayActive') return false
-    return (
-      output.outputId === `device:${device.id}` ||
-      (device.sounderGroupId !== undefined &&
-        output.outputId === `sounder-group:${device.panelId}:${device.sounderGroupId}`) ||
-      (device.ioGroupId !== undefined &&
-        output.outputId === `io-group:${device.panelId}:${device.ioGroupId}`)
-    )
-  })
-}
-
 function deviceClass(device: FireDevice): string[] {
   return [
     selectedDeviceId.value === device.id ? 'selected' : '',
-    hasActiveInput(device.id) ? 'alarm' : '',
-    hasActiveFault(device.id) ? 'fault' : '',
-    hasActiveOutput(device) ? 'output-active' : '',
     device.disabled ? 'disabled' : ''
   ].filter(Boolean)
 }
@@ -591,12 +632,12 @@ function zoomViewport(focusPoint: Vector2, factor: number): void {
   })
 }
 
-function clampViewport(nextViewport: {
+function clampViewport(nextViewport: { x: number; y: number; width: number; height: number }): {
   x: number
   y: number
   width: number
   height: number
-}): { x: number; y: number; width: number; height: number } {
+} {
   const width = clampNumber(nextViewport.width, mapWidth.value / 8, mapWidth.value * 4)
   const height = clampNumber(nextViewport.height, mapHeight.value / 8, mapHeight.value * 4)
 
@@ -717,32 +758,19 @@ function parseDeviceIds(raw: string | undefined): string[] {
 function closeContextMenu(): void {
   contextMenu.value = { visible: false, x: 0, y: 0, deviceId: null }
 }
+
+function segmentTouchesDevice(
+  segment: { fromDeviceId: string; toDeviceId: string },
+  deviceId: string
+): boolean {
+  return segment.fromDeviceId === deviceId || segment.toDeviceId === deviceId
+}
 </script>
 
 <template>
   <section class="planner-2d" @click="closeContextMenu">
     <header class="planner-toolbar" @click.stop>
-      <div class="floor-controls">
-        <el-select
-          v-model="selectedBuildingId"
-          size="small"
-          :placeholder="t('fire.planner.building')"
-        >
-          <el-option
-            v-for="building in project.buildings"
-            :key="building.id"
-            :label="building.name"
-            :value="building.id"
-          />
-        </el-select>
-        <el-select v-model="selectedFloorId" size="small" :placeholder="t('fire.planner.floor')">
-          <el-option
-            v-for="floor in currentBuilding?.floors ?? []"
-            :key="floor.id"
-            :label="floor.name"
-            :value="floor.id"
-          />
-        </el-select>
+      <div class="toolbar-section floor-controls" :aria-label="t('fire.planner.floor')">
         <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
           <el-button :icon="Upload" size="small" @click="importDrawingForCurrentFloor" />
         </el-tooltip>
@@ -776,8 +804,10 @@ function closeContextMenu(): void {
         @restore-default="restoreDefaultLoop"
       />
 
-      <div class="view-controls">
-        <span class="control-label">{{ t('fire.planner.iconScale') }}</span>
+      <div class="toolbar-section view-controls" :aria-label="t('fire.planner.iconScale')">
+        <el-tooltip :content="t('fire.planner.iconScale')" placement="bottom">
+          <el-icon class="view-icon"><ZoomIn /></el-icon>
+        </el-tooltip>
         <el-slider
           v-model="deviceIconScale2D"
           size="small"
@@ -791,12 +821,40 @@ function closeContextMenu(): void {
       </div>
     </header>
 
-    <div class="canvas-shell">
+    <div class="canvas-shell" :class="{ 'has-map': mapAssetHref }">
+      <!-- Floor Navigator Panel -->
+      <div class="floor-navigator-panel" v-if="project.buildings.length > 0 && (project.buildings.length > 1 || sortedFloors.length > 0)">
+        <!-- Building Selector -->
+        <div class="building-tabs" v-if="project.buildings.length > 1">
+          <button
+            v-for="b in project.buildings"
+            :key="b.id"
+            :class="['building-tab-btn', { active: selectedBuildingId === b.id }]"
+            @click="selectedBuildingId = b.id"
+          >
+            {{ b.name }}
+          </button>
+        </div>
+
+        <!-- Floor Buttons Stack -->
+        <div :class="['floor-grid', { 'multi-column': isMultiColumn }]">
+          <button
+            v-for="f in sortedFloors"
+            :key="f.id"
+            :class="['floor-btn', { active: selectedFloorId === f.id, 'rect-btn': isMultiColumn }]"
+            @click="selectedFloorId = f.id"
+            :title="f.name"
+          >
+            {{ getFloorAbbr(f.name) }}
+          </button>
+        </div>
+      </div>
+
       <svg
         ref="svgRef"
-        class="planner-canvas"
-        :class="{ 'is-panning': isPanning }"
+        :class="['planner-canvas', { 'is-panning': isPanning, 'has-map': mapAssetHref }]"
         :viewBox="viewBox"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         @dragover.prevent
         @drop="handleDrop"
@@ -808,7 +866,7 @@ function closeContextMenu(): void {
         @click="handleCanvasClick"
         @dblclick="handleCanvasDoubleClick"
       >
-        <rect class="canvas-bg" :width="mapWidth" :height="mapHeight" />
+        <rect v-if="!mapAssetHref" class="canvas-bg" :width="mapWidth" :height="mapHeight" />
         <image
           v-if="mapAssetHref"
           class="floor-map"
@@ -871,6 +929,18 @@ function closeContextMenu(): void {
             stroke-linecap="round"
           />
           <line
+            v-for="line in dragPreviewLoopLines"
+            :key="line.id"
+            :x1="line.x1"
+            :y1="line.y1"
+            :x2="line.x2"
+            :y2="line.y2"
+            :stroke="line.color"
+            class="drag-preview-line"
+            stroke-width="3.5"
+            stroke-linecap="round"
+          />
+          <line
             v-for="line in draftLoopLines"
             :key="line.id"
             :x1="line.x1"
@@ -893,7 +963,6 @@ function closeContextMenu(): void {
             :transform="`translate(${devicePoint(device).x} ${devicePoint(device).y})`"
             @mousedown="startDeviceDrag(device, $event)"
             @click="handleDeviceClick(device, $event)"
-            @dblclick="handleDeviceDoubleClick(device, $event)"
             @contextmenu="showDeviceContextMenu(device, $event)"
           >
             <circle :r="deviceRingRadius" class="device-ring" />
@@ -929,25 +998,13 @@ function closeContextMenu(): void {
       :x="contextMenu.x"
       :y="contextMenu.y"
       :device="contextDevice"
-      :simulation-mode="simulationMode"
-      :input-active="contextDevice ? hasActiveInput(contextDevice.id) : false"
-      :fault-active="contextDevice ? hasActiveFault(contextDevice.id) : false"
+      :simulation-mode="false"
+      :input-active="false"
+      :fault-active="false"
       @close="closeContextMenu"
       @open-properties="emit('openProperties', $event)"
       @remove-from-drawing="store.removeDeviceFromDrawing($event)"
       @locate-in-tree="emit('locateDevice', $event)"
-      @start-alarm="
-        store.dispatchSimulationAction({ type: 'activate-input', deviceId: $event, at: Date.now() })
-      "
-      @restore-input="
-        store.dispatchSimulationAction({ type: 'restore-input', deviceId: $event, at: Date.now() })
-      "
-      @trigger-fault="
-        store.dispatchSimulationAction({ type: 'trigger-fault', deviceId: $event, at: Date.now() })
-      "
-      @restore-fault="
-        store.dispatchSimulationAction({ type: 'restore-fault', deviceId: $event, at: Date.now() })
-      "
     />
   </section>
 </template>
@@ -965,7 +1022,7 @@ function closeContextMenu(): void {
 .planner-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
   padding: 8px 10px;
   border-bottom: 1px solid #d8dee8;
@@ -973,33 +1030,40 @@ function closeContextMenu(): void {
   overflow-x: auto;
 }
 
-.floor-controls {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.floor-controls :deep(.el-select) {
-  width: 150px;
-}
-
-.view-controls {
+.toolbar-section {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-  min-width: 230px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.floor-controls {
+  max-width: 390px;
+}
+
+.floor-controls :deep(.el-select) {
+  width: 118px;
+}
+
+.view-controls {
+  min-width: 148px;
   color: #475569;
   font-size: 12px;
   font-weight: 700;
 }
 
 .view-controls :deep(.el-slider) {
-  width: 96px;
+  width: 68px;
 }
 
-.control-label {
-  white-space: nowrap;
+.view-icon {
+  color: #334155;
+  font-size: 16px;
 }
 
 .control-value,
@@ -1018,10 +1082,19 @@ function closeContextMenu(): void {
   min-height: 0;
   overflow: auto;
   padding: 16px;
+  background: #e8eef6;
+}
+
+.canvas-shell.has-map {
+  overflow: hidden;
+  padding: 0;
 }
 
 .planner-canvas {
   display: block;
+}
+
+.planner-canvas:not(.has-map) {
   width: min(100%, 1400px);
   min-width: 720px;
   aspect-ratio: 3 / 2;
@@ -1030,6 +1103,17 @@ function closeContextMenu(): void {
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.planner-canvas.has-map {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .planner-canvas.is-panning {
@@ -1049,6 +1133,10 @@ function closeContextMenu(): void {
   pointer-events: none;
 }
 
+.drag-preview-line {
+  filter: drop-shadow(0 0 4px rgba(15, 23, 42, 0.18));
+}
+
 .device-node {
   cursor: grab;
 }
@@ -1065,31 +1153,12 @@ function closeContextMenu(): void {
   stroke-width: 1.5;
 }
 
-.device-node.selected .device-ring {
-  opacity: 1;
-}
-
-.device-node.alarm .device-ring {
-  fill: rgba(220, 38, 38, 0.1);
-  opacity: 1;
-  stroke: rgba(220, 38, 38, 0.7);
-  animation: pulse-fire 1s infinite;
-}
-
-.device-node.fault .device-ring {
-  fill: rgba(217, 119, 6, 0.1);
-  opacity: 1;
-  stroke: rgba(217, 119, 6, 0.65);
-}
-
-.device-node.output-active .device-ring {
-  fill: rgba(37, 99, 235, 0.1);
-  opacity: 1;
-  stroke: rgba(37, 99, 235, 0.6);
-}
-
 .device-node.disabled {
   opacity: 0.45;
+}
+
+.device-node.selected image {
+  filter: brightness(1.08) drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
 }
 
 .device-node text {
@@ -1122,13 +1191,111 @@ function closeContextMenu(): void {
   gap: 8px;
 }
 
-@keyframes pulse-fire {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+/* Floor Navigator Panel */
+.floor-navigator-panel {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: auto;
+  max-height: calc(100% - 30px);
+  overflow-y: auto;
+  align-items: center;
+}
+
+/* Building Tabs (Segmented Control style) */
+.building-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.building-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #515154;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.building-tab-btn.active {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Floor Grid */
+.floor-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.floor-grid.multi-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+/* Floor Buttons */
+.floor-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.floor-btn:hover:not(.active) {
+  background: #f5f5f7;
+  transform: scale(1.05);
+}
+
+.floor-btn:active {
+  transform: scale(0.95);
+}
+
+.floor-btn.active {
+  background: #0071e3;
+  border-color: #0071e3;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.4);
+}
+
+/* Rounded rectangle style for multi-column layout */
+.floor-btn.rect-btn {
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 11px;
 }
 </style>
