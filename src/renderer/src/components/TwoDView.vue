@@ -699,7 +699,8 @@ const smoothFocusTo = (
     const y = startPos.y + (targetY - startPos.y) * t
     const scale = startScale + (targetScale - startScale) * t
 
-    network!.moveTo({ position: { x, y }, scale, animation: false })
+    if (!network) return
+    network.moveTo({ position: { x, y }, scale, animation: false })
 
     if (rawT < 1) {
       focusAnimationId = requestAnimationFrame(animate)
@@ -848,6 +849,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   saveCurrentState() // [关键] 离开前保存
   window.removeEventListener('resize', handleResize)
+  if (focusAnimationId !== null) {
+    cancelAnimationFrame(focusAnimationId)
+    focusAnimationId = null
+  }
   if (network) {
     network.destroy()
     network = null // [关键修复] 设置为 null 确保异步回调不再执行
