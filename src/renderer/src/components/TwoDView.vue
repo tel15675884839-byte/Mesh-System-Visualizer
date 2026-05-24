@@ -96,10 +96,10 @@ const getFloorAbbr = (name: string): string => {
     if (lower.includes('三层') || lower.includes('三')) return 'B3'
     return 'B'
   }
-  
+
   const match = name.match(/\d+/)
   if (match) return `${match[0]}F`
-  
+
   if (lower.includes('一层') || lower.includes('一')) return '1F'
   if (lower.includes('二层') || lower.includes('二')) return '2F'
   if (lower.includes('三层') || lower.includes('三')) return '3F'
@@ -110,7 +110,7 @@ const getFloorAbbr = (name: string): string => {
   if (lower.includes('八层') || lower.includes('八')) return '8F'
   if (lower.includes('九层') || lower.includes('九')) return '9F'
   if (lower.includes('十层') || lower.includes('十')) return '10F'
-  
+
   return name.slice(0, 3)
 }
 
@@ -120,8 +120,6 @@ Log.debug('Floor helpers initialized', {
   sortedFloors: sortedFloors.value,
   getFloorAbbr
 })
-
-
 
 // [修改] 初始化时尝试从 Store 恢复上次所在的楼层
 const initDefaultFloor = (): void => {
@@ -864,29 +862,6 @@ onBeforeUnmount(() => {
   <div class="twod-container" @drop="handleDrop" @dragover="handleDragOver">
     <div class="overlay-tools ios-style">
       <div class="tool-group">
-        <el-select
-          v-model="currentBuildingId"
-          placeholder="Building"
-          size="small"
-          style="width: 100px"
-          class="ios-select"
-        >
-          <el-option v-for="b in store.buildings" :key="b.id" :label="b.name" :value="b.id" />
-        </el-select>
-        <el-select
-          v-model="currentFloorId"
-          placeholder="Floor"
-          size="small"
-          style="width: 80px; margin-left: 8px"
-          class="ios-select"
-        >
-          <el-option v-for="f in availableFloors" :key="f.id" :label="f.name" :value="f.id" />
-        </el-select>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="tool-group">
         <span class="tool-label">Icon</span>
         <div class="ios-stepper">
           <button class="stepper-btn" @click="adjustIconScale(-10)">
@@ -935,6 +910,33 @@ onBeforeUnmount(() => {
           size="small"
           class="ios-checkbox"
         />
+      </div>
+    </div>
+
+    <div class="floor-navigator-panel" v-if="store.buildings.length > 0">
+      <!-- Building Selector: Only display if there are multiple buildings -->
+      <div class="building-tabs" v-if="store.buildings.length > 1">
+        <button
+          v-for="b in store.buildings"
+          :key="b.id"
+          :class="['building-tab-btn', { active: currentBuildingId === b.id }]"
+          @click="currentBuildingId = b.id"
+        >
+          {{ b.name }}
+        </button>
+      </div>
+
+      <!-- Floor Buttons Stack -->
+      <div :class="['floor-grid', { 'multi-column': isMultiColumn }]">
+        <button
+          v-for="f in sortedFloors"
+          :key="f.id"
+          :class="['floor-btn', { active: currentFloorId === f.id, 'rect-btn': isMultiColumn }]"
+          @click="currentFloorId = f.id"
+          :title="f.name"
+        >
+          {{ getFloorAbbr(f.name) }}
+        </button>
       </div>
     </div>
 
@@ -1071,5 +1073,113 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: #1d1d1f;
   font-weight: 500;
+}
+
+/* Floor Navigator Panel */
+.floor-navigator-panel {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: auto;
+  max-height: calc(100% - 30px);
+  overflow-y: auto;
+  align-items: center;
+}
+
+/* Building Tabs (Segmented Control style) */
+.building-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.building-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #515154;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.building-tab-btn.active {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Floor Grid */
+.floor-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.floor-grid.multi-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+/* Floor Buttons */
+.floor-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.floor-btn:hover {
+  background: #f5f5f7;
+  transform: scale(1.05);
+}
+
+.floor-btn:active {
+  transform: scale(0.95);
+}
+
+.floor-btn.active {
+  background: #0071e3;
+  border-color: #0071e3;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.4);
+}
+
+/* Rounded rectangle style for multi-column layout */
+.floor-btn.rect-btn {
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 11px;
 }
 </style>
