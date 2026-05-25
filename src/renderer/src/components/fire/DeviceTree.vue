@@ -269,7 +269,7 @@ function issueClass(node: FireTreeNode): string {
                   <path d="M2 8a7.92 7.92 0 0 1 .7-3" />
                   <path d="M2 14a7.92 7.92 0 0 0 .7 3" />
                 </svg>
-                <!-- I/O (Pure vector lines) -->
+                <!-- I/O (Relay contact switch - Option 5) -->
                 <svg
                   v-else-if="option.value === 'ioGroup'"
                   viewBox="0 0 24 24"
@@ -279,9 +279,10 @@ function issueClass(node: FireTreeNode): string {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                 >
-                  <line x1="5" y1="8" x2="5" y2="16" />
-                  <line x1="9.5" y1="18" x2="13.5" y2="6" />
-                  <circle cx="18" cy="12" r="4" />
+                  <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+                  <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+                  <line x1="5.5" y1="12" x2="11" y2="12" />
+                  <line x1="11" y1="12" x2="18.5" y2="7" />
                 </svg>
               </el-icon>
             </el-button>
