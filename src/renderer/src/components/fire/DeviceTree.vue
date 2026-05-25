@@ -282,7 +282,7 @@ function issueClass(node: FireTreeNode): string {
                   <circle cx="4" cy="12" r="1.5" fill="currentColor" />
                   <circle cx="20" cy="12" r="1.5" fill="currentColor" />
                   <line x1="5.5" y1="12" x2="11" y2="12" />
-                  <line x1="11" y1="12" x2="18.5" y2="7" />
+                  <line x1="11" y1="12" x2="17.5" y2="4" />
                 </svg>
               </el-icon>
             </el-button>
