@@ -5,8 +5,6 @@ import {
   Moon,
   Sunny,
   Operation,
-  VideoCamera,
-  MapLocation,
   FolderOpened,
   Plus,
   DocumentChecked,
@@ -162,12 +160,28 @@ const handleDiscardTopology = (loopId: string): void => {
 
       <div class="tool-group">
         <el-radio-group v-model="store.currentViewMode" size="small" class="view-switch">
-          <el-radio-button value="2D"
-            ><el-icon><MapLocation /></el-icon> 2D</el-radio-button
-          >
-          <el-radio-button value="3D"
-            ><el-icon><VideoCamera /></el-icon> 3D</el-radio-button
-          >
+          <el-radio-button label="2D">
+            <el-icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z" />
+                <path d="M9 3v15" />
+                <path d="M15 6v15" />
+              </svg>
+            </el-icon>
+            2D
+          </el-radio-button>
+          <el-radio-button label="3D">
+            <el-icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 7v10" />
+                <path d="M12 12v10" />
+                <path d="M22 7v10" />
+              </svg>
+            </el-icon>
+            3D
+          </el-radio-button>
         </el-radio-group>
       </div>
 

@@ -938,110 +938,8 @@ function disposeMaterial(material: THREE.Material): void {
 
 <template>
   <section ref="containerRef" class="viewer-3d">
-    <!-- Left Vertical Floor Spacing Slider - CAD Elevation Style -->
-    <div class="vertical-slider-container" @pointerdown.stop @wheel.stop>
-      <span class="v-slider-label">{{ t('fire.viewer3d.floorSpacing') }}</span>
-      <div class="slider-track-v">
-        <input
-          type="range"
-          class="custom-slider-vertical"
-          min="12"
-          max="96"
-          v-model.number="floorSpacing3D"
-        />
-      </div>
-      <span class="v-slider-val">{{ floorSpacing3D }}</span>
-    </div>
-
-    <!-- Right 3D Control Panel (Cohesive UI style) -->
-    <div class="control-panel-3d" @pointerdown.stop @wheel.stop>
-      <!-- Section A: Drawing Controls -->
-      <h4 class="panel-section-title">{{ t('fire.viewer3d.drawingControl') || '图纸独立控制' }}</h4>
-      <div class="drawing-list">
-        <div v-for="b in project.buildings" :key="b.id" class="drawing-item">
-          <div class="item-header">
-            <span class="item-title-wrap">
-              <!-- Building Icon -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="building-icon">
-                <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-                <line x1="9" y1="22" x2="9" y2="16" />
-                <line x1="15" y1="22" x2="15" y2="16" />
-                <line x1="9" y1="16" x2="15" y2="16" />
-                <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01" />
-              </svg>
-              <span>{{ b.name }}</span>
-            </span>
-            <div class="item-actions">
-              <button
-                class="eye-btn"
-                :class="{ hidden: hiddenBuildingIds.has(b.id) }"
-                @click="toggleBuildingVisibility(b.id)"
-              >
-                <svg v-if="!hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              </button>
-              <div class="inline-slider-container">
-                <input
-                  type="range"
-                  class="inline-slider"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  :value="getBuildingOpacity(b)"
-                  :disabled="hiddenBuildingIds.has(b.id)"
-                  @input="setBuildingOpacity(b, $event)"
-                />
-                <span class="inline-val">{{ Math.round(getBuildingOpacity(b) * 100) }}%</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Floor Sub-list -->
-          <div class="floor-sublist">
-            <div v-for="f in getSortedFloors(b)" :key="f.id" class="floor-item">
-              <span class="floor-title">{{ f.name }}</span>
-              <div class="item-actions">
-                <button
-                  class="eye-btn"
-                  :class="{ hidden: hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id) }"
-                  :disabled="hiddenBuildingIds.has(b.id)"
-                  @click="toggleFloorVisibility(f.id)"
-                >
-                  <svg v-if="!hiddenFloorIds.has(f.id) && !hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                </button>
-                <div class="inline-slider-container">
-                  <input
-                    type="range"
-                    class="inline-slider"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    :value="getFloorOpacity(f)"
-                    :disabled="hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id)"
-                    @input="setFloorOpacity(f, $event)"
-                  />
-                  <span class="inline-val">{{ Math.round(getFloorOpacity(f) * 100) }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section B: Highlights -->
+    <!-- Top-left Highlight Panel -->
+    <div class="viewer-highlight-panel" @pointerdown.stop @wheel.stop>
       <h4 class="panel-section-title">{{ t('fire.viewer3d.highlight') }}</h4>
       <div class="highlight-group">
         <div class="segmented-v3">
@@ -1128,6 +1026,116 @@ function disposeMaterial(material: THREE.Material): void {
         </div>
       </div>
     </div>
+
+    <!-- Integrated Drawings & Floor Spacing Panel on the Left -->
+    <div class="viewer-drawings-panel" @pointerdown.stop @wheel.stop>
+      <div class="panel-layout-row">
+        <!-- Spacing Slider (Height适中) -->
+        <div class="v-slider-col">
+          <span class="v-slider-label">{{ t('fire.viewer3d.floorSpacing') }}</span>
+          <div class="slider-track-v">
+            <input
+              type="range"
+              class="custom-slider-vertical"
+              min="12"
+              max="96"
+              v-model.number="floorSpacing3D"
+            />
+          </div>
+          <span class="v-slider-val">{{ floorSpacing3D }}</span>
+        </div>
+
+        <el-divider direction="vertical" class="col-divider" />
+
+        <!-- Flat Drawing Control List (Narrowed Spacing) -->
+        <div class="drawings-col">
+          <h4 class="panel-section-title">{{ t('fire.viewer3d.drawingControl') || '图纸独立控制' }}</h4>
+          <div class="drawing-list">
+            <div v-for="b in project.buildings" :key="b.id" class="drawing-item">
+              <div class="item-header">
+                <span class="item-title-wrap">
+                  <!-- Building Icon -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="building-icon">
+                    <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+                    <line x1="9" y1="22" x2="9" y2="16" />
+                    <line x1="15" y1="22" x2="15" y2="16" />
+                    <line x1="9" y1="16" x2="15" y2="16" />
+                    <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01" />
+                  </svg>
+                  <span>{{ b.name }}</span>
+                </span>
+                <div class="item-actions">
+                  <button
+                    class="eye-btn"
+                    :class="{ hidden: hiddenBuildingIds.has(b.id) }"
+                    @click="toggleBuildingVisibility(b.id)"
+                  >
+                    <svg v-if="!hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  </button>
+                  <div class="inline-slider-container">
+                    <input
+                      type="range"
+                      class="inline-slider"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      :value="getBuildingOpacity(b)"
+                      :disabled="hiddenBuildingIds.has(b.id)"
+                      @input="setBuildingOpacity(b, $event)"
+                    />
+                    <span class="inline-val">{{ Math.round(getBuildingOpacity(b) * 100) }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Floor Sub-list -->
+              <div class="floor-sublist">
+                <div v-for="f in getSortedFloors(b)" :key="f.id" class="floor-item">
+                  <span class="floor-title">{{ f.name }}</span>
+                  <div class="item-actions">
+                    <button
+                      class="eye-btn"
+                      :class="{ hidden: hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id) }"
+                      :disabled="hiddenBuildingIds.has(b.id)"
+                      @click="toggleFloorVisibility(f.id)"
+                    >
+                      <svg v-if="!hiddenFloorIds.has(f.id) && !hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    </button>
+                    <div class="inline-slider-container">
+                      <input
+                        type="range"
+                        class="inline-slider"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        :value="getFloorOpacity(f)"
+                        :disabled="hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id)"
+                        @input="setFloorOpacity(f, $event)"
+                      />
+                      <span class="inline-val">{{ Math.round(getFloorOpacity(f) * 100) }}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
   <DeviceContextMenu
     :visible="contextMenu.visible"
@@ -1166,24 +1174,87 @@ function disposeMaterial(material: THREE.Material): void {
   background: #eef2f7;
 }
 
-.vertical-slider-container {
+/* Top-left Highlight Panel */
+.viewer-highlight-panel {
   position: absolute;
   left: 12px;
   top: 12px;
-  bottom: 12px;
   z-index: 4;
+  width: 320px;
   background: rgba(248, 250, 252, 0.92);
   border: 1px solid rgba(148, 163, 184, 0.42);
   border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Integrated Drawings & Spacing Panel on Left */
+.viewer-drawings-panel {
+  position: absolute;
+  left: 12px;
+  top: 128px;
+  z-index: 4;
+  width: 340px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  max-height: calc(100% - 150px);
+}
+
+.panel-layout-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+/* Spacing slider column (limited appropriate height) */
+.v-slider-col {
+  width: 36px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(8px);
+  padding: 6px 0;
   box-sizing: border-box;
-  width: 46px;
+  flex-shrink: 0;
+  height: 240px; /* Suitable height, not full screen */
+}
+
+.col-divider {
+  height: auto;
+  margin: 0;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+/* Drawings control list column */
+.drawings-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.panel-section-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding-bottom: 6px;
 }
 
 .v-slider-label {
@@ -1215,7 +1286,7 @@ function disposeMaterial(material: THREE.Material): void {
   -webkit-appearance: none;
   appearance: none;
   position: absolute;
-  width: 200px;
+  width: 170px; /* Adjusted to fit the 240px height */
   height: 20px;
   background: transparent;
   outline: none;
@@ -1251,41 +1322,10 @@ function disposeMaterial(material: THREE.Material): void {
   transform: scale(1.2);
 }
 
-.control-panel-3d {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  bottom: 12px;
-  z-index: 4;
-  width: 320px;
-  background: rgba(248, 250, 252, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.42);
-  border-radius: 8px;
-  padding: 14px;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
-  box-sizing: border-box;
-}
-
-.panel-section-title {
-  font-size: 10px;
-  font-weight: 800;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  margin: 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-  padding-bottom: 6px;
-}
-
 .drawing-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .drawing-item {
@@ -1294,20 +1334,20 @@ function disposeMaterial(material: THREE.Material): void {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 6px;
-  padding: 8px;
+  padding: 6px;
 }
 
 .item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .item-title-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 11px;
   font-weight: 700;
   color: #334155;
@@ -1321,8 +1361,8 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 .building-icon {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   color: #64748b;
   flex-shrink: 0;
 }
@@ -1330,7 +1370,7 @@ function disposeMaterial(material: THREE.Material): void {
 .item-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .eye-btn {
@@ -1346,8 +1386,8 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 .eye-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .eye-btn.hidden {
@@ -1366,8 +1406,8 @@ function disposeMaterial(material: THREE.Material): void {
 .inline-slider-container {
   display: flex;
   align-items: center;
-  gap: 6px;
-  width: 90px;
+  gap: 4px;
+  width: 80px; /* Narrowed width */
 }
 
 .inline-slider {
@@ -1383,8 +1423,8 @@ function disposeMaterial(material: THREE.Material): void {
 .inline-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #2563eb;
   cursor: pointer;
@@ -1404,24 +1444,24 @@ function disposeMaterial(material: THREE.Material): void {
   font-size: 9px;
   font-weight: 700;
   color: #64748b;
-  min-width: 26px;
+  min-width: 24px;
   text-align: right;
 }
 
 .floor-sublist {
-  margin-top: 6px;
-  padding-left: 12px;
+  margin-top: 4px;
+  padding-left: 10px;
   border-left: 1px dashed #cbd5e1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .floor-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 0;
+  padding: 1px 0;
   font-size: 11px;
 }
 
@@ -1436,7 +1476,7 @@ function disposeMaterial(material: THREE.Material): void {
 .highlight-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .segmented-v3 {
@@ -1455,7 +1495,7 @@ function disposeMaterial(material: THREE.Material): void {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 6px 2px;
+  padding: 5px 2px;
   border-radius: 4px;
   font-size: 9px;
   font-weight: 700;
@@ -1467,8 +1507,8 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 .segment-btn-v3 svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .segment-btn-v3:hover {
@@ -1484,14 +1524,14 @@ function disposeMaterial(material: THREE.Material): void {
 .target-picker-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
 }
 
 .target-label {
   flex: 0 0 auto;
   color: #334155;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1501,7 +1541,7 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 .target-hint {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
 }
 
@@ -1512,13 +1552,13 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 @media (max-width: 720px) {
-  .control-panel-3d {
+  .viewer-drawings-panel {
     width: auto;
-    left: 70px;
+    left: 12px;
     right: 12px;
     bottom: 12px;
     height: auto;
-    max-height: 50%;
+    max-height: 40%;
   }
 }
 </style>
