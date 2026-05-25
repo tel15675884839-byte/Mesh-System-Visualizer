@@ -12,6 +12,7 @@ import {
   getDeviceSimulationOutput,
   type DeviceSimulationOutput
 } from './domain/fire/simulationOutputMapping'
+import { shouldPlaySimulationAlarmAudio } from './domain/fire/simulationAudio'
 import type { FireDevice } from './domain/fire/types'
 import { getViewer3DDeviceAnimationFrame } from './domain/fire/viewer3DSimulationVisual'
 import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
@@ -39,6 +40,17 @@ interface Viewer3DCheckResult {
     delayEdgeAddress4ActiveOutputCount: number
     nonDelayedState: DeviceSimulationOutput | null
     nonDelayedColor: string | null
+  }
+  mountedDelayEdge3D: {
+    beforeDelaySounderState: DeviceSimulationOutput | null
+    beforeDelayIoState: DeviceSimulationOutput | null
+    beforeDelayCountdownSeconds: number
+    beforeDelayActiveOutputCount: number
+    beforeDelayShouldPlayAudio: boolean
+    afterDelaySounderState: DeviceSimulationOutput | null
+    afterDelayColor: string | null
+    afterDelayShouldPlayAudio: boolean
+    afterDelayActiveOutputCount: number
   }
 }
 
@@ -228,6 +240,7 @@ function runVisualCheck(): Viewer3DCheckResult {
   const checks: Record<string, boolean> = {}
   const errors: string[] = []
   const cpdSounder3D = runCpdSounder3DCheck()
+  const mountedDelayEdge3D = runMountedDelayEdge3DCheck()
   const statuses = project.devices.map((device) => {
     const appearance = getDeviceStatusAppearance(device)
     return {
@@ -280,15 +293,29 @@ function runVisualCheck(): Viewer3DCheckResult {
   )
   record(
     'mounted-delay-edge-store-has-no-immediate-active-outputs',
-    simulationActiveOutputCount() === 0
+    mountedDelayEdge3D.beforeDelayActiveOutputCount === 0
   )
   record(
     'mounted-delay-edge-renders-delayed-sounder-output',
-    mountedDeviceOutputState(94)?.state === 'delayActive'
+    mountedDelayEdge3D.beforeDelaySounderState?.state === 'delayActive'
   )
   record(
     'mounted-delay-edge-renders-delayed-io-output',
-    mountedDeviceOutputState(7)?.state === 'delayActive'
+    mountedDelayEdge3D.beforeDelayIoState?.state === 'delayActive'
+  )
+  record(
+    'mounted-delay-edge-shows-countdown-before-active',
+    mountedDelayEdge3D.beforeDelayCountdownSeconds > 0
+  )
+  record(
+    'mounted-delay-edge-audio-muted-before-countdown-expires',
+    mountedDelayEdge3D.beforeDelayShouldPlayAudio === false
+  )
+  record(
+    'mounted-delay-edge-starts-audio-and-active-light-after-countdown',
+    mountedDelayEdge3D.afterDelaySounderState?.state === 'active' &&
+      mountedDelayEdge3D.afterDelayShouldPlayAudio === true &&
+      mountedDelayEdge3D.afterDelayColor === '#ef4444'
   )
   record(
     'cpd-non-delayed-zone-renders-active-3d-sounder',
@@ -300,7 +327,8 @@ function runVisualCheck(): Viewer3DCheckResult {
     checks,
     errors,
     statuses,
-    cpdSounder3D
+    cpdSounder3D,
+    mountedDelayEdge3D
   }
 }
 
@@ -453,8 +481,57 @@ function mountedDeviceOutputState(address: number): DeviceSimulationOutput | nul
   )
 }
 
-function simulationActiveOutputCount(): number {
+function mountedActiveOutputCount(): number {
   return store.simulationState.outputs.filter((output) => output.state === 'active').length
+}
+
+function mountedShouldPlayAudio(): boolean {
+  return shouldPlaySimulationAlarmAudio({
+    simulationMode: store.simulationMode,
+    soundEnabled: store.project.simulationSettings.soundEnabled,
+    soundState: store.simulationState.soundState,
+    project: store.project,
+    devices: store.project.devices,
+    outputs: store.simulationState.outputs
+  })
+}
+
+function runMountedDelayEdge3DCheck(): Viewer3DCheckResult['mountedDelayEdge3D'] {
+  const beforeDelaySounderState = mountedDeviceOutputState(94)
+  const beforeDelayIoState = mountedDeviceOutputState(7)
+  const beforeDelayCountdownSeconds = Math.max(
+    0,
+    Math.ceil(beforeDelaySounderState?.remainingDelaySeconds ?? 0)
+  )
+  const beforeDelayActiveOutputCount = mountedActiveOutputCount()
+  const beforeDelayShouldPlayAudio = mountedShouldPlayAudio()
+
+  store.dispatchSimulationAction({
+    type: 'tick',
+    at: Date.now() + beforeDelayCountdownSeconds * 1000,
+    elapsedSeconds: beforeDelayCountdownSeconds
+  })
+
+  const afterDelaySounderState = mountedDeviceOutputState(94)
+  const afterDelaySounder = mountedDeviceByAddress(94)
+
+  return {
+    beforeDelaySounderState,
+    beforeDelayIoState,
+    beforeDelayCountdownSeconds,
+    beforeDelayActiveOutputCount,
+    beforeDelayShouldPlayAudio,
+    afterDelaySounderState,
+    afterDelayColor: getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: afterDelaySounderState?.state ?? null,
+      sounderPattern: afterDelaySounderState?.sounderPattern,
+      isSounder: afterDelaySounder.isSounder
+    }).color,
+    afterDelayShouldPlayAudio: mountedShouldPlayAudio(),
+    afterDelayActiveOutputCount: mountedActiveOutputCount()
+  }
 }
 
 function trigger(result: CpdAdapterResult, address: number): OutputActivation[] {

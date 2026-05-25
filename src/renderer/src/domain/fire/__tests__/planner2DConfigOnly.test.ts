@@ -19,11 +19,26 @@ describe('Planner2D configuration-only boundary', () => {
     }
   })
 
-  it('keeps the simulation panel out of the 2D workflow', () => {
-    const source = readFileSync(resolve('src/renderer/src/App.vue'), 'utf8')
+  it('keeps simulation controls out of the app shell and the 2D workflow', () => {
+    const appSource = readFileSync(resolve('src/renderer/src/App.vue'), 'utf8')
+    const plannerTemplateSource = readFileSync(
+      resolve('src/renderer/src/components/fire/Planner2D.template.html'),
+      'utf8'
+    )
+    const viewerTemplateSource = readFileSync(
+      resolve('src/renderer/src/components/fire/Viewer3D.template.html'),
+      'utf8'
+    )
+    const viewerScriptSource = readFileSync(
+      resolve('src/renderer/src/components/fire/Viewer3D.ts'),
+      'utf8'
+    )
 
-    expect(source).toContain('v-if="viewMode === \'3d\'"')
-    expect(source).toContain('<SimulationPanel />')
+    expect(appSource).not.toContain('SimulationPanel')
+    expect(plannerTemplateSource).not.toContain('SimulationPanel')
+    expect(viewerTemplateSource).not.toContain('SimulationPanel')
+    expect(viewerTemplateSource).toContain('viewer-simulation-actions')
+    expect(viewerScriptSource).toContain('shouldPlaySimulationAlarmAudio')
   })
 
   it('keeps loop wiring automatic and confirms zone drawings before saving', () => {

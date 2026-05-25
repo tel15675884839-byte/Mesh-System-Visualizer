@@ -2,7 +2,7 @@
 
 Date: 2026-05-24
 
-Updated: 2026-05-25 for Goal 6 Delayed Sounders validation.
+Updated: 2026-05-25 for Goal 6 Delayed Sounders validation and Goal 7 3D delayed sounder audio/visual activation.
 
 ## What Was Added
 
@@ -12,6 +12,7 @@ Updated: 2026-05-25 for Goal 6 Delayed Sounders validation.
 - `scripts/verify-cpd-fixtures.mjs`: regenerates extractor JSON and validates fixture fields.
 - `scripts/runtime-cpd-fixture-check.mjs`: applies generated fixture data to the simulator adapter and simulation logic.
 - `scripts/viewer3d-fixture-browser-check.mjs`: opens the 3D viewer harness in headless Chrome and verifies generated CPD delayed/non-delayed sounder states in the 3D mapping path.
+- `src/renderer/src/domain/fire/simulationAudio.ts`: shared gate that allows browser alarm audio only when simulation sound is enabled and a sounder output is actually active.
 - CPD fixture import and simulation tests.
 
 ## Generated Fixtures
@@ -33,8 +34,8 @@ Updated: 2026-05-25 for Goal 6 Delayed Sounders validation.
 - `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts`: passed, including generated CPD delayed/non-delayed 3D mapping.
 - `node .\scripts\runtime-cpd-fixture-check.mjs`: passed.
 - `node .\scripts\viewer3d-fixture-browser-check.mjs`: passed, with browser report written to `.codex-dev-run/viewer3d-fixture-browser-report.json`.
-- `npm run test`: passed, 28 test files and 181 tests.
-- `npm run lint`: passed with one pre-existing warning in `.codex-dev-run/goal3-baseline-simulation.ts`.
+- `npm run test`: passed, 33 test files and 198 tests.
+- `npm run lint`: passed.
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
 
@@ -60,6 +61,17 @@ Report path:
 .codex-dev-run/cpd-fixture-runtime-report.json
 .codex-dev-run/viewer3d-fixture-browser-report.json
 ```
+
+## Goal 7 3D Delayed Sounder Audio/Visual Check
+
+The 3D view no longer mounts the old `SimulationPanel`, so browser audio is now owned by `Viewer3D.ts` and gated through `shouldPlaySimulationAlarmAudio`. This gate intentionally ignores `soundState="fire"` while all sounder outputs are still `delayActive`; audio starts only after an addressable or non-addressable sounder output becomes `active`.
+
+The 3D browser harness now mounts `Viewer3D` with `6002-delay-edge-fields`, activates Zone 1 address `04`, and verifies:
+
+- before countdown expiry: Sounder Group 1 is `delayActive`, remaining delay is 60 seconds, active output count is 0, and audio gate is false;
+- before countdown expiry: I/O Group 1 remains `delayActive` with 45 seconds;
+- after a 60-second tick: the Zone 1 sounder maps to `active`, 3D active color is `#ef4444`, and audio gate is true;
+- the non-delayed control fixture still activates immediately.
 
 ## Implementation Note
 

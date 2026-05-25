@@ -6,6 +6,7 @@ import { getDeviceSimulationOutput } from '../simulationOutputMapping'
 import type { FireDevice, FireProject } from '../types'
 import { getViewer3DDeviceAnimationFrame } from '../viewer3DSimulationVisual'
 import { resolveCauseAndEffect } from '../simulation/causeEffect'
+import { tickDelayedOutputs } from '../simulation/delays'
 import type { OutputActivation } from '../simulation/types'
 
 function loadExtractedFixture(fileName: string): unknown {
@@ -86,18 +87,18 @@ describe('viewer 3D simulation visuals', () => {
     expect(second.scale).toBeGreaterThan(10)
   })
 
-  it('uses a slower cyan pulse for delayed outputs', () => {
+  it('uses a slower cyan pulse for delayed non-sounder outputs', () => {
     const first = getViewer3DDeviceAnimationFrame({
       baseSize: 10,
       elapsedMs: 0,
       outputState: 'delayActive',
-      isSounder: true
+      isSounder: false
     })
     const second = getViewer3DDeviceAnimationFrame({
       baseSize: 10,
       elapsedMs: 700,
       outputState: 'delayActive',
-      isSounder: true
+      isSounder: false
     })
 
     expect(first.color).toBe('#0ea5e9')
@@ -157,8 +158,43 @@ describe('viewer 3D simulation visuals', () => {
     })
 
     expect(delayedOutput).toMatchObject({ state: 'delayActive' })
+    expect(delayedOutput?.remainingDelaySeconds).toBeGreaterThan(0)
     expect(delayedFrame.color).toBe('#0ea5e9')
     expect(activeOutput).toMatchObject({ state: 'active', sounderPattern: 'continuous' })
+    expect(activeFrame.color).toBe('#ef4444')
+  })
+
+  it('switches the delay-edge Zone 1 sounder from countdown state to active 3D alarm state', () => {
+    const result = adaptFixture('6002-delay-edge-fields.json')
+    const sounder = deviceByAddress(result, 94)
+    const delayedOutputs = trigger(result, 4)
+    const delayedOutput = getDeviceSimulationOutput(makeProject(result), delayedOutputs, sounder)
+    const activeOutputs = tickDelayedOutputs(delayedOutputs, 60)
+    const activeOutput = getDeviceSimulationOutput(makeProject(result), activeOutputs, sounder)
+    const delayedFrame = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: delayedOutput?.state ?? null,
+      sounderPattern: delayedOutput?.sounderPattern,
+      isSounder: sounder.isSounder
+    })
+    const activeFrame = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: activeOutput?.state ?? null,
+      sounderPattern: activeOutput?.sounderPattern,
+      isSounder: sounder.isSounder
+    })
+
+    expect(delayedOutput).toMatchObject({
+      state: 'delayActive',
+      remainingDelaySeconds: 60
+    })
+    expect(delayedFrame.color).toBe('#0ea5e9')
+    expect(activeOutput).toMatchObject({
+      state: 'active',
+      sounderPattern: 'continuous'
+    })
     expect(activeFrame.color).toBe('#ef4444')
   })
 })
