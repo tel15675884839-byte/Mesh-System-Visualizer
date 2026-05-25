@@ -8,3 +8,4 @@ release
 .idea
 *.log
 .superpowers/
+tools/CpdFixtureGenerator/bin/

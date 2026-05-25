@@ -24,7 +24,10 @@ import {
   DEFAULT_FLOOR_HEIGHT_3D,
   getEffectiveFloorHeight3D
 } from '../../domain/fire/viewer3DGeometry'
-import { getDeviceSimulationOutputState } from '../../domain/fire/simulationOutputMapping'
+import {
+  getDeviceSimulationOutput,
+  type SounderOutputPattern
+} from '../../domain/fire/simulationOutputMapping'
 import {
   getViewer3DDeviceHighlightAppearance,
   getViewer3DHighlightOptions,
@@ -37,11 +40,16 @@ import {
   getViewer3DDeviceAnimationFrame,
   type Viewer3DDeviceOutputState
 } from '../../domain/fire/viewer3DSimulationVisual'
+import {
+  getDeviceStatusAppearance,
+  type DeviceStatusAppearance
+} from '../../domain/fire/deviceVisualState'
 import { getFireAssetHref } from '../../domain/fire/projectAssets'
 import {
   getViewer3DMapOpacity,
   shouldRenderViewer3DDevice,
   shouldRenderViewer3DFloor,
+  shouldRenderViewer3DZoneArea,
   type Viewer3DScopeKind,
   type Viewer3DScopeSelection
 } from '../../domain/fire/viewer3DViewState'
@@ -99,6 +107,7 @@ interface AnimatedDeviceObject {
   baseColor: THREE.ColorRepresentation
   baseOpacity: number
   outputState: Viewer3DDeviceOutputState
+  sounderPattern?: SounderOutputPattern
   isSounder: boolean
 }
 
@@ -381,6 +390,15 @@ function rebuildScene(): void {
         })
 
         for (const area of areas) {
+          if (
+            !shouldRenderViewer3DZoneArea({
+              area,
+              scope: viewScopeSelection.value
+            })
+          ) {
+            continue
+          }
+
           renderZoneArea(
             panel,
             area.zoneNumber,
@@ -473,13 +491,14 @@ function renderDevice(device: FireDevice, point: THREE.Vector3): void {
   )
   const highlighted = highlightAppearance.highlighted
   const outputState = getDeviceOutputState(device)
+  const statusAppearance = getDeviceStatusAppearance(device)
   const deviceColor = getDeviceColor(device)
   const material = new THREE.SpriteMaterial({
     map: texture,
     color: deviceColor,
     transparent: true,
     alphaTest: 0.05,
-    opacity: highlightAppearance.opacity,
+    opacity: highlightAppearance.opacity * statusAppearance.iconOpacity,
     depthTest: true,
     depthWrite: false,
     toneMapped: false
@@ -495,10 +514,14 @@ function renderDevice(device: FireDevice, point: THREE.Vector3): void {
   let ringMaterial: THREE.MeshBasicMaterial | null = null
   const isSelectedOrHighlighted = device.id === selectedDeviceId.value || highlighted
 
+  if (statusAppearance.state !== 'normal') {
+    renderDeviceStatusMarker(point, size, statusAppearance, highlightAppearance.opacity)
+  }
+
   if (isSelectedOrHighlighted) {
-    // 3D 声呐雷达波纹颜色：单选选中为绿色，回路等批量高亮为浅绿色
+    // Use a stronger ripple for the selected device and a softer one for grouped highlights.
     const rippleColor = device.id === selectedDeviceId.value ? '#00ff66' : '#52c41a'
-    // 渲染 3D 声呐雷达 3层水波纹扩散环
+    // Render three expanding radar rings around the device.
     for (let i = 0; i < 3; i++) {
       const rippleMat = new THREE.MeshBasicMaterial({
         color: rippleColor,
@@ -536,11 +559,34 @@ function renderDevice(device: FireDevice, point: THREE.Vector3): void {
       ringMaterial,
       baseSize: size,
       baseColor: deviceColor,
-      baseOpacity: highlightAppearance.opacity,
-      outputState,
+      baseOpacity: highlightAppearance.opacity * statusAppearance.iconOpacity,
+      outputState: outputState.state,
+      sounderPattern: outputState.sounderPattern,
       isSounder: device.isSounder
     })
   }
+}
+
+function renderDeviceStatusMarker(
+  point: THREE.Vector3,
+  size: number,
+  appearance: DeviceStatusAppearance,
+  baseOpacity: number
+): void {
+  const material = new THREE.MeshBasicMaterial({
+    color: appearance.color,
+    transparent: true,
+    opacity: Math.max(0.34, baseOpacity * 0.9),
+    depthWrite: false
+  })
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(size * 0.72, Math.max(0.04, size * 0.045), 8, 36),
+    material
+  )
+  ring.position.copy(point)
+  ring.position.y += Math.max(0.04, size * 0.04)
+  ring.rotation.x = Math.PI / 2
+  scene?.add(ring)
 }
 
 function renderLoop(loop: FireLoop, deviceObjects: Map<string, THREE.Vector3>): void {
@@ -670,12 +716,10 @@ function getDeviceColor(device: FireDevice): THREE.ColorRepresentation {
   if (hasActiveInput(device.id)) return '#dc2626'
   if (hasActiveFault(device.id)) return '#d97706'
   const outputState = getDeviceOutputState(device)
-  if (outputState === 'delayActive') return '#0ea5e9'
-  if (outputState === 'active' && device.isSounder) return '#ef4444'
-  if (outputState === 'active') return '#2563eb'
-  // 移除了选中和批量高亮时直接改变图标自身颜色的逻辑
-  if (device.disabled) return '#94a3b8'
-  return '#ffffff'
+  if (outputState?.state === 'delayActive') return '#0ea5e9'
+  if (outputState?.state === 'active' && device.isSounder) return '#ef4444'
+  if (outputState?.state === 'active') return '#2563eb'
+  return getDeviceStatusAppearance(device).spriteColor
 }
 
 function focusSelectedZone(): void {
@@ -715,6 +759,15 @@ function getSelectedZoneBounds(): THREE.Box3 | null {
 
   const bounds = new THREE.Box3()
   for (const area of selected.zone.visualAreas) {
+    if (
+      !shouldRenderViewer3DZoneArea({
+        area,
+        scope: viewScopeSelection.value
+      })
+    ) {
+      continue
+    }
+
     includeZoneAreaBounds(bounds, area.buildingId, area.floorId, area.points)
   }
 
@@ -784,8 +837,10 @@ function hasActiveFault(deviceId: string): boolean {
   return simulationState.value.activeFaults.some((fault) => fault.deviceId === deviceId)
 }
 
-function getDeviceOutputState(device: FireDevice): 'active' | 'delayActive' | null {
-  return getDeviceSimulationOutputState(project.value, simulationState.value.outputs, device)
+function getDeviceOutputState(
+  device: FireDevice
+): { state: 'active' | 'delayActive'; sounderPattern?: SounderOutputPattern } | null {
+  return getDeviceSimulationOutput(project.value, simulationState.value.outputs, device)
 }
 
 function resizeRenderer(): void {
@@ -876,6 +931,7 @@ function updateDeviceAnimations(elapsedMs: number): void {
       baseSize: object.baseSize,
       elapsedMs,
       outputState: object.outputState,
+      sounderPattern: object.sounderPattern,
       isSounder: object.isSounder
     })
 
@@ -893,9 +949,8 @@ function updateDeviceAnimations(elapsedMs: number): void {
 let lastTime = 0
 
 function updateRadarHighlightAnimations(time: number, deltaMs: number): void {
-  // 1. 更新设备声呐扩散波纹
   radarRipples.forEach((ripple) => {
-    ripple.progress += deltaMs / 1800 // 1.8s 为一个扩散周期
+    ripple.progress += deltaMs / 1800
     if (ripple.progress > 1) {
       ripple.progress = 0
     }
@@ -903,10 +958,9 @@ function updateRadarHighlightAnimations(time: number, deltaMs: number): void {
     ripple.mesh.scale.setScalar(scale)
 
     const mat = ripple.mesh.material as THREE.MeshBasicMaterial
-    mat.opacity = 0.85 * (1.0 - ripple.progress) // 随半径增大而渐淡
+    mat.opacity = 0.85 * (1.0 - ripple.progress)
   })
 
-  // 2. 更新防火分区呼吸发光
   radarZones.forEach((zone) => {
     const pulseOpacity = zone.baseOpacity * (1.0 + Math.sin(time * 0.004) * 0.3)
     const mat = zone.mesh.material as THREE.MeshBasicMaterial
@@ -933,7 +987,6 @@ function animate(): void {
 function clearScene(): void {
   if (!scene) return
 
-  // 清空雷达动画追踪数组
   radarRipples.length = 0
   radarZones.length = 0
 
@@ -1022,9 +1075,9 @@ function disposeMaterial(material: THREE.Material): void {
       <div class="toolbar-row scope-row">
         <span class="toolbar-label">{{ t('fire.viewer3d.scope') }}</span>
         <el-radio-group v-model="viewScopeKind" size="small">
-          <el-radio-button label="all">{{ t('fire.viewer3d.all') }}</el-radio-button>
-          <el-radio-button label="building">{{ t('fire.viewer3d.building') }}</el-radio-button>
-          <el-radio-button label="floor">{{ t('fire.viewer3d.floor') }}</el-radio-button>
+          <el-radio-button value="all">{{ t('fire.viewer3d.all') }}</el-radio-button>
+          <el-radio-button value="building">{{ t('fire.viewer3d.building') }}</el-radio-button>
+          <el-radio-button value="floor">{{ t('fire.viewer3d.floor') }}</el-radio-button>
         </el-radio-group>
         <el-select
           v-if="showScopeTargetPicker"
@@ -1047,14 +1100,14 @@ function disposeMaterial(material: THREE.Material): void {
       <div class="toolbar-row highlight-row">
         <span class="toolbar-label">{{ t('fire.viewer3d.highlight') }}</span>
         <el-radio-group v-model="highlightKind" size="small">
-          <el-radio-button label="none">{{ t('fire.viewer3d.none') }}</el-radio-button>
-          <el-radio-button label="type">{{ t('fire.viewer3d.type') }}</el-radio-button>
-          <el-radio-button label="loop">{{ t('fire.viewer3d.loop') }}</el-radio-button>
-          <el-radio-button label="zone">{{ t('fire.viewer3d.zone') }}</el-radio-button>
-          <el-radio-button label="sounderGroup">{{
+          <el-radio-button value="none">{{ t('fire.viewer3d.none') }}</el-radio-button>
+          <el-radio-button value="type">{{ t('fire.viewer3d.type') }}</el-radio-button>
+          <el-radio-button value="loop">{{ t('fire.viewer3d.loop') }}</el-radio-button>
+          <el-radio-button value="zone">{{ t('fire.viewer3d.zone') }}</el-radio-button>
+          <el-radio-button value="sounderGroup">{{
             t('fire.viewer3d.sounderGroup')
           }}</el-radio-button>
-          <el-radio-button label="ioGroup">{{ t('fire.viewer3d.ioGroup') }}</el-radio-button>
+          <el-radio-button value="ioGroup">{{ t('fire.viewer3d.ioGroup') }}</el-radio-button>
         </el-radio-group>
         <div
           v-if="showHighlightTargetPicker"

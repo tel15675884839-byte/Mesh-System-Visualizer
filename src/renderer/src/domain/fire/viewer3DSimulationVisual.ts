@@ -1,3 +1,5 @@
+import type { SounderOutputPattern } from './simulationOutputMapping'
+
 export type Viewer3DDeviceOutputState = 'active' | 'delayActive' | null
 
 export interface Viewer3DDeviceAnimationInput {
@@ -5,6 +7,7 @@ export interface Viewer3DDeviceAnimationInput {
   elapsedMs: number
   outputState: Viewer3DDeviceOutputState
   isSounder: boolean
+  sounderPattern?: SounderOutputPattern
 }
 
 export interface Viewer3DDeviceAnimationFrame {
@@ -18,9 +21,19 @@ export function getViewer3DDeviceAnimationFrame({
   baseSize,
   elapsedMs,
   outputState,
-  isSounder
+  isSounder,
+  sounderPattern
 }: Viewer3DDeviceAnimationInput): Viewer3DDeviceAnimationFrame {
   if (outputState === 'active' && isSounder) {
+    if (sounderPattern === 'continuous') {
+      return {
+        color: '#ef4444',
+        opacity: 1,
+        scale: baseSize * 1.08,
+        ringOpacity: 0.85
+      }
+    }
+
     const flashOn = Math.floor(elapsedMs / 180) % 2 === 0
     const pulse = flashOn ? 1.12 : 1.06
     return {

@@ -112,7 +112,7 @@ export interface FireDevice {
   immediateEvacuate: boolean
   setEvacuateTimer: boolean
   overrideDelays: boolean
-  selectedDisablement?: string
+  selectedDisablement?: string | boolean
   reportingDetail?: string
   smokeSensitivity?: string
   heatGrade?: string
@@ -197,6 +197,7 @@ export interface NonAddressableSounderMember {
   cieId?: number
   nonAddressable1?: boolean
   nonAddressable2?: boolean
+  status?: string
   raw: Record<string, unknown>
 }
 

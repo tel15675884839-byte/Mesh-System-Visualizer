@@ -10,7 +10,7 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
 
 ## Tasks
 
-- [ ] Task 1: Inspect Configurator generation surface and simulator CPD import expectations
+- [x] Task 1: Inspect Configurator generation surface and simulator CPD import expectations
   - Scope:
     - Read the existing Configurator `CPDExamManager.cs` generation path.
     - Confirm required assemblies, template file, serializer methods, device append methods, and relevant `GData`/`GDataDetail` tables.
@@ -23,8 +23,11 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
     - Confirm existing extractor can read at least one current generated/sample CPD.
   - Completion notes:
     - Record exact source fields and any missing optional fields before implementation.
+    - Confirmed baseline extractor on `..\Exam_6002_Answer_Advanced.cpd`: 1 panel, 20 devices, 128 zones, 4 sounder groups, 3 I/O groups.
+    - Confirmed required fields: `SounderDelayMM/SS`, `OverrideDelays`, `DeviceDisabled`, `InhibitRelays`, `IOOverrideDelay`, `DelayedSounders`, Zone sounder/I/O linkage, Sounder Group members, and I/O Group members.
+    - Recorded field map in `.codex-dev-run/cpd-fixture-field-map.md`.
 
-- [ ] Task 2: Create simulator-local `tools/CpdFixtureGenerator` scaffold
+- [x] Task 2: Create simulator-local `tools/CpdFixtureGenerator` scaffold
   - Scope:
     - Add the generator project or script wrapper under `tools/CpdFixtureGenerator/`.
     - Keep the tool independent from renderer/runtime app code.
@@ -37,8 +40,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Run the tool in a no-op or list mode if implemented.
     - Confirm it does not modify Configurator binaries or simulator source runtime files.
+  - Completion notes:
+    - Added `tools/CpdFixtureGenerator/CpdFixtureGenerator.cs`, `build.ps1`, `generate.ps1`, and README.
+    - Verified `.\tools\CpdFixtureGenerator\generate.ps1 -List` builds and lists all 7 fixture names.
+    - The tool loads Configurator assemblies by path and writes only under simulator `fixtures/cpd/`.
 
-- [ ] Task 3: Implement deterministic 6002 device and group fixture generation
+- [x] Task 3: Implement deterministic 6002 device and group fixture generation
   - Scope:
     - Load `templet project/6002.cpd`.
     - Normalize Loop 1 device addresses for Zones 1-3.
@@ -51,8 +58,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Generated CPD exists and can be read by `CpdExtractorPortable`.
     - Extracted JSON contains expected zones, devices, sounder groups, and zone-to-output relations.
+  - Completion notes:
+    - Generated deterministic Loop 1 addresses for Zones 1-3 and Sounder Groups 1, 2, 3, and 10.
+    - Generated `6002-basic-zone-linkage.cpd`.
+    - Verified through `node .\scripts\verify-cpd-fixtures.mjs`.
 
-- [ ] Task 4: Implement delay, override, disabled, inhibited, and I/O fixtures
+- [x] Task 4: Implement delay, override, disabled, inhibited, and I/O fixtures
   - Scope:
     - Generate focused files for:
       - global sounder delay;
@@ -67,8 +78,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Extractor validation confirms each file exposes expected fields and relation mappings.
     - Required fixtures fail loudly if required columns are missing.
+  - Completion notes:
+    - Generated focused delay, override, disabled/inhibited, I/O stage, and optional edge-field fixtures.
+    - Optional edge fixture confirmed `IOOverrideDelay` and `SetEvacuateTimer` fields are present in this 6002 template.
+    - Extractor validation passes for all generated files.
 
-- [ ] Task 5: Generate the realistic 6002 composite building fixture
+- [x] Task 5: Generate the realistic 6002 composite building fixture
   - Scope:
     - Generate `6002-realistic-building-composite.cpd`.
     - Include three logical floors/zones, global delay, manual override, local first-stage sounders, all-evacuation second stage, I/O stage linkage, disabled maintenance detector, and inhibited relay module.
@@ -79,8 +94,11 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Extractor JSON contains all expected major sections: panels, devices, zones, sounderGroups, ioGroups, and relations.
     - Composite fixture imports through existing importer tests without schema errors.
+  - Completion notes:
+    - Generated `6002-realistic-building-composite.cpd` with three zones, global 60-second delay, manual overrides, staged I/O, disabled address 21, and inhibited relay address 17.
+    - Runtime report recognizes 20 devices, Zones 1-3, Sounder Groups 1/2/3/10, and I/O Groups 1/2/3.
 
-- [ ] Task 6: Add simulator import and adapter regression tests for generated fixtures
+- [x] Task 6: Add simulator import and adapter regression tests for generated fixtures
   - Scope:
     - Add or extend tests so generated fixtures are parsed through the same extractor/import adapter path used by the app.
     - Verify recognized device count, zone IDs, group IDs, relation mappings, and delay-related normalized fields.
@@ -92,8 +110,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Run the focused CPD adapter/import tests.
     - Run `npm run typecheck`.
+  - Completion notes:
+    - Added `src/renderer/src/domain/fire/__tests__/cpdFixtureImport.test.ts`.
+    - Fixed `cpdAdapter.ts` to infer double-stage zones when real CPD has stage-2 output fields but no explicit `AlarmMode`.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/cpdFixtureImport.test.ts`; `npm run typecheck`.
 
-- [ ] Task 7: Add simulation behavior tests for generated fixture scenarios
+- [x] Task 7: Add simulation behavior tests for generated fixture scenarios
   - Scope:
     - Verify ordinary detector activation respects global delay.
     - Verify manual call point activation bypasses delay.
@@ -106,8 +128,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
   - Verification:
     - Run focused simulation tests.
     - Run `npm run typecheck`.
+  - Completion notes:
+    - Added `src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`.
+    - Verified generated fixtures drive global delay, manual override, staged I/O, disabled input, and inhibited relay behavior.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`; `npm run typecheck`.
 
-- [ ] Task 8: Apply generated CPD files directly to the app and verify runtime effect
+- [x] Task 8: Apply generated CPD files directly to the app and verify runtime effect
   - Scope:
     - Import at least:
       - `6002-realistic-building-composite.cpd`;
@@ -126,8 +152,13 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
     - Record observed results for delay, override delay, Zone linkage, I/O linkage, disabled, and inhibited scenarios.
   - Completion requirement:
     - This task is mandatory. The generator is not complete until the current program has consumed the generated CPD files and shown that the configurations are recognized and effective.
+  - Completion notes:
+    - Added `scripts/runtime-cpd-fixture-check.mjs` and `scripts/runtime-cpd-fixture-check.ts`.
+    - Harness imports generated fixture JSON through the simulator adapter and triggers representative devices through the simulator cause/effect logic.
+    - Verified: `node .\scripts\runtime-cpd-fixture-check.mjs`.
+    - Runtime report written to `.codex-dev-run/cpd-fixture-runtime-report.json`.
 
-- [ ] Review Cycle A: Generator and fixture correctness review
+- [x] Review Cycle A: Generator and fixture correctness review
   - Scope:
     - Recheck generator output against Configurator field map.
     - Re-run extractor validation.
@@ -137,8 +168,12 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
     - Run generator.
     - Run extractor validation script/checks.
     - Run focused import tests.
+  - Completion notes:
+    - Verified: `.\tools\CpdFixtureGenerator\generate.ps1`.
+    - Verified: `node .\scripts\verify-cpd-fixtures.mjs`.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/cpdFixtureImport.test.ts src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`.
 
-- [ ] Review Cycle B: End-to-end simulator verification review
+- [x] Review Cycle B: End-to-end simulator verification review
   - Scope:
     - Recheck the full chain:
       - template generation;
@@ -152,4 +187,9 @@ Create a reusable 6002 CPD fixture generator inside the simulator project, gener
     - `npm run test`
     - `npm run typecheck`
     - Runtime app or harness verification from Task 8.
-
+  - Completion notes:
+    - Verified full test suite: `npm run test` passed, 28 files and 176 tests.
+    - Verified: `npm run lint` passed with one pre-existing `.codex-dev-run/goal3-baseline-simulation.ts` prettier warning.
+    - Verified: `npm run typecheck` passed.
+    - Verified: `npm run build` passed.
+    - Verified runtime harness: detector delay, manual override, Zone stage 2, I/O stage, disabled input, and inhibited relay all passed.

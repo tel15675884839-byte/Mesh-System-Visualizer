@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { FireDevice, FireNetwork, FireProject } from '../types'
-import { getDeviceSimulationOutputState } from '../simulationOutputMapping'
+import {
+  getDeviceSimulationOutput,
+  getDeviceSimulationOutputState
+} from '../simulationOutputMapping'
 import type { OutputActivation } from '../simulation/types'
 
 describe('simulation output mapping', () => {
@@ -69,6 +72,31 @@ describe('simulation output mapping', () => {
       getDeviceSimulationOutputState(project, outputs, { ...ioMember, disabled: true })
     ).toBeNull()
   })
+
+  it('uses sounder group member status to determine addressable sounder output pattern', () => {
+    const project = makeProject()
+    const [, sounderMember] = project.devices as FireDevice[]
+    const outputs: OutputActivation[] = [
+      { outputId: 'sounder-group:panel-1:7', state: 'active', causes: ['input-1'] }
+    ]
+
+    expect(getDeviceSimulationOutput(project, outputs, sounderMember)).toEqual({
+      state: 'active',
+      sounderPattern: 'continuous'
+    })
+  })
+
+  it('keeps silent sounder group members visually and audibly inactive', () => {
+    const project = makeProject()
+    project.networks[0].panels[0].sounderGroups[0].addressableMembers[0].status = 'Silent'
+    const [, sounderMember] = project.devices as FireDevice[]
+    const outputs: OutputActivation[] = [
+      { outputId: 'sounder-group:panel-1:7', state: 'active', causes: ['input-1'] }
+    ]
+
+    expect(getDeviceSimulationOutput(project, outputs, sounderMember)).toBeNull()
+    expect(getDeviceSimulationOutputState(project, outputs, sounderMember)).toBeNull()
+  })
 })
 
 function makeProject(): FireProject & { devices: FireDevice[] } {
@@ -104,7 +132,7 @@ function makeProject(): FireProject & { devices: FireDevice[] } {
             networkId: 'network-1',
             panelId: 'panel-1',
             groupId: 7,
-            addressableMembers: [{ loopId: 1, physicalAddress: 94, raw: {} }],
+            addressableMembers: [{ loopId: 1, physicalAddress: 94, status: 'Continuous', raw: {} }],
             nonAddressableMembers: [],
             raw: {}
           }

@@ -5,6 +5,7 @@ export type DelayReason =
   | 'io'
   | 'fire-brigade'
   | 'evacuate'
+  | 'evacuate-io'
   | 'zone-delayed-sounders'
   | 'zone-non-delayed-sounders'
   | 'device-override-delay'

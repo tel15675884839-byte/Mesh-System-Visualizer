@@ -15,6 +15,7 @@ import type {
   FireZone,
   GroupMember,
   IOGroup,
+  NonAddressableSounderMember,
   PanelGeneralConfig,
   SounderGroup,
   SounderMode,
@@ -85,16 +86,16 @@ export function adaptCpdExport(input: unknown, now = Date.now()): CpdAdapterResu
     panel.sounderGroups = mergeSounderGroups(
       panel,
       sounderGroupsInput
-        .filter((group) => inputBelongsToPanel(group, panel, panels.length))
-        .map((group) => adaptSounderGroup(group, networkId, panel.id))
+        .filter((group) => groupBelongsToPanel(group, panel, panels.length))
+        .map((group) => adaptSounderGroup(group, networkId, panel.id, panel, panels.length))
         .filter(isNotNull),
       panelDevices
     )
     panel.ioGroups = mergeIOGroups(
       panel,
       ioGroupsInput
-        .filter((group) => inputBelongsToPanel(group, panel, panels.length))
-        .map((group) => adaptIOGroup(group, networkId, panel.id))
+        .filter((group) => groupBelongsToPanel(group, panel, panels.length))
+        .map((group) => adaptIOGroup(group, networkId, panel.id, panel, panels.length))
         .filter(isNotNull),
       panelDevices
     )
@@ -128,7 +129,9 @@ function adaptPanelZones(
   issues: FireIssue[]
 ): FireZone[] {
   const panelDevices = devices.filter((device) => device.panelNumber === panel.panelNumber)
-  const panelZoneInputs = zonesInput.filter((zone) => inputBelongsToPanel(zone, panel, panelCount))
+  const panelZoneInputs = zonesInput.filter((zone) =>
+    zoneBelongsToPanel(zone, panel, panelCount, panelDevices)
+  )
   const adaptedZones = panelZoneInputs
     .filter((zone) => isRelevantZoneInput(zone, panelDevices))
     .map((zone) => adaptZone(zone, networkId, panel.id, issues))
@@ -141,26 +144,72 @@ function adaptPanelZones(
   return synthesizeZonesFromDevices(panel, panelDevices)
 }
 
-function inputBelongsToPanel(
+function explicitInputPanelNumber(input: Record<string, unknown>): number | undefined {
+  const raw = toRecord(input.raw)
+  return optionalGroupNumberFromFields(input, raw, ['panelNumber', 'PanelNumber'])
+}
+
+function zoneBelongsToPanel(
   input: Record<string, unknown>,
   panel: FirePanel,
-  panelCount: number
+  panelCount: number,
+  panelDevices: FireDevice[]
 ): boolean {
-  const panelNumber = optionalGroupNumber(input.panelNumber)
+  const panelNumber = explicitInputPanelNumber(input)
   if (panelNumber === undefined) {
-    return panelCount === 1
+    if (panelCount === 1) {
+      return true
+    }
+
+    const raw = toRecord(input.raw)
+    const zoneNumber = optionalGroupNumberFromFields(input, raw, ['zoneNumber', 'ZoneNumber'])
+    if (
+      zoneNumber !== undefined &&
+      panelDevices.some((device) => device.zoneNumber === zoneNumber)
+    ) {
+      return true
+    }
+
+    return hasZoneOutputLinks(input)
   }
 
   return panelNumber === panel.panelNumber
 }
 
+function groupBelongsToPanel(
+  input: Record<string, unknown>,
+  panel: FirePanel,
+  panelCount: number
+): boolean {
+  const panelNumber = explicitInputPanelNumber(input)
+  if (panelNumber !== undefined) {
+    return panelNumber === panel.panelNumber
+  }
+
+  const members = collectGroupMemberRecords(input)
+  const memberPanelNumbers = members
+    .map(memberPanelNumber)
+    .filter((value): value is number => value !== undefined)
+
+  if (memberPanelNumbers.length > 0) {
+    return memberPanelNumbers.includes(panel.panelNumber)
+  }
+
+  return panelCount === 1
+}
+
 function isRelevantZoneInput(zoneInput: Record<string, unknown>, devices: FireDevice[]): boolean {
-  const zoneNumber = optionalGroupNumber(zoneInput.zoneNumber)
+  const raw = toRecord(zoneInput.raw)
+  const zoneNumber = optionalGroupNumberFromFields(zoneInput, raw, ['zoneNumber', 'ZoneNumber'])
   if (zoneNumber === undefined) {
     return false
   }
 
-  return hasZoneText(zoneInput) || devices.some((device) => device.zoneNumber === zoneNumber)
+  return (
+    hasZoneText(zoneInput) ||
+    hasZoneOutputLinks(zoneInput) ||
+    devices.some((device) => device.zoneNumber === zoneNumber)
+  )
 }
 
 function hasZoneText(zoneInput: Record<string, unknown>): boolean {
@@ -168,6 +217,26 @@ function hasZoneText(zoneInput: Record<string, unknown>): boolean {
   return Boolean(
     optionalStringFromFields(zoneInput, raw, ['text', 'ZoneTexts', 'zoneText'])?.trim()
   )
+}
+
+function hasZoneOutputLinks(zoneInput: Record<string, unknown>): boolean {
+  const raw = toRecord(zoneInput.raw)
+  return [
+    'sounderGroupAlarm1',
+    'SounderGroupAlarm1',
+    'sounderGroupAlarm2',
+    'SounderGroupAlarm2',
+    'ioGroup1Alarm1',
+    'IOGroup1Alarm1',
+    'ioGroup1Alarm2',
+    'IOGroup1Alarm2',
+    'ioGroup2Alarm1',
+    'IOGroup2Alarm1',
+    'ioGroup3Alarm1',
+    'IOGroup3Alarm1',
+    'ioGroup4Alarm1',
+    'IOGroup4Alarm1'
+  ].some((field) => optionalGroupNumberFromFields(zoneInput, raw, [field]) !== undefined)
 }
 
 function synthesizeZonesFromDevices(panel: FirePanel, devices: FireDevice[]): FireZone[] {
@@ -324,7 +393,7 @@ function adaptDevice(
     isOutputCapable: isOutputCapableType(normalizedType),
     isSounder: isSounderType(normalizedType),
     isWirelessType: isWirelessDeviceType(normalizedType),
-    disabled: booleanFromFields(deviceInput, raw, ['disabled', 'DeviceDisabled', 'deviceDisabled']),
+    disabled: isDisabledDevice(deviceInput, raw),
     inhibitSounders: booleanFromFields(deviceInput, raw, ['inhibitSounders', 'InhibitSounders']),
     inhibitIO: booleanFromFields(deviceInput, raw, ['inhibitIO', 'InhibitIO']),
     inhibitRelays: booleanFromFields(deviceInput, raw, ['inhibitRelays', 'InhibitRelays']),
@@ -336,7 +405,7 @@ function adaptDevice(
     ]),
     setEvacuateTimer: booleanFromFields(deviceInput, raw, ['setEvacuateTimer', 'SetEvacuateTimer']),
     overrideDelays: booleanFromFields(deviceInput, raw, ['overrideDelays', 'OverrideDelays']),
-    selectedDisablement: optionalString(deviceInput.selectedDisablement),
+    selectedDisablement: selectedDisablementValue(deviceInput, raw),
     reportingDetail: optionalString(deviceInput.reportingDetail),
     smokeSensitivity: optionalString(deviceInput.smokeSensitivity),
     heatGrade: optionalString(deviceInput.heatGrade),
@@ -433,7 +502,9 @@ function adaptZone(
 function adaptSounderGroup(
   groupInput: Record<string, unknown>,
   networkId: string,
-  panelId: string
+  panelId: string,
+  panel: FirePanel,
+  panelCount: number
 ): SounderGroup | null {
   const raw = toRecord(groupInput.raw)
   const groupId = optionalGroupNumberFromFields(groupInput, raw, ['groupId', 'GroupId', 'GroupID'])
@@ -448,8 +519,10 @@ function adaptSounderGroup(
     groupId,
     title: optionalStringFromFields(groupInput, raw, ['title', 'Title']),
     description: optionalStringFromFields(groupInput, raw, ['description', 'Description']),
-    addressableMembers: collectGroupMemberRecords(groupInput).map(adaptGroupMember),
-    nonAddressableMembers: [],
+    addressableMembers: collectPanelGroupMemberRecords(groupInput, panel, panelCount).map(
+      adaptGroupMember
+    ),
+    nonAddressableMembers: adaptNonAddressableSounderMembers(groupInput),
     raw
   }
 }
@@ -457,7 +530,9 @@ function adaptSounderGroup(
 function adaptIOGroup(
   groupInput: Record<string, unknown>,
   networkId: string,
-  panelId: string
+  panelId: string,
+  panel: FirePanel,
+  panelCount: number
 ): IOGroup | null {
   const raw = toRecord(groupInput.raw)
   const groupId = optionalGroupNumberFromFields(groupInput, raw, ['groupId', 'GroupId', 'GroupID'])
@@ -470,7 +545,7 @@ function adaptIOGroup(
     networkId,
     panelId,
     groupId,
-    members: collectGroupMemberRecords(groupInput).map(adaptGroupMember),
+    members: collectPanelGroupMemberRecords(groupInput, panel, panelCount).map(adaptGroupMember),
     raw
   }
 }
@@ -496,6 +571,36 @@ function adaptGroupMember(member: Record<string, unknown>): GroupMember {
   }
 }
 
+function adaptNonAddressableSounderMembers(
+  groupInput: Record<string, unknown>
+): NonAddressableSounderMember[] {
+  const raw = toRecord(groupInput.raw)
+  const cieId = optionalNumberFromFields(groupInput, raw, ['cieId', 'CIE', 'Cie', 'CieId', 'CIEID'])
+  const members: NonAddressableSounderMember[] = []
+
+  for (const channel of ['nonAddressable1', 'nonAddressable2'] as const) {
+    const field = channel === 'nonAddressable1' ? 'NonAddressable1' : 'NonAddressable2'
+    const value = firstDefinedField(groupInput, raw, [channel, field])
+    if (isEmptyNonAddressableMode(value)) {
+      continue
+    }
+
+    const status = optionalString(value) ?? String(value)
+    members.push({
+      cieId,
+      [channel]: true,
+      status,
+      raw: {
+        ...(cieId !== undefined ? { CIE: cieId } : {}),
+        channel,
+        status
+      }
+    })
+  }
+
+  return members
+}
+
 function mapSounderMode(
   value: unknown,
   targetId: string,
@@ -504,6 +609,14 @@ function mapSounderMode(
 ): SounderMode {
   if (value === 'Preset' || value === 'Programmed') {
     return value
+  }
+
+  if (value === 0 || value === '0') {
+    return 'Programmed'
+  }
+
+  if (value === 1 || value === '1') {
+    return 'Preset'
   }
 
   if (value !== undefined) {
@@ -535,6 +648,10 @@ function mapZoneAlarmMode(
     return mode
   }
 
+  if (mode === '' && hasConfiguredStage2Output(zoneInput, raw)) {
+    return 'double'
+  }
+
   issues.push({
     id: `zone.alarm-mode-unresolved:${targetId}`,
     code: 'zone.alarm-mode-unresolved',
@@ -546,6 +663,15 @@ function mapZoneAlarmMode(
   })
 
   return 'single'
+}
+
+function hasConfiguredStage2Output(
+  zoneInput: Record<string, unknown>,
+  raw: Record<string, unknown>
+): boolean {
+  return ['sounderGroupAlarm2', 'SounderGroupAlarm2', 'ioGroup1Alarm2', 'IOGroup1Alarm2'].some(
+    (field) => optionalGroupNumberFromFields(zoneInput, raw, [field]) !== undefined
+  )
 }
 
 function delaySeconds(minutes: unknown, seconds: unknown): number {
@@ -687,6 +813,63 @@ function booleanFromFields(
   return fallback
 }
 
+function isDisabledDevice(input: Record<string, unknown>, raw: Record<string, unknown>): boolean {
+  return (
+    booleanFromFields(input, raw, ['disabled', 'DeviceDisabled', 'deviceDisabled']) ||
+    booleanFromFields(input, raw, ['selectedDisablement', 'SelectedDisablement'])
+  )
+}
+
+function selectedDisablementValue(
+  input: Record<string, unknown>,
+  raw: Record<string, unknown>
+): string | boolean | undefined {
+  const value = firstDefinedField(input, raw, ['selectedDisablement', 'SelectedDisablement'])
+  if (typeof value === 'string' && value.trim() !== '') {
+    return value
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  return undefined
+}
+
+function firstDefinedField(
+  input: Record<string, unknown>,
+  raw: Record<string, unknown>,
+  fields: string[]
+): unknown {
+  for (const field of fields) {
+    const value = input[field] ?? raw[field]
+    if (value !== undefined && value !== null) {
+      return value
+    }
+  }
+
+  return undefined
+}
+
+function isEmptyNonAddressableMode(value: unknown): boolean {
+  if (value === undefined || value === null || value === false) {
+    return true
+  }
+
+  if (typeof value === 'number') {
+    return value <= 0
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    return (
+      normalized === '' || normalized === '0' || normalized === 'false' || normalized === 'none'
+    )
+  }
+
+  return false
+}
+
 function collectGroupMemberRecords(groupInput: Record<string, unknown>): Record<string, unknown>[] {
   const raw = toRecord(groupInput.raw)
   const records = [
@@ -726,6 +909,34 @@ function collectGroupMemberRecords(groupInput: Record<string, unknown>): Record<
     seen.add(key)
     return true
   })
+}
+
+function collectPanelGroupMemberRecords(
+  groupInput: Record<string, unknown>,
+  panel: FirePanel,
+  panelCount: number
+): Record<string, unknown>[] {
+  const records = collectGroupMemberRecords(groupInput)
+  const explicitGroupPanelNumber = explicitInputPanelNumber(groupInput)
+
+  if (explicitGroupPanelNumber !== undefined || panelCount === 1) {
+    return records.filter((record) => {
+      const panelNumber = memberPanelNumber(record)
+      return panelNumber === undefined || panelNumber === panel.panelNumber
+    })
+  }
+
+  const hasPanelScopedMembers = records.some((record) => memberPanelNumber(record) !== undefined)
+  if (!hasPanelScopedMembers) {
+    return records
+  }
+
+  return records.filter((record) => memberPanelNumber(record) === panel.panelNumber)
+}
+
+function memberPanelNumber(member: Record<string, unknown>): number | undefined {
+  const raw = toRecord(member.raw)
+  return optionalGroupNumberFromFields(member, raw, ['panelNumber', 'PanelNumber'])
 }
 
 function isNotNull<T>(value: T | null): value is T {

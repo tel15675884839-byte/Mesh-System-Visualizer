@@ -35,6 +35,11 @@ interface EffectiveAlarm {
   zone?: FireZone
 }
 
+interface EvacuateActivation {
+  causes: string[]
+  delaySeconds: number
+}
+
 export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResult {
   const effectiveAlarms = input.activeInputAlarms.flatMap((alarm): EffectiveAlarm[] => {
     const device = input.devices.find((candidate) => candidate.id === alarm.deviceId)
@@ -61,7 +66,7 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
     if (input.network.sounderMode === 'Preset') {
       addPresetSounders(outputs, input, alarm)
     } else {
-      addProgrammedZoneOutputs(outputs, input.devices, alarm, effectiveAlarms)
+      addProgrammedZoneOutputs(outputs, input, alarm, effectiveAlarms)
     }
 
     addFireBrigadeOutput(outputs, alarm)
@@ -96,30 +101,19 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
     }
   }
 
-  if (input.evacuateActive) {
-    addEvacuateSounders(outputs, input)
-    const maxDelaySeconds = Math.max(
-      ...input.network.panels.map((panel) => panel.general.evacuateDelaySeconds),
-      0
-    )
-    upsertOutput(
-      outputs,
-      createDelayedActivation(
-        `evacuate:${input.network.id}`,
-        ['manual-evacuate'],
-        maxDelaySeconds,
-        'evacuate'
-      )
-    )
+  const evacuateActivations = collectEvacuateActivations(input, effectiveAlarms)
+  for (const activation of evacuateActivations) {
+    addEvacuateOutputs(outputs, input, activation)
   }
 
-  const hasFireSound = effectiveAlarms.length > 0 || input.evacuateActive === true
+  const hasEvacuate = evacuateActivations.length > 0
+  const hasFireSound = effectiveAlarms.length > 0 || hasEvacuate
   const hasFaultSound = (input.activeFaults?.length ?? 0) > 0
   const soundState: SoundState = hasFireSound ? 'fire' : hasFaultSound ? 'fault' : 'silent'
   const systemState: SystemState =
     effectiveAlarms.length > 0
       ? 'fireAlarm'
-      : input.evacuateActive
+      : hasEvacuate
         ? 'evacuate'
         : hasFaultSound
           ? 'fault'
@@ -131,9 +125,78 @@ export function resolveCauseAndEffect(input: CauseEffectInput): CauseEffectResul
   })
 }
 
+function collectEvacuateActivations(
+  input: CauseEffectInput,
+  effectiveAlarms: EffectiveAlarm[]
+): EvacuateActivation[] {
+  const activations: EvacuateActivation[] = []
+
+  if (input.evacuateActive) {
+    activations.push({
+      causes: ['manual-evacuate'],
+      delaySeconds: getNetworkEvacuateDelaySeconds(input.network)
+    })
+  }
+
+  for (const alarm of effectiveAlarms) {
+    if (alarm.device.immediateEvacuate) {
+      activations.push({
+        causes: [alarm.device.id],
+        delaySeconds: 0
+      })
+      continue
+    }
+
+    if (alarmStartsEvacuateTimer(alarm, effectiveAlarms)) {
+      activations.push({
+        causes: [alarm.device.id],
+        delaySeconds: alarm.panel.general.evacuateDelaySeconds
+      })
+    }
+  }
+
+  return activations
+}
+
+function alarmStartsEvacuateTimer(
+  alarm: EffectiveAlarm,
+  effectiveAlarms: EffectiveAlarm[]
+): boolean {
+  if (alarm.device.setEvacuateTimer) {
+    return true
+  }
+
+  if (alarm.panel.general.onManualCallPoints && isManualCallPoint(alarm.device)) {
+    return true
+  }
+
+  return alarm.panel.general.onTwoDevices && hasTwoEffectiveAlarmsOnPanel(alarm, effectiveAlarms)
+}
+
+function getNetworkEvacuateDelaySeconds(network: FireNetwork): number {
+  return Math.max(...network.panels.map((panel) => panel.general.evacuateDelaySeconds), 0)
+}
+
+function isManualCallPoint(device: FireDevice): boolean {
+  return (
+    device.type === 'manual_call_point' ||
+    device.friendlyTypeName.trim().toLowerCase() === 'manual call point'
+  )
+}
+
+function hasTwoEffectiveAlarmsOnPanel(
+  alarm: EffectiveAlarm,
+  effectiveAlarms: EffectiveAlarm[]
+): boolean {
+  return (
+    effectiveAlarms.filter((candidate) => candidate.device.panelId === alarm.device.panelId)
+      .length >= 2
+  )
+}
+
 function addProgrammedZoneOutputs(
   outputs: Map<string, OutputActivation>,
-  devices: FireDevice[],
+  input: CauseEffectInput,
   alarm: EffectiveAlarm,
   effectiveAlarms: EffectiveAlarm[]
 ): void {
@@ -150,16 +213,28 @@ function addProgrammedZoneOutputs(
   const useStage2 = zone.alarmMode === 'double' && zoneAlarmCount >= 2
 
   if (useStage2) {
-    addSounderGroupOutput(outputs, alarm, devices, zone.sounderGroupAlarm2)
-    addIOGroupOutput(outputs, alarm, devices, zone.ioGroup1Alarm2)
+    addSounderGroupOutput(
+      outputs,
+      alarm,
+      input.devices,
+      input.nonAddressablePoints,
+      zone.sounderGroupAlarm2
+    )
+    addIOGroupOutput(outputs, alarm, input.devices, zone.ioGroup1Alarm2)
     return
   }
 
-  addSounderGroupOutput(outputs, alarm, devices, zone.sounderGroupAlarm1)
-  addIOGroupOutput(outputs, alarm, devices, zone.ioGroup1Alarm1)
-  addIOGroupOutput(outputs, alarm, devices, zone.ioGroup2Alarm1)
-  addIOGroupOutput(outputs, alarm, devices, zone.ioGroup3Alarm1)
-  addIOGroupOutput(outputs, alarm, devices, zone.ioGroup4Alarm1)
+  addSounderGroupOutput(
+    outputs,
+    alarm,
+    input.devices,
+    input.nonAddressablePoints,
+    zone.sounderGroupAlarm1
+  )
+  addIOGroupOutput(outputs, alarm, input.devices, zone.ioGroup1Alarm1)
+  addIOGroupOutput(outputs, alarm, input.devices, zone.ioGroup2Alarm1)
+  addIOGroupOutput(outputs, alarm, input.devices, zone.ioGroup3Alarm1)
+  addIOGroupOutput(outputs, alarm, input.devices, zone.ioGroup4Alarm1)
 }
 
 function addPresetSounders(
@@ -182,49 +257,90 @@ function addPresetSounders(
     })
   }
 
-  addProgrammedZoneOutputs(outputs, input.devices, alarm, [alarm])
+  addProgrammedZoneOutputs(outputs, input, alarm, [alarm])
 }
 
-function addEvacuateSounders(
+function addEvacuateOutputs(
   outputs: Map<string, OutputActivation>,
-  input: CauseEffectInput
+  input: CauseEffectInput,
+  activation: EvacuateActivation
 ): void {
   for (const sounder of input.devices.filter((device) => device.isSounder)) {
     if (sounder.disabled) {
       upsertOutput(outputs, {
         outputId: `device:${sounder.id}`,
         state: 'disabled',
-        causes: ['manual-evacuate'],
+        causes: activation.causes,
         remainingDelaySeconds: 0,
         reason: 'disabled-output'
       })
       continue
     }
 
-    upsertOutput(outputs, {
-      outputId: `device:${sounder.id}`,
-      state: 'active',
-      causes: ['manual-evacuate'],
-      remainingDelaySeconds: 0,
-      reason: 'evacuate'
-    })
+    upsertOutput(
+      outputs,
+      createDelayedActivation(
+        `device:${sounder.id}`,
+        activation.causes,
+        activation.delaySeconds,
+        'evacuate'
+      )
+    )
   }
 
   for (const point of input.nonAddressablePoints) {
-    upsertOutput(outputs, {
-      outputId: `non-addressable-sounder:${point.id}`,
-      state: 'active',
-      causes: ['manual-evacuate'],
-      remainingDelaySeconds: 0,
-      reason: 'evacuate'
-    })
+    upsertOutput(
+      outputs,
+      createDelayedActivation(
+        `non-addressable-sounder:${point.id}`,
+        activation.causes,
+        activation.delaySeconds,
+        'evacuate'
+      )
+    )
   }
+
+  for (const output of input.devices.filter(
+    (device) => device.evacuateIO && device.isOutputCapable && !device.isSounder
+  )) {
+    if (output.disabled) {
+      upsertOutput(outputs, {
+        outputId: `device:${output.id}`,
+        state: 'disabled',
+        causes: activation.causes,
+        remainingDelaySeconds: 0,
+        reason: 'disabled-output'
+      })
+      continue
+    }
+
+    upsertOutput(
+      outputs,
+      createDelayedActivation(
+        `device:${output.id}`,
+        activation.causes,
+        activation.delaySeconds,
+        'evacuate-io'
+      )
+    )
+  }
+
+  upsertOutput(
+    outputs,
+    createDelayedActivation(
+      `evacuate:${input.network.id}`,
+      activation.causes,
+      activation.delaySeconds,
+      'evacuate'
+    )
+  )
 }
 
 function addSounderGroupOutput(
   outputs: Map<string, OutputActivation>,
   alarm: EffectiveAlarm,
   devices: FireDevice[],
+  nonAddressablePoints: NonAddressableSounderPoint[],
   groupId: number | undefined
 ): void {
   if (groupId === undefined) {
@@ -253,15 +369,58 @@ function addSounderGroupOutput(
     return
   }
 
-  upsertOutput(
-    outputs,
-    createDelayedActivation(
-      `sounder-group:${alarm.panel.id}:${groupId}`,
-      [alarm.device.id],
-      getSounderDelaySeconds(alarm),
-      getSounderDelayReason(alarm)
-    )
+  const activation = createDelayedActivation(
+    `sounder-group:${alarm.panel.id}:${groupId}`,
+    [alarm.device.id],
+    getSounderDelaySeconds(alarm),
+    getSounderDelayReason(alarm)
   )
+  upsertOutput(outputs, activation)
+  addNonAddressableSounderGroupOutputs(outputs, alarm, nonAddressablePoints, groupId, activation)
+}
+
+function addNonAddressableSounderGroupOutputs(
+  outputs: Map<string, OutputActivation>,
+  alarm: EffectiveAlarm,
+  nonAddressablePoints: NonAddressableSounderPoint[],
+  groupId: number,
+  groupActivation: OutputActivation
+): void {
+  const group = alarm.panel.sounderGroups.find((candidate) => candidate.groupId === groupId)
+  if (!group || group.nonAddressableMembers.length === 0) {
+    return
+  }
+
+  for (const member of group.nonAddressableMembers) {
+    if (isSilentSounderMode(member.status)) {
+      continue
+    }
+
+    const channel = member.nonAddressable1
+      ? 'nonAddressable1'
+      : member.nonAddressable2
+        ? 'nonAddressable2'
+        : undefined
+    if (!channel) {
+      continue
+    }
+
+    for (const point of nonAddressablePoints) {
+      if (
+        point.panelId !== alarm.panel.id ||
+        point.sounderGroupId !== groupId ||
+        point.channel !== channel ||
+        (member.cieId !== undefined && point.cieId !== member.cieId)
+      ) {
+        continue
+      }
+
+      upsertOutput(outputs, {
+        ...groupActivation,
+        outputId: `non-addressable-sounder:${point.id}`
+      })
+    }
+  }
 }
 
 function addDeviceSounderOutput(
@@ -435,6 +594,10 @@ function getSounderDelayReason(alarm: EffectiveAlarm): DelayReason {
     return 'zone-non-delayed-sounders'
   }
 
+  if (alarm.zone?.delayedSounders === true) {
+    return 'zone-delayed-sounders'
+  }
+
   return 'general-sounder'
 }
 
@@ -456,6 +619,15 @@ function getIODelayReason(alarm: EffectiveAlarm): DelayReason {
   }
 
   return 'io'
+}
+
+function isSilentSounderMode(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return false
+  }
+
+  const normalized = value.trim().toLowerCase()
+  return normalized === 'silent' || normalized === 'silence' || normalized === 'off'
 }
 
 function upsertOutput(outputs: Map<string, OutputActivation>, next: OutputActivation): void {

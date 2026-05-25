@@ -2,72 +2,104 @@ import type { FireDevice, FirePanel, FireProject, GroupMember } from './types'
 import type { OutputActivation } from './simulation/types'
 
 export type DeviceSimulationOutputState = 'active' | 'delayActive' | null
+export type SounderOutputPattern = 'silent' | 'continuous' | 'pulse'
+
+export interface DeviceSimulationOutput {
+  state: Exclude<DeviceSimulationOutputState, null>
+  sounderPattern?: SounderOutputPattern
+}
 
 export function getDeviceSimulationOutputState(
   project: FireProject,
   outputs: OutputActivation[],
   device: FireDevice
 ): DeviceSimulationOutputState {
+  return getDeviceSimulationOutput(project, outputs, device)?.state ?? null
+}
+
+export function getDeviceSimulationOutput(
+  project: FireProject,
+  outputs: OutputActivation[],
+  device: FireDevice
+): DeviceSimulationOutput | null {
   if (device.disabled) {
     return null
   }
 
   const panel = findPanel(project, device.panelId)
-  let state: DeviceSimulationOutputState = null
+  let delayedOutput: DeviceSimulationOutput | null = null
 
   for (const output of outputs) {
     if (output.state !== 'active' && output.state !== 'delayActive') {
       continue
     }
 
-    if (!outputMatchesDevice(output.outputId, panel, device)) {
+    const match = outputMatchesDevice(output.outputId, panel, device)
+    if (!match) {
+      continue
+    }
+
+    if (match.sounderPattern === 'silent') {
       continue
     }
 
     if (output.state === 'active') {
-      return 'active'
+      return {
+        state: 'active',
+        sounderPattern: match.sounderPattern
+      }
     }
 
-    state = 'delayActive'
+    delayedOutput = {
+      state: 'delayActive',
+      sounderPattern: match.sounderPattern
+    }
   }
 
-  return state
+  return delayedOutput
 }
 
 function outputMatchesDevice(
   outputId: string,
   panel: FirePanel | undefined,
   device: FireDevice
-): boolean {
+): { sounderPattern?: SounderOutputPattern } | null {
   if (outputId === `device:${device.id}`) {
-    return true
+    return { sounderPattern: device.isSounder ? 'continuous' : undefined }
   }
 
   if (!panel) {
-    return false
+    return null
   }
 
   const sounderGroupId = parseOutputGroupId(outputId, 'sounder-group', panel.id)
   if (sounderGroupId !== undefined) {
-    return (
-      device.sounderGroupId === sounderGroupId ||
-      panel.sounderGroups
-        .find((group) => group.groupId === sounderGroupId)
-        ?.addressableMembers.some((member) => memberMatchesDevice(member, device)) === true
+    const group = panel.sounderGroups.find((candidate) => candidate.groupId === sounderGroupId)
+    const member = group?.addressableMembers.find((candidate) =>
+      memberMatchesDevice(candidate, device)
     )
+    if (member) {
+      return { sounderPattern: resolveSounderOutputPattern(member.status) }
+    }
+
+    if (device.sounderGroupId === sounderGroupId) {
+      return { sounderPattern: resolveSounderOutputPattern(device.sounderGroupValue) }
+    }
+
+    return null
   }
 
   const ioGroupId = parseOutputGroupId(outputId, 'io-group', panel.id)
   if (ioGroupId !== undefined) {
-    return (
+    const matches =
       device.ioGroupId === ioGroupId ||
       panel.ioGroups
         .find((group) => group.groupId === ioGroupId)
         ?.members.some((member) => memberMatchesDevice(member, device)) === true
-    )
+    return matches ? {} : null
   }
 
-  return false
+  return null
 }
 
 function parseOutputGroupId(
@@ -100,4 +132,35 @@ function findPanel(project: FireProject, panelId: string): FirePanel | undefined
     }
   }
   return undefined
+}
+
+export function resolveSounderOutputPattern(value: unknown): SounderOutputPattern {
+  if (typeof value !== 'string') {
+    return 'pulse'
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'silent' || normalized === 'silence' || normalized === 'off') {
+    return 'silent'
+  }
+
+  if (
+    normalized === 'continuous' ||
+    normalized === 'continue' ||
+    normalized === 'continued' ||
+    normalized === 'on'
+  ) {
+    return 'continuous'
+  }
+
+  if (
+    normalized === 'intermittent' ||
+    normalized === 'pulse' ||
+    normalized === 'pulsed' ||
+    normalized === 'pulsing'
+  ) {
+    return 'pulse'
+  }
+
+  return 'pulse'
 }

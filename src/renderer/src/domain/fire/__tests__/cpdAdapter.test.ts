@@ -165,6 +165,31 @@ describe('adaptCpdExport', () => {
     })
   })
 
+  it('maps numeric CPD SounderMode values without warning noise', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        panelCount: 2,
+        panels: [
+          {
+            ...fixture.panels[0],
+            general: { ...fixture.panels[0].general, SounderMode: 0 }
+          },
+          {
+            panelNumber: 2,
+            panelModel: 'ControlPanel6004_N',
+            general: { PanelNumber: 2, SounderMode: 1 }
+          }
+        ]
+      },
+      1234
+    )
+
+    expect(result.network.panels[0].general.sounderMode).toBe('Programmed')
+    expect(result.network.panels[1].general.sounderMode).toBe('Preset')
+    expect(result.issues.map((issue) => issue.code)).not.toContain('sounder-mode-unknown')
+  })
+
   it('normalizes device ids by panel, loop, and address and preserves raw rows', () => {
     const result = adaptCpdExport(fixture, 1234)
 
@@ -210,6 +235,31 @@ describe('adaptCpdExport', () => {
     })
   })
 
+  it('treats SelectedDisablement as a disabled device source', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          {
+            ...fixture.devices[0],
+            disabled: false,
+            selectedDisablement: true,
+            raw: {
+              ...fixture.devices[0].raw,
+              DeviceDisabled: false,
+              SelectedDisablement: true
+            }
+          }
+        ]
+      },
+      1234
+    )
+
+    expect(result.devices[0]).toMatchObject({
+      disabled: true
+    })
+  })
+
   it('maps zone, sounder group, and I/O group data onto the panel', () => {
     const result = adaptCpdExport(fixture, 1234)
     const panel = result.network.panels[0]
@@ -249,6 +299,49 @@ describe('adaptCpdExport', () => {
       ],
       raw: fixture.ioGroups[0].raw
     })
+  })
+
+  it('preserves non-addressable sounder channel modes from CPD sounder groups', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        sounderGroups: [
+          {
+            ...fixture.sounderGroups[0],
+            raw: {
+              GroupId: 7,
+              CIE: 1,
+              NonAddressable1: 'Intermittent',
+              NonAddressable2: 'Silent'
+            }
+          }
+        ]
+      },
+      1234
+    )
+
+    expect(result.network.panels[0].sounderGroups[0].nonAddressableMembers).toEqual([
+      {
+        cieId: 1,
+        nonAddressable1: true,
+        status: 'Intermittent',
+        raw: {
+          CIE: 1,
+          channel: 'nonAddressable1',
+          status: 'Intermittent'
+        }
+      },
+      {
+        cieId: 1,
+        nonAddressable2: true,
+        status: 'Silent',
+        raw: {
+          CIE: 1,
+          channel: 'nonAddressable2',
+          status: 'Silent'
+        }
+      }
+    ])
   })
 
   it('normalizes CPD relation fields from raw and legacy group member tables', () => {
@@ -414,6 +507,189 @@ describe('adaptCpdExport', () => {
     )
   })
 
+  it('assigns extractor rows without top-level panel numbers using panel-scoped devices and members', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        panelCount: 2,
+        panels: [
+          fixture.panels[0],
+          {
+            panelNumber: 2,
+            panelModel: 'ControlPanel6004_N',
+            general: { PanelNumber: 2, SounderMode: 'Programmed' }
+          }
+        ],
+        devices: [
+          {
+            panelNumber: 1,
+            loopId: 1,
+            address: 10,
+            type: 'manual_call_point',
+            zone: 1,
+            raw: { PhysicalAddress: 10 }
+          },
+          {
+            panelNumber: 1,
+            loopId: 1,
+            address: 90,
+            type: 'sounder',
+            zone: 1,
+            sounderGroup: 5,
+            raw: { PhysicalAddress: 90 }
+          },
+          {
+            panelNumber: 1,
+            loopId: 1,
+            address: 91,
+            type: 'input_output',
+            zone: 1,
+            ioGroup: 6,
+            raw: { PhysicalAddress: 91 }
+          },
+          {
+            panelNumber: 2,
+            loopId: 1,
+            address: 10,
+            type: 'manual_call_point',
+            zone: 2,
+            raw: { PhysicalAddress: 10 }
+          },
+          {
+            panelNumber: 2,
+            loopId: 1,
+            address: 90,
+            type: 'sounder',
+            zone: 2,
+            sounderGroup: 5,
+            raw: { PhysicalAddress: 90 }
+          },
+          {
+            panelNumber: 2,
+            loopId: 1,
+            address: 91,
+            type: 'input_output',
+            zone: 2,
+            ioGroup: 6,
+            raw: { PhysicalAddress: 91 }
+          }
+        ],
+        zones: [
+          {
+            zoneNumber: 1,
+            text: 'Panel 1 zone',
+            enabled: true,
+            sounderGroupAlarm1: 5,
+            ioGroup1Alarm1: 6,
+            raw: {}
+          },
+          {
+            zoneNumber: 2,
+            text: 'Panel 2 zone',
+            enabled: true,
+            sounderGroupAlarm1: 5,
+            ioGroup1Alarm1: 6,
+            raw: {}
+          }
+        ],
+        sounderGroups: [
+          {
+            groupId: 5,
+            title: 'Configured sounder group',
+            members: [
+              {
+                panelNumber: 1,
+                loopId: 1,
+                physicalAddress: 90,
+                description: 'Panel 1 sounder member',
+                raw: {}
+              },
+              {
+                panelNumber: 2,
+                loopId: 1,
+                physicalAddress: 90,
+                description: 'Panel 2 sounder member',
+                raw: {}
+              }
+            ],
+            raw: {}
+          }
+        ],
+        ioGroups: [
+          {
+            groupId: 6,
+            members: [
+              {
+                panelNumber: 1,
+                loopId: 1,
+                physicalAddress: 91,
+                description: 'Panel 1 IO member',
+                raw: {}
+              },
+              {
+                panelNumber: 2,
+                loopId: 1,
+                physicalAddress: 91,
+                description: 'Panel 2 IO member',
+                raw: {}
+              }
+            ],
+            raw: {}
+          }
+        ]
+      },
+      1234
+    )
+
+    const panel1 = result.network.panels[0]
+    const panel2 = result.network.panels[1]
+
+    expect(panel1.zones.find((zone) => zone.zoneNumber === 1)).toMatchObject({
+      text: 'Panel 1 zone',
+      sounderGroupAlarm1: 5,
+      ioGroup1Alarm1: 6
+    })
+    expect(panel2.zones.find((zone) => zone.zoneNumber === 2)).toMatchObject({
+      text: 'Panel 2 zone',
+      sounderGroupAlarm1: 5,
+      ioGroup1Alarm1: 6
+    })
+    expect(panel1.sounderGroups.find((group) => group.groupId === 5)).toMatchObject({
+      title: 'Configured sounder group',
+      addressableMembers: [
+        expect.objectContaining({
+          loopId: 1,
+          physicalAddress: 90,
+          description: 'Panel 1 sounder member'
+        })
+      ]
+    })
+    expect(panel2.sounderGroups.find((group) => group.groupId === 5)).toMatchObject({
+      title: 'Configured sounder group',
+      addressableMembers: [
+        expect.objectContaining({
+          loopId: 1,
+          physicalAddress: 90,
+          description: 'Panel 2 sounder member'
+        })
+      ]
+    })
+    expect(panel1.ioGroups.find((group) => group.groupId === 6)?.members).toEqual([
+      expect.objectContaining({
+        loopId: 1,
+        physicalAddress: 91,
+        description: 'Panel 1 IO member'
+      })
+    ])
+    expect(panel2.ioGroups.find((group) => group.groupId === 6)?.members).toEqual([
+      expect.objectContaining({
+        loopId: 1,
+        physicalAddress: 91,
+        description: 'Panel 2 IO member'
+      })
+    ])
+  })
+
   it('keeps only configured or device-referenced CPD zones', () => {
     const result = adaptCpdExport(
       {
@@ -426,14 +702,55 @@ describe('adaptCpdExport', () => {
           { ...fixture.zones[0], zoneNumber: 1, text: '1st Floor' },
           { ...fixture.zones[0], zoneNumber: 2, text: '2nd Floor' },
           { ...fixture.zones[0], zoneNumber: 3, text: '3rd Floor' },
-          { ...fixture.zones[0], zoneNumber: 4, text: '' },
-          { ...fixture.zones[0], zoneNumber: 5, text: '' }
+          {
+            ...fixture.zones[0],
+            zoneNumber: 4,
+            text: '',
+            sounderGroupAlarm1: 0,
+            sounderGroupAlarm2: 0,
+            ioGroup1Alarm1: 0,
+            ioGroup1Alarm2: 0
+          },
+          {
+            ...fixture.zones[0],
+            zoneNumber: 5,
+            text: '',
+            sounderGroupAlarm1: 0,
+            sounderGroupAlarm2: 0,
+            ioGroup1Alarm1: 0,
+            ioGroup1Alarm2: 0
+          }
         ]
       },
       1234
     )
 
     expect(result.network.panels[0].zones.map((zone) => zone.zoneNumber)).toEqual([1, 2, 3])
+  })
+
+  it('keeps output-configured CPD zones even when they have no text or current devices', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        zones: [
+          { ...fixture.zones[0], zoneNumber: 1, text: 'Device zone' },
+          {
+            zoneNumber: 8,
+            text: '',
+            enabled: true,
+            sounderGroupAlarm1: 7,
+            ioGroup1Alarm1: 9,
+            raw: {}
+          }
+        ]
+      },
+      1234
+    )
+
+    expect(result.network.panels[0].zones.find((zone) => zone.zoneNumber === 8)).toMatchObject({
+      sounderGroupAlarm1: 7,
+      ioGroup1Alarm1: 9
+    })
   })
 
   it('synthesizes panel zones from device zone assignments when CPD zone rows are missing', () => {
