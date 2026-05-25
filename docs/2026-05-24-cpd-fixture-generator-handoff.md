@@ -66,6 +66,8 @@ Report path:
 
 The 3D view no longer mounts the old `SimulationPanel`, so browser audio is now owned by `Viewer3D.ts` and gated through `shouldPlaySimulationAlarmAudio`. This gate intentionally ignores `soundState="fire"` while all sounder outputs are still `delayActive`; audio starts only after an addressable or non-addressable sounder output becomes `active`.
 
+`Viewer3D.ts` delegates Web Audio node ownership to `simulationAudioRuntime.ts`. When sound stops, the runtime first drives gain to 0, then stops/disconnects the oscillator, disconnects gain, closes the `AudioContext`, and clears node references. This prevents the browser or Electron audio graph from continuing to ring after a buzzer silence, restore, reset, view unmount, or sound-disabled transition.
+
 The 3D browser harness now mounts `Viewer3D` with `6002-delay-edge-fields`, activates Zone 1 address `04`, and verifies:
 
 - before countdown expiry: Sounder Group 1 is `delayActive`, remaining delay is 60 seconds, active output count is 0, and audio gate is false;

@@ -92,3 +92,21 @@ Re-implement delayed sounder activation in the 3D simulator so `fixtures/cpd/600
   - Completion notes:
     - Git staging/commit is scoped to this task's implementation, 3D runtime dependencies, tests, task file, and handoff notes.
     - Pre-existing unrelated dirty files, build output churn, cache files, and local `.codex-dev-run` artifacts are left unstaged unless they are already part of the 3D runtime surface required by this task.
+
+## Follow-up Fix: 2026-05-25 3D audio could keep ringing after sounder activation
+
+- [x] Reproduced the lifecycle gap in code and test coverage.
+  - Root cause: `Viewer3D.ts` owned a raw `OscillatorNode` directly and stopped it with `stop()`/`disconnect()` only. The stop path did not first mute gain, did not close/reset the `AudioContext`, and was not covered by a lifecycle test.
+- [x] Added regression coverage.
+  - `simulationAudioRuntime.test.ts` proves stopping sound mutes the gain to 0, stops/disconnects the oscillator, disconnects gain, closes the audio context, and can start again with a fresh oscillator.
+- [x] Fixed the 3D audio lifecycle.
+  - Added `simulationAudioRuntime.ts`.
+  - `Viewer3D.ts` now delegates all browser audio start/stop behavior to the runtime helper.
+  - Stop now zeroes gain before stopping, disconnects the graph, closes the context, and clears local node references.
+- [x] Verified.
+  - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/simulationAudioRuntime.test.ts src/renderer/src/domain/fire/__tests__/simulationAudio.test.ts`.
+  - Verified: `npm run test`.
+  - Verified: `node .\scripts\viewer3d-fixture-browser-check.mjs`.
+  - Verified: `npm run lint`.
+  - Verified: `npm run typecheck`.
+  - Verified: `npm run build`.

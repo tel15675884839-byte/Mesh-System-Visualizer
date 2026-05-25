@@ -11,6 +11,7 @@ import {
   type Viewer3DHighlightSelection
 } from '../../domain/fire/viewer3DHighlight'
 import { shouldPlaySimulationAlarmAudio } from '../../domain/fire/simulationAudio'
+import { createSimulationAudioRuntime } from '../../domain/fire/simulationAudioRuntime'
 import { createViewer3DScene } from './Viewer3DScene'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 
@@ -27,9 +28,7 @@ export default defineComponent({
     const highlightTargetId = ref<string | null>(null)
     const contextMenu = ref({ visible: false, x: 0, y: 0, deviceId: null as string | null })
     let simulationTickTimer: number | undefined
-    let audioContext: AudioContext | null = null
-    let oscillator: OscillatorNode | null = null
-    let gainNode: GainNode | null = null
+    const simulationAudioRuntime = createSimulationAudioRuntime(window)
 
     const hiddenBuildingIds = ref(new Set<string>())
     const hiddenFloorIds = ref(new Set<string>())
@@ -199,7 +198,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       stopSimulationTicking()
-      stopSimulationAudio()
+      simulationAudioRuntime.stop()
       cleanupScene()
       store.exitSimulationMode()
     })
@@ -249,57 +248,10 @@ export default defineComponent({
     watch(
       [shouldPlay3DSimulationAudio, () => simulationState.value.soundState],
       ([shouldPlay, soundState]) => {
-        syncSimulationAudio(shouldPlay, soundState)
+        simulationAudioRuntime.sync(shouldPlay, soundState)
       },
       { immediate: true }
     )
-
-    function syncSimulationAudio(shouldPlay: boolean, soundState: string): void {
-      if (!shouldPlay) {
-        stopSimulationAudio()
-        return
-      }
-
-      const context = ensureAudioContext()
-      if (!context) return
-
-      if (!oscillator || !gainNode) {
-        oscillator = context.createOscillator()
-        gainNode = context.createGain()
-        oscillator.type = soundState === 'fault' ? 'sawtooth' : 'square'
-        gainNode.gain.value = 0.035
-        oscillator.connect(gainNode)
-        gainNode.connect(context.destination)
-        oscillator.start()
-      }
-
-      oscillator.frequency.setTargetAtTime(
-        soundState === 'fault' ? 420 : 880,
-        context.currentTime,
-        0.02
-      )
-    }
-
-    function ensureAudioContext(): AudioContext | null {
-      if (audioContext) return audioContext
-
-      const AudioContextCtor =
-        window.AudioContext ??
-        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextCtor) return null
-
-      audioContext = new AudioContextCtor()
-      void audioContext.resume()
-      return audioContext
-    }
-
-    function stopSimulationAudio(): void {
-      oscillator?.stop()
-      oscillator?.disconnect()
-      gainNode?.disconnect()
-      oscillator = null
-      gainNode = null
-    }
 
     return {
       store,
