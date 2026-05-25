@@ -45,14 +45,7 @@ import {
   type DeviceStatusAppearance
 } from '../../domain/fire/deviceVisualState'
 import { getFireAssetHref } from '../../domain/fire/projectAssets'
-import {
-  getViewer3DMapOpacity,
-  shouldRenderViewer3DDevice,
-  shouldRenderViewer3DFloor,
-  shouldRenderViewer3DZoneArea,
-  type Viewer3DScopeKind,
-  type Viewer3DScopeSelection
-} from '../../domain/fire/viewer3DViewState'
+import { getViewer3DMapOpacity } from '../../domain/fire/viewer3DViewState'
 import { resolveViewer3DZoneAreas } from '../../domain/fire/viewer3DZoneArea'
 import DeviceContextMenu from './DeviceContextMenu.vue'
 
@@ -66,10 +59,60 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement | null>(null)
 const highlightKind = ref<Viewer3DHighlightKind>('none')
 const highlightTargetId = ref<string | null>(null)
-const viewScopeKind = ref<Viewer3DScopeKind>('all')
-const viewScopeTargetId = ref<string | null>(null)
-const opacityFloorId = ref<string | null>(null)
 const contextMenu = ref({ visible: false, x: 0, y: 0, deviceId: null as string | null })
+
+const hiddenBuildingIds = ref(new Set<string>())
+const hiddenFloorIds = ref(new Set<string>())
+
+function toggleBuildingVisibility(buildingId: string) {
+  const next = new Set(hiddenBuildingIds.value)
+  if (next.has(buildingId)) {
+    next.delete(buildingId)
+  } else {
+    next.add(buildingId)
+  }
+  hiddenBuildingIds.value = next
+}
+
+function toggleFloorVisibility(floorId: string) {
+  const next = new Set(hiddenFloorIds.value)
+  if (next.has(floorId)) {
+    next.delete(floorId)
+  } else {
+    next.add(floorId)
+  }
+  hiddenFloorIds.value = next
+}
+
+function getSortedFloors(building: FireBuilding) {
+  return [...building.floors].sort((a, b) => b.levelIndex - a.levelIndex)
+}
+
+function getBuildingOpacity(building: FireBuilding): number {
+  if (building.floors.length === 0) return mapOpacity3D.value
+  const firstOverride = building.floors.find((f) => f.mapOpacity3D !== undefined)
+  return firstOverride?.mapOpacity3D ?? mapOpacity3D.value
+}
+
+function setBuildingOpacity(building: FireBuilding, event: Event) {
+  const value = parseFloat((event.target as HTMLInputElement).value)
+  building.floors.forEach((f) => {
+    store.setFloorMapOpacity3D(f.id, value)
+  })
+}
+
+function getFloorOpacity(floor: FireFloor): number {
+  return floor.mapOpacity3D ?? mapOpacity3D.value
+}
+
+function setFloorOpacity(floor: FireFloor, event: Event) {
+  const value = parseFloat((event.target as HTMLInputElement).value)
+  store.setFloorMapOpacity3D(floor.id, value)
+}
+
+function setHighlightKind(kind: Viewer3DHighlightKind) {
+  highlightKind.value = kind
+}
 
 let scene: THREE.Scene | null = null
 let camera: THREE.PerspectiveCamera | null = null
@@ -119,48 +162,7 @@ const mapOpacity3D = computed({
   get: () => project.value.viewSettings.mapOpacity3D ?? 1,
   set: (value: number) => store.setMapOpacity3D(value)
 })
-const buildingScopeOptions = computed(() =>
-  project.value.buildings.map((building) => ({
-    id: building.id,
-    label: building.name
-  }))
-)
-const floorScopeOptions = computed(() =>
-  project.value.buildings.flatMap((building) =>
-    building.floors.map((floor) => ({
-      id: floor.id,
-      label: `${building.name} / ${floor.name}`
-    }))
-  )
-)
-const scopeOptions = computed(() => {
-  if (viewScopeKind.value === 'building') {
-    return buildingScopeOptions.value
-  }
 
-  if (viewScopeKind.value === 'floor') {
-    return floorScopeOptions.value
-  }
-
-  return []
-})
-const showScopeTargetPicker = computed(() => viewScopeKind.value !== 'all')
-const viewScopeSelection = computed<Viewer3DScopeSelection>(() => ({
-  kind: viewScopeKind.value,
-  targetId: viewScopeTargetId.value
-}))
-const opacityFloor = computed(() =>
-  project.value.buildings
-    .flatMap((building) => building.floors)
-    .find((floor) => floor.id === opacityFloorId.value)
-)
-const floorMapOpacity3D = computed({
-  get: () => opacityFloor.value?.mapOpacity3D ?? mapOpacity3D.value,
-  set: (value: number) => {
-    if (!opacityFloorId.value) return
-    store.setFloorMapOpacity3D(opacityFloorId.value, value)
-  }
-})
 const highlightOptions = computed(() =>
   getViewer3DHighlightOptions(project.value, highlightKind.value)
 )
@@ -185,29 +187,7 @@ const highlightSelection = computed<Viewer3DHighlightSelection>(() => ({
   kind: highlightKind.value,
   targetId: highlightTargetId.value
 }))
-const relationContextDeviceIds = computed(() => {
-  if (
-    highlightKind.value === 'none' ||
-    highlightKind.value === 'type' ||
-    !highlightTargetId.value
-  ) {
-    return new Set<string>()
-  }
 
-  return new Set(
-    project.value.devices
-      .filter((device) => isDeviceHighlighted(project.value, highlightSelection.value, device))
-      .map((device) => device.id)
-  )
-})
-const relationContextFloorIds = computed(() => {
-  const deviceIds = relationContextDeviceIds.value
-  return new Set(
-    project.value.devices.flatMap((device) =>
-      deviceIds.has(device.id) && device.placement.floorId ? [device.placement.floorId] : []
-    )
-  )
-})
 onMounted(() => {
   initScene()
   rebuildScene()
@@ -233,51 +213,13 @@ watch(
     simulationState,
     highlightKind,
     highlightTargetId,
-    viewScopeKind,
-    viewScopeTargetId
+    hiddenBuildingIds,
+    hiddenFloorIds
   ],
   () => {
     rebuildScene()
   },
   { deep: true }
-)
-
-watch(
-  viewScopeKind,
-  () => {
-    if (viewScopeKind.value === 'all') {
-      viewScopeTargetId.value = null
-      return
-    }
-
-    viewScopeTargetId.value = scopeOptions.value[0]?.id ?? null
-  },
-  { flush: 'post' }
-)
-
-watch(
-  scopeOptions,
-  (options) => {
-    if (viewScopeKind.value === 'all') {
-      viewScopeTargetId.value = null
-      return
-    }
-
-    if (!options.some((option) => option.id === viewScopeTargetId.value)) {
-      viewScopeTargetId.value = options[0]?.id ?? null
-    }
-  },
-  { immediate: true }
-)
-
-watch(
-  floorScopeOptions,
-  (options) => {
-    if (!options.some((option) => option.id === opacityFloorId.value)) {
-      opacityFloorId.value = options[0]?.id ?? null
-    }
-  },
-  { immediate: true }
 )
 
 watch(
@@ -315,14 +257,6 @@ watch([highlightKind, highlightTargetId], () => {
 
   requestAnimationFrame(() => focusSelectedZone())
 })
-
-function clearFloorMapOpacity3D(): void {
-  if (!opacityFloorId.value) {
-    return
-  }
-
-  store.setFloorMapOpacity3D(opacityFloorId.value, null)
-}
 
 function initScene(): void {
   const container = containerRef.value
@@ -391,10 +325,8 @@ function rebuildScene(): void {
 
         for (const area of areas) {
           if (
-            !shouldRenderViewer3DZoneArea({
-              area,
-              scope: viewScopeSelection.value
-            })
+            hiddenBuildingIds.value.has(area.buildingId) ||
+            hiddenFloorIds.value.has(area.floorId)
           ) {
             continue
           }
@@ -415,14 +347,9 @@ function rebuildScene(): void {
 }
 
 function renderBuilding(building: FireBuilding, buildingIndex: number): void {
+  if (hiddenBuildingIds.value.has(building.id)) return
   for (const floor of building.floors) {
-    if (
-      !shouldRenderViewer3DFloor({
-        floor,
-        scope: viewScopeSelection.value,
-        relationContextFloorIds: relationContextFloorIds.value
-      })
-    ) {
+    if (hiddenFloorIds.value.has(floor.id)) {
       continue
     }
 
@@ -667,11 +594,8 @@ function getDevicePoint(device: FireDevice): THREE.Vector3 | null {
   }
 
   if (
-    !shouldRenderViewer3DDevice({
-      device,
-      scope: viewScopeSelection.value,
-      relationContextDeviceIds: relationContextDeviceIds.value
-    })
+    hiddenBuildingIds.value.has(placement.buildingId) ||
+    hiddenFloorIds.value.has(placement.floorId)
   ) {
     return null
   }
@@ -760,10 +684,8 @@ function getSelectedZoneBounds(): THREE.Box3 | null {
   const bounds = new THREE.Box3()
   for (const area of selected.zone.visualAreas) {
     if (
-      !shouldRenderViewer3DZoneArea({
-        area,
-        scope: viewScopeSelection.value
-      })
+      hiddenBuildingIds.value.has(area.buildingId) ||
+      hiddenFloorIds.value.has(area.floorId)
     ) {
       continue
     }
@@ -1016,104 +938,166 @@ function disposeMaterial(material: THREE.Material): void {
 
 <template>
   <section ref="containerRef" class="viewer-3d">
-    <div class="viewer-toolbar" @pointerdown.stop @wheel.stop>
-      <div class="toolbar-row floor-row">
-        <span class="toolbar-label">{{ t('fire.viewer3d.floorSpacing') }}</span>
-        <el-slider
-          v-model="floorSpacing3D"
-          class="floor-slider"
-          size="small"
-          :min="12"
-          :max="96"
-          :step="2"
-          :show-tooltip="false"
+    <!-- Left Vertical Floor Spacing Slider - CAD Elevation Style -->
+    <div class="vertical-slider-container" @pointerdown.stop @wheel.stop>
+      <span class="v-slider-label">{{ t('fire.viewer3d.floorSpacing') }}</span>
+      <div class="slider-track-v">
+        <input
+          type="range"
+          class="custom-slider-vertical"
+          min="12"
+          max="96"
+          v-model.number="floorSpacing3D"
         />
-        <span class="toolbar-value">{{ floorSpacing3D }}</span>
+      </div>
+      <span class="v-slider-val">{{ floorSpacing3D }}</span>
+    </div>
+
+    <!-- Right 3D Control Panel (Cohesive UI style) -->
+    <div class="control-panel-3d" @pointerdown.stop @wheel.stop>
+      <!-- Section A: Drawing Controls -->
+      <h4 class="panel-section-title">{{ t('fire.viewer3d.drawingControl') || '图纸独立控制' }}</h4>
+      <div class="drawing-list">
+        <div v-for="b in project.buildings" :key="b.id" class="drawing-item">
+          <div class="item-header">
+            <span class="item-title-wrap">
+              <!-- Building Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="building-icon">
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+                <line x1="9" y1="22" x2="9" y2="16" />
+                <line x1="15" y1="22" x2="15" y2="16" />
+                <line x1="9" y1="16" x2="15" y2="16" />
+                <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01" />
+              </svg>
+              <span>{{ b.name }}</span>
+            </span>
+            <div class="item-actions">
+              <button
+                class="eye-btn"
+                :class="{ hidden: hiddenBuildingIds.has(b.id) }"
+                @click="toggleBuildingVisibility(b.id)"
+              >
+                <svg v-if="!hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              </button>
+              <div class="inline-slider-container">
+                <input
+                  type="range"
+                  class="inline-slider"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  :value="getBuildingOpacity(b)"
+                  :disabled="hiddenBuildingIds.has(b.id)"
+                  @input="setBuildingOpacity(b, $event)"
+                />
+                <span class="inline-val">{{ Math.round(getBuildingOpacity(b) * 100) }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Floor Sub-list -->
+          <div class="floor-sublist">
+            <div v-for="f in getSortedFloors(b)" :key="f.id" class="floor-item">
+              <span class="floor-title">{{ f.name }}</span>
+              <div class="item-actions">
+                <button
+                  class="eye-btn"
+                  :class="{ hidden: hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id) }"
+                  :disabled="hiddenBuildingIds.has(b.id)"
+                  @click="toggleFloorVisibility(f.id)"
+                >
+                  <svg v-if="!hiddenFloorIds.has(f.id) && !hiddenBuildingIds.has(b.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                </button>
+                <div class="inline-slider-container">
+                  <input
+                    type="range"
+                    class="inline-slider"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    :value="getFloorOpacity(f)"
+                    :disabled="hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id)"
+                    @input="setFloorOpacity(f, $event)"
+                  />
+                  <span class="inline-val">{{ Math.round(getFloorOpacity(f) * 100) }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="toolbar-row opacity-row">
-        <span class="toolbar-label">{{ t('fire.viewer3d.mapOpacity') }}</span>
-        <el-slider
-          v-model="mapOpacity3D"
-          class="opacity-slider"
-          size="small"
-          :min="0"
-          :max="1"
-          :step="0.05"
-          :show-tooltip="false"
-        />
-        <span class="toolbar-value">{{ Math.round(mapOpacity3D * 100) }}%</span>
-        <el-select
-          v-model="opacityFloorId"
-          class="floor-override-select"
-          size="small"
-          filterable
-          :placeholder="t('fire.viewer3d.floorOverride')"
-        >
-          <el-option
-            v-for="option in floorScopeOptions"
-            :key="option.id"
-            :label="option.label"
-            :value="option.id"
-          />
-        </el-select>
-        <el-slider
-          v-model="floorMapOpacity3D"
-          class="opacity-slider"
-          size="small"
-          :disabled="!opacityFloorId"
-          :min="0"
-          :max="1"
-          :step="0.05"
-          :show-tooltip="false"
-        />
-        <el-button size="small" :disabled="!opacityFloorId" @click="clearFloorMapOpacity3D">
-          {{ t('fire.viewer3d.useGlobal') }}
-        </el-button>
-      </div>
+      <!-- Section B: Highlights -->
+      <h4 class="panel-section-title">{{ t('fire.viewer3d.highlight') }}</h4>
+      <div class="highlight-group">
+        <div class="segmented-v3">
+          <!-- None -->
+          <button :class="['segment-btn-v3', { active: highlightKind === 'none' }]" @click="setHighlightKind('none')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+            {{ t('fire.viewer3d.none') }}
+          </button>
+          <!-- Loop -->
+          <button :class="['segment-btn-v3', { active: highlightKind === 'loop' }]" @click="setHighlightKind('loop')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="8" />
+              <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+              <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="20" r="1.5" fill="currentColor" />
+              <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+            {{ t('fire.viewer3d.loop') }}
+          </button>
+          <!-- Zone -->
+          <button :class="['segment-btn-v3', { active: highlightKind === 'zone' }]" @click="setHighlightKind('zone')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3.5 3.5" />
+              <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+            </svg>
+            {{ t('fire.viewer3d.zone') }}
+          </button>
+          <!-- Sounder Group -->
+          <button :class="['segment-btn-v3', { active: highlightKind === 'sounderGroup' }]" @click="setHighlightKind('sounderGroup')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              <path d="M22 8a7.92 7.92 0 0 0-.7-3" />
+              <path d="M22 14a7.92 7.92 0 0 1-.7 3" />
+              <path d="M2 8a7.92 7.92 0 0 1 .7-3" />
+              <path d="M2 14a7.92 7.92 0 0 0 .7 3" />
+            </svg>
+            {{ t('fire.viewer3d.sounderGroup') }}
+          </button>
+          <!-- IO Group -->
+          <button :class="['segment-btn-v3', { active: highlightKind === 'ioGroup' }]" @click="setHighlightKind('ioGroup')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+              <line x1="5.5" y1="12" x2="11" y2="12" />
+              <line x1="11" y1="12" x2="17.5" y2="4" />
+            </svg>
+            {{ t('fire.viewer3d.ioGroup') }}
+          </button>
+        </div>
 
-      <div class="toolbar-row scope-row">
-        <span class="toolbar-label">{{ t('fire.viewer3d.scope') }}</span>
-        <el-radio-group v-model="viewScopeKind" size="small">
-          <el-radio-button value="all">{{ t('fire.viewer3d.all') }}</el-radio-button>
-          <el-radio-button value="building">{{ t('fire.viewer3d.building') }}</el-radio-button>
-          <el-radio-button value="floor">{{ t('fire.viewer3d.floor') }}</el-radio-button>
-        </el-radio-group>
-        <el-select
-          v-if="showScopeTargetPicker"
-          v-model="viewScopeTargetId"
-          class="scope-select"
-          size="small"
-          filterable
-          :placeholder="t('fire.viewer3d.selectScope')"
-          :empty-text="t('fire.viewer3d.noTargets')"
-        >
-          <el-option
-            v-for="option in scopeOptions"
-            :key="option.id"
-            :label="option.label"
-            :value="option.id"
-          />
-        </el-select>
-      </div>
-
-      <div class="toolbar-row highlight-row">
-        <span class="toolbar-label">{{ t('fire.viewer3d.highlight') }}</span>
-        <el-radio-group v-model="highlightKind" size="small">
-          <el-radio-button value="none">{{ t('fire.viewer3d.none') }}</el-radio-button>
-          <el-radio-button value="type">{{ t('fire.viewer3d.type') }}</el-radio-button>
-          <el-radio-button value="loop">{{ t('fire.viewer3d.loop') }}</el-radio-button>
-          <el-radio-button value="zone">{{ t('fire.viewer3d.zone') }}</el-radio-button>
-          <el-radio-button value="sounderGroup">{{
-            t('fire.viewer3d.sounderGroup')
-          }}</el-radio-button>
-          <el-radio-button value="ioGroup">{{ t('fire.viewer3d.ioGroup') }}</el-radio-button>
-        </el-radio-group>
-        <div
-          v-if="showHighlightTargetPicker"
-          class="target-picker"
-          :class="{ 'needs-target': highlightKind === 'zone' && !highlightTargetId }"
-        >
+        <!-- Target Picker Dropdown -->
+        <div v-if="showHighlightTargetPicker" class="target-picker-container">
           <span class="target-label">{{ highlightTargetLabel }}</span>
           <el-select
             v-model="highlightTargetId"
@@ -1182,82 +1166,326 @@ function disposeMaterial(material: THREE.Material): void {
   background: #eef2f7;
 }
 
-.viewer-toolbar {
+.vertical-slider-container {
   position: absolute;
-  top: 12px;
   left: 12px;
+  top: 12px;
+  bottom: 12px;
   z-index: 4;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(920px, calc(100% - 24px));
-  padding: 8px 10px;
+  background: rgba(248, 250, 252, 0.92);
   border: 1px solid rgba(148, 163, 184, 0.42);
   border-radius: 8px;
-  background: rgba(248, 250, 252, 0.92);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  width: 46px;
 }
 
-.toolbar-row {
+.v-slider-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #64748b;
+  writing-mode: vertical-lr;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.v-slider-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.slider-track-v {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.custom-slider-vertical {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  width: 200px;
+  height: 20px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(270deg);
+  margin: 0;
+  padding: 0;
+}
+
+.custom-slider-vertical::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+.custom-slider-vertical::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563eb;
+  cursor: pointer;
+  margin-top: -4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease;
+}
+
+.custom-slider-vertical::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.control-panel-3d {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  bottom: 12px;
+  z-index: 4;
+  width: 320px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.panel-section-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding-bottom: 6px;
+}
+
+.drawing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawing-item {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.item-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
   min-width: 0;
 }
 
-.toolbar-label {
-  flex: 0 0 auto;
-  min-width: 78px;
-  color: #475569;
-  font-size: 12px;
+.item-title-wrap span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.building-icon {
+  width: 12px;
+  height: 12px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eye-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.eye-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.eye-btn.hidden {
+  color: #cbd5e1;
+}
+
+.eye-btn:hover {
+  color: #2563eb;
+}
+
+.eye-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.inline-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 90px;
+}
+
+.inline-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 99px;
+  outline: none;
+}
+
+.inline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563eb;
+  cursor: pointer;
+}
+
+.inline-slider:disabled {
+  background: #f1f5f9;
+  cursor: not-allowed;
+}
+
+.inline-slider:disabled::-webkit-slider-thumb {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.inline-val {
+  font-size: 9px;
   font-weight: 700;
-}
-
-.floor-slider {
-  width: 210px;
-}
-
-.opacity-slider {
-  width: 120px;
-}
-
-.floor-override-select,
-.scope-select {
-  width: 210px;
-}
-
-.toolbar-value {
-  flex: 0 0 34px;
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 700;
+  color: #64748b;
+  min-width: 26px;
   text-align: right;
 }
 
-.highlight-row {
-  flex-wrap: wrap;
+.floor-sublist {
+  margin-top: 6px;
+  padding-left: 12px;
+  border-left: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.opacity-row,
-.scope-row {
-  flex-wrap: wrap;
+.floor-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 11px;
 }
 
-.target-picker {
+.floor-title {
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.highlight-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.segmented-v3 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segment-btn-v3 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 2px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.segment-btn-v3 svg {
+  width: 14px;
+  height: 14px;
+}
+
+.segment-btn-v3:hover {
+  color: #2563eb;
+}
+
+.segment-btn-v3.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.target-picker-container {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  border-radius: 6px;
-  background: #ffffff;
-}
-
-.target-picker.needs-target {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: #eff6ff;
+  width: 100%;
 }
 
 .target-label {
@@ -1268,15 +1496,13 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 .highlight-select {
-  width: 260px;
+  flex: 1;
+  min-width: 0;
 }
 
 .target-hint {
-  flex: 0 1 auto;
-  min-width: 110px;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  color: #64748b;
 }
 
 .viewer-3d :deep(canvas) {
@@ -1286,28 +1512,13 @@ function disposeMaterial(material: THREE.Material): void {
 }
 
 @media (max-width: 720px) {
-  .viewer-toolbar {
-    right: 8px;
-    left: 8px;
+  .control-panel-3d {
     width: auto;
-  }
-
-  .toolbar-label {
-    min-width: 64px;
-  }
-
-  .floor-slider,
-  .opacity-slider,
-  .floor-override-select,
-  .scope-select,
-  .highlight-select {
-    width: 100%;
-    min-width: 180px;
-  }
-
-  .target-picker {
-    width: 100%;
-    flex-wrap: wrap;
+    left: 70px;
+    right: 12px;
+    bottom: 12px;
+    height: auto;
+    max-height: 50%;
   }
 }
 </style>
