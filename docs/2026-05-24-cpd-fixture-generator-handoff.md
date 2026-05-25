@@ -67,6 +67,8 @@ Real generated CPD/extractor data does not expose a separate `AlarmMode` value f
 
 For delayed Sounder behavior, the generated CPD must set Zone `DelayedSounders=true`; a global `SounderDelayMM/SS` value alone is not enough. `6002-zone-no-delayed-sounders.cpd` intentionally keeps a 60-second global Sounder Delay while Zone `DelayedSounders=false` to prove this distinction.
 
+`6002-delay-edge-fields.cpd` keeps Zone 1 Sounder Group activation delayed for all Zone 1 trigger devices, including manual call point address `04`. Manual call point override behavior remains isolated in `6002-manual-callpoint-override-delay.cpd`, so the delay-edge fixture can be used to test `DelayedSounders=true` without being masked by `OverrideDelays` or `SetEvacuateTimer`.
+
 The generator writes each fixture to a fresh temporary path and only replaces the final `.cpd` after successful serialization. This prevents a failed overwrite from leaving a 0-byte fixture file.
 
 ## Regeneration

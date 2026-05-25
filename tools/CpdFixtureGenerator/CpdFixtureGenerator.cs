@@ -52,11 +52,10 @@ namespace CpdFixtureGenerator
                     DelayedSounders = true,
                     SounderDelaySeconds = 60,
                     InputOutputDelaySeconds = 45,
-                    ManualOverride = true,
                     IoStage = true,
                     OptionalEdgeFields = true,
                     IoOverrideDelayAddress4 = true,
-                    SetEvacuateTimerAddress4 = true
+                    SetEvacuateTimerAddress4 = false
                 }),
             new FixtureDefinition(
                 "6002-realistic-building-composite.cpd",

@@ -93,11 +93,7 @@ function validateFixture(fileName, data, expected) {
     )
   }
 
-  if (
-    fileName.includes('manual-callpoint') ||
-    fileName.includes('delay-edge') ||
-    fileName.includes('realistic-building')
-  ) {
+  if (fileName.includes('manual-callpoint') || fileName.includes('realistic-building')) {
     assert(
       deviceByAddress(data, 4)?.overrideDelays === true,
       `${fileName}: expected address 4 OverrideDelays=true`

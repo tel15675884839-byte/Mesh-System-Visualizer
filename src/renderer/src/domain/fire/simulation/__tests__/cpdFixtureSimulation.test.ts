@@ -70,6 +70,18 @@ describe('generated CPD fixtures drive simulator cause and effect', () => {
     expect(outputs.systemState).toBe('fireAlarm')
   })
 
+  it('keeps Zone 1 manual call point delayed in the delay edge fixture', () => {
+    const result = adaptFixture('6002-delay-edge-fields.json')
+    const panelId = result.network.panels[0].id
+    const outputs = trigger(result, 4)
+
+    expect(outputById(outputs, `sounder-group:${panelId}:1`)).toMatchObject({
+      state: 'delayActive',
+      remainingDelaySeconds: 60,
+      reason: 'zone-delayed-sounders'
+    })
+  })
+
   it('bypasses global sounder delay when the Zone does not enable Delayed Sounders', () => {
     const result = adaptFixture('6002-zone-no-delayed-sounders.json')
     const panelId = result.network.panels[0].id

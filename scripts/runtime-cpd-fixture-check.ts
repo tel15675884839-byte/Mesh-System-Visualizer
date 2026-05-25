@@ -68,6 +68,7 @@ function sortedNumbers(values: number[]): number[] {
 
 const composite = adaptFixture('6002-realistic-building-composite.json')
 const globalDelay = adaptFixture('6002-global-sounder-delay.json')
+const delayEdge = adaptFixture('6002-delay-edge-fields.json')
 const noDelayedSounders = adaptFixture('6002-zone-no-delayed-sounders.json')
 const manualOverride = adaptFixture('6002-manual-callpoint-override-delay.json')
 const ioStage = adaptFixture('6002-io-stage-linkage.json')
@@ -84,6 +85,18 @@ assert(
   outputById(trigger(globalDelay, 1), `sounder-group:${globalPanelId}:1`).remainingDelaySeconds ===
     60,
   'global detector delay was not 60 seconds'
+)
+
+const delayEdgePanelId = delayEdge.network.panels[0].id
+const delayEdgeManualOutput = outputById(
+  trigger(delayEdge, 4),
+  `sounder-group:${delayEdgePanelId}:1`
+)
+assert(
+  delayEdgeManualOutput.state === 'delayActive' &&
+    delayEdgeManualOutput.remainingDelaySeconds === 60 &&
+    delayEdgeManualOutput.reason === 'zone-delayed-sounders',
+  'delay-edge Zone 1 manual call point did not keep the Zone sounder delay'
 )
 
 const noDelayedPanelId = noDelayedSounders.network.panels[0].id
@@ -137,6 +150,7 @@ const report: RuntimeResult = {
   },
   simulation: {
     detectorDelay: 'passed',
+    delayEdgeZone1ManualCallPointDelay: 'passed',
     zoneNoDelayedSounders: 'passed',
     manualOverride: 'passed',
     zoneStage2: 'passed',

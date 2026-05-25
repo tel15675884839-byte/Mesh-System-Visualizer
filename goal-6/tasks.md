@@ -118,3 +118,18 @@ Fix the generated `.cpd` fixture data so Zone-to-Sounder delayed activation corr
     - Requirement checklist reviewed: generated CPD now writes Zone `DelayedSounders=true` for delay fixtures; a 60-second non-delayed control fixture proves the negative case; simulator cause/effect and 3D mapping both distinguish true vs false.
     - Runtime evidence reports exist at `.codex-dev-run/cpd-fixture-runtime-report.json` and `.codex-dev-run/viewer3d-fixture-browser-report.json`.
     - No unrelated dirty worktree files were reverted.
+
+## Follow-up Fix: 2026-05-25 `6002-delay-edge-fields.cpd`
+
+- [x] Reproduced the reported no-delay symptom on Zone 1 address `04`.
+  - Evidence: Zone 1 detector/I/O addresses `01`, `02`, `03`, `07`, and `08` already delayed correctly, but address `04` was active immediately because the delay-edge fixture combined `OverrideDelays=true` and `SetEvacuateTimer=true` on the same manual call point.
+- [x] Added failing regression coverage.
+  - Test: `cpdFixtureSimulation.test.ts` now requires address `04` in `6002-delay-edge-fields.json` to keep the Zone Sounder Group in `delayActive` for 60 seconds.
+- [x] Fixed the generator.
+  - `6002-delay-edge-fields.cpd` no longer sets manual override or evacuate timer on address `04`; it still records the optional edge columns and keeps `IOOverrideDelay=true` for I/O-specific coverage.
+  - Manual call point override behavior remains covered by `6002-manual-callpoint-override-delay.cpd`.
+- [x] Regenerated and verified fixtures.
+  - Verified: `.\tools\CpdFixtureGenerator\generate.ps1`.
+  - Verified: `node .\scripts\verify-cpd-fixtures.mjs`.
+  - Verified: `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`.
+  - Verified: `node .\scripts\runtime-cpd-fixture-check.mjs`.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-05-25T01:54:10.7858195Z",
+  "generatedAt": "2026-05-25T05:55:26.0444039Z",
   "sourceTemplate": "Configurator templet project/6002.cpd",
   "fixtures": [
     {
@@ -60,7 +60,7 @@
     {
       "fileName": "6002-delay-edge-fields.cpd",
       "purpose": "Optional delay edge fields when supported by the source tables.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 45, "delayedSounders": true, "manualOverride": true, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 45, "delayedSounders": true, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
       "optionalFields": {
         "present": ["DelayedSounders", "IOOverrideDelay", "SetEvacuateTimer"],
         "skipped": []
