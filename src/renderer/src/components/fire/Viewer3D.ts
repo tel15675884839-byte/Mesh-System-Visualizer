@@ -1,9 +1,9 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Bell, MuteNotification, RefreshLeft } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireBuilding, FireFloor } from '../../domain/fire/types'
+import type { SimulationAction } from '../../domain/fire/simulation/engine'
 import { getEffectiveFloorHeight3D } from '../../domain/fire/viewer3DGeometry'
 import {
   getViewer3DHighlightOptions,
@@ -17,7 +17,7 @@ import DeviceContextMenu from './DeviceContextMenu.vue'
 
 export default defineComponent({
   name: 'Viewer3D',
-  components: { Bell, DeviceContextMenu, MuteNotification, RefreshLeft },
+  components: { DeviceContextMenu },
   emits: ['locateDevice'],
   setup() {
     const store = useFireProjectStore()
@@ -27,6 +27,7 @@ export default defineComponent({
     const highlightKind = ref<Viewer3DHighlightKind>('none')
     const highlightTargetId = ref<string | null>(null)
     const contextMenu = ref({ visible: false, x: 0, y: 0, deviceId: null as string | null })
+    const sounderDelaysEnabled = ref(false)
     let simulationTickTimer: number | undefined
     const simulationAudioRuntime = createSimulationAudioRuntime(window)
 
@@ -79,12 +80,56 @@ export default defineComponent({
       store.setFloorMapOpacity3D(floor.id, value)
     }
 
+    function getShortFloorName(name: string): string {
+      const match = name.match(/\d+/)
+      return match ? 'F' + match[0] : name.slice(0, 3)
+    }
+
     function setHighlightKind(kind: Viewer3DHighlightKind): void {
       highlightKind.value = kind
     }
 
-    function dispatchSimulation(type: 'evacuate' | 'buzzer-silence' | 'system-reset'): void {
-      store.dispatchSimulationAction({ type, at: Date.now() })
+    function dispatchSimulationAction(action: SimulationAction): void {
+      store.dispatchSimulationAction(action, {
+        sounderDelaysEnabled: sounderDelaysEnabled.value
+      })
+    }
+
+    function dispatchSimulation(type: 'buzzer-silence' | 'system-reset'): void {
+      dispatchSimulationAction({ type, at: Date.now() })
+    }
+
+    function isSounderOutputId(outputId: string): boolean {
+      if (
+        outputId.startsWith('sounder-group:') ||
+        outputId.startsWith('non-addressable-sounder:')
+      ) {
+        return true
+      }
+
+      if (!outputId.startsWith('device:')) {
+        return false
+      }
+
+      return deviceById.value.get(outputId.slice('device:'.length))?.isSounder === true
+    }
+
+    function toggleSounders(): void {
+      dispatchSimulationAction({
+        type: soundersActive.value ? 'sounder-silence' : 'evacuate',
+        at: Date.now()
+      })
+    }
+
+    function skipSounderDelays(): void {
+      dispatchSimulationAction({ type: 'skip-sounder-delays', at: Date.now() })
+    }
+
+    function toggleSounderDelays(): void {
+      sounderDelaysEnabled.value = !sounderDelaysEnabled.value
+      if (!sounderDelaysEnabled.value && hasDelayedSounderOutputs.value) {
+        skipSounderDelays()
+      }
     }
 
     function startSimulationTicking(): void {
@@ -135,6 +180,18 @@ export default defineComponent({
     )
     const deviceById = computed(
       () => new Map(project.value.devices.map((device) => [device.id, device]))
+    )
+    const hasDelayedSounderOutputs = computed(() =>
+      simulationState.value.outputs.some(
+        (output) => output.state === 'delayActive' && isSounderOutputId(output.outputId)
+      )
+    )
+    const soundersActive = computed(() =>
+      simulationState.value.outputs.some(
+        (output) =>
+          (output.state === 'active' || output.state === 'delayActive') &&
+          isSounderOutputId(output.outputId)
+      )
     )
     const shouldPlay3DSimulationAudio = computed(() =>
       shouldPlaySimulationAlarmAudio({
@@ -273,6 +330,9 @@ export default defineComponent({
       highlightTargetPlaceholder,
       highlightTargetEmptyText,
       deviceById,
+      sounderDelaysEnabled,
+      hasDelayedSounderOutputs,
+      soundersActive,
       contextDevice,
       hasActiveInput,
       hasActiveFault,
@@ -284,8 +344,13 @@ export default defineComponent({
       setBuildingOpacity,
       getFloorOpacity,
       setFloorOpacity,
+      getShortFloorName,
       setHighlightKind,
       dispatchSimulation,
+      dispatchSimulationAction,
+      toggleSounders,
+      toggleSounderDelays,
+      skipSounderDelays,
       initScene,
       rebuildScene,
       focusSelectedZone,
