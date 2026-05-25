@@ -954,181 +954,201 @@ function segmentTouchesDevice(
 <template>
   <section class="planner-2d" @click="closeContextMenu">
     <div class="canvas-shell" :class="{ 'has-map': mapAssetHref }">
-      <header class="planner-toolbar" @click.stop>
-        <!-- 1. 图纸楼层 (Drawing & Floor) -->
-        <div class="toolbar-section floor-controls" :aria-label="t('fire.planner.floor')">
-          <span class="section-tag">图纸楼层</span>
-          <div class="btn-group">
-            <el-tooltip :content="t('fire.planner.importDrawing')" placement="bottom">
-              <button class="toolbar-btn" @click="importDrawingForCurrentFloor">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
+      <!-- 左侧包裹容器 -->
+      <div class="left-sidebar-wrapper">
+        <!-- 1. Controls Panel (等宽 56px, 单列分组) -->
+        <div class="left-panel-base left-controls-panel">
+          <span class="panel-title-tag">Controls</span>
+          <div class="vertical-groups">
+            <!-- 组1: 图纸操作 (Upload / Clear) -->
+            <div class="button-pair-col" title="Drawing: Upload / Clear">
+              <el-tooltip :content="t('fire.planner.importDrawing')" placement="right">
+                <button
+                  class="toolbar-btn drawing-upload-btn"
+                  @click="importDrawingForCurrentFloor"
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </button>
-            </el-tooltip>
-            <el-tooltip :content="t('fire.planner.clearDrawing')" placement="bottom">
-              <button
-                class="toolbar-btn"
-                :disabled="!currentFloor?.mapAssetId"
-                @click="clearDrawing"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </button>
+              </el-tooltip>
+              <el-tooltip :content="t('fire.planner.clearDrawing')" placement="right">
+                <button
+                  class="toolbar-btn danger drawing-clear-btn"
+                  :disabled="!currentFloor?.mapAssetId"
+                  @click="clearDrawing"
                 >
-                  <path d="m20 20-5-5" />
-                  <path d="M12 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.5" />
-                  <path d="m8.5 12.5 4-4" />
-                  <path d="m11.5 15.5 4-4" />
-                </svg>
-              </button>
-            </el-tooltip>
-            <el-tooltip :content="t('fire.planner.addBuilding')" placement="bottom">
-              <button class="toolbar-btn" @click="addBuilding">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <path d="m20 20-5-5" />
+                    <path d="M12 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.5" />
+                    <path d="m8.5 12.5 4-4" />
+                  </svg>
+                </button>
+              </el-tooltip>
+            </div>
+
+            <!-- 组2: 楼栋操作 (Add / Delete) -->
+            <div class="button-pair-col" title="Building: Add / Delete">
+              <el-tooltip :content="t('fire.planner.addBuilding')" placement="right">
+                <button class="toolbar-btn" @click="addBuilding">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <rect x="4" y="2" width="8" height="20" rx="1" />
+                    <rect x="12" y="8" width="8" height="14" rx="1" />
+                  </svg>
+                  <span class="icon-badge plus"></span>
+                </button>
+              </el-tooltip>
+              <el-tooltip :content="t('fire.planner.deleteBuilding')" placement="right">
+                <button
+                  class="toolbar-btn danger"
+                  :disabled="!currentBuilding"
+                  @click="deleteBuilding"
                 >
-                  <rect x="4" y="2" width="8" height="20" rx="1" />
-                  <rect x="12" y="8" width="8" height="14" rx="1" />
-                  <line x1="6" y1="6" x2="6.01" y2="6" />
-                  <line x1="10" y1="6" x2="10.01" y2="6" />
-                  <line x1="6" y1="10" x2="6.01" y2="10" />
-                  <line x1="10" y1="10" x2="10.01" y2="10" />
-                  <line x1="6" y1="14" x2="6.01" y2="14" />
-                  <line x1="10" y1="14" x2="10.01" y2="14" />
-                  <line x1="6" y1="18" x2="6.01" y2="18" />
-                  <line x1="10" y1="18" x2="10.01" y2="18" />
-                  <line x1="14" y1="12" x2="14.01" y2="12" />
-                  <line x1="18" y1="12" x2="18.01" y2="12" />
-                  <line x1="14" y1="16" x2="14.01" y2="16" />
-                  <line x1="18" y1="16" x2="18.01" y2="16" />
-                  <circle cx="17" cy="4" r="3" />
-                  <line x1="17" y1="2" x2="17" y2="6" />
-                  <line x1="15" y1="4" x2="19" y2="4" />
-                </svg>
-              </button>
-            </el-tooltip>
-            <el-tooltip :content="t('fire.planner.deleteBuilding')" placement="bottom">
-              <button
-                class="toolbar-btn danger"
-                :disabled="!currentBuilding"
-                @click="deleteBuilding"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
-                >
-                  <rect x="4" y="2" width="8" height="20" rx="1" />
-                  <rect x="12" y="8" width="8" height="14" rx="1" />
-                  <line x1="6" y1="6" x2="6.01" y2="6" />
-                  <line x1="10" y1="6" x2="10.01" y2="6" />
-                  <line x1="6" y1="10" x2="6.01" y2="10" />
-                  <line x1="10" y1="10" x2="10.01" y2="10" />
-                  <line x1="6" y1="14" x2="6.01" y2="14" />
-                  <line x1="10" y1="14" x2="10.01" y2="14" />
-                  <line x1="6" y1="18" x2="6.01" y2="18" />
-                  <line x1="10" y1="18" x2="10.01" y2="18" />
-                  <line x1="14" y1="12" x2="14.01" y2="12" />
-                  <line x1="18" y1="12" x2="18.01" y2="12" />
-                  <line x1="14" y1="16" x2="14.01" y2="16" />
-                  <line x1="18" y1="16" x2="18.01" y2="16" />
-                  <circle cx="17" cy="4" r="3" />
-                  <line x1="15" y1="4" x2="19" y2="4" />
-                </svg>
-              </button>
-            </el-tooltip>
-            <el-tooltip :content="t('fire.planner.addFloor')" placement="bottom">
-              <button class="toolbar-btn" @click="addFloor">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
-                >
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                  <circle cx="12" cy="7" r="1.5" fill="currentColor" />
-                  <line x1="12" y1="15" x2="12" y2="19" />
-                  <line x1="10" y1="17" x2="14" y2="17" />
-                </svg>
-              </button>
-            </el-tooltip>
-            <el-tooltip :content="t('fire.planner.deleteFloor')" placement="bottom">
-              <button class="toolbar-btn danger" :disabled="!currentFloor" @click="deleteFloor">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="svg-icon"
-                >
-                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                  <polyline points="2 17 12 22 22 17" />
-                  <polyline points="2 12 12 17 22 12" />
-                  <circle cx="12" cy="7" r="1.5" fill="currentColor" />
-                  <line x1="10" y1="17" x2="14" y2="17" />
-                </svg>
-              </button>
-            </el-tooltip>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <rect x="4" y="2" width="8" height="20" rx="1" />
+                    <rect x="12" y="8" width="8" height="14" rx="1" />
+                  </svg>
+                  <span class="icon-badge minus"></span>
+                </button>
+              </el-tooltip>
+            </div>
+
+            <!-- 组3: 楼层操作 (Add / Delete) -->
+            <div class="button-pair-col" title="Floor: Add / Delete">
+              <el-tooltip :content="t('fire.planner.addFloor')" placement="right">
+                <button class="toolbar-btn" @click="addFloor">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 12 12 17 22 12" />
+                  </svg>
+                  <span class="icon-badge plus"></span>
+                </button>
+              </el-tooltip>
+              <el-tooltip :content="t('fire.planner.deleteFloor')" placement="right">
+                <button class="toolbar-btn danger" :disabled="!currentFloor" @click="deleteFloor">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="svg-icon"
+                  >
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 12 12 17 22 12" />
+                  </svg>
+                  <span class="icon-badge minus"></span>
+                </button>
+              </el-tooltip>
+            </div>
           </div>
         </div>
 
-        <div class="toolbar-divider"></div>
+        <!-- 2. Floors Panel (等宽 56px, 原右侧切换器挪至此) -->
+        <div
+          v-if="
+            project.buildings.length > 0 &&
+            (project.buildings.length > 1 || sortedFloors.length > 0)
+          "
+          class="left-panel-base left-floors-panel"
+        >
+          <span class="panel-title-tag">Floors</span>
+          <!-- Building Selector -->
+          <div v-if="project.buildings.length > 1" class="building-tabs">
+            <button
+              v-for="b in project.buildings"
+              :key="b.id"
+              :class="['building-tab-btn', { active: selectedBuildingId === b.id }]"
+              @click="selectedBuildingId = b.id"
+            >
+              {{ b.name }}
+            </button>
+          </div>
 
+          <!-- Floor Buttons Stack -->
+          <div :class="['floor-grid', { 'multi-column': isMultiColumn }]">
+            <button
+              v-for="f in sortedFloors"
+              :key="f.id"
+              :class="[
+                'floor-btn',
+                { active: selectedFloorId === f.id, 'rect-btn': isMultiColumn }
+              ]"
+              :title="f.name"
+              @click="selectedFloorId = f.id"
+            >
+              {{ getFloorAbbr(f.name) }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <header class="planner-toolbar" @click.stop>
         <!-- 2. 探测防区 (Zones) -->
         <div class="toolbar-section zone-controls" :aria-label="t('fire.zoneToolbar.zone')">
-          <span class="section-tag">探测防区</span>
+          <span class="section-tag">Zones</span>
           <div class="btn-group">
             <el-select
               :model-value="selectedZoneId"
               size="small"
               class="zone-select-dock"
-              :placeholder="t('fire.zoneToolbar.zone')"
+              placeholder="Select Zone"
               clearable
               @update:model-value="(value) => (selectedZoneId = value || null)"
             >
               <el-option
                 v-for="zone in zones"
                 :key="zone.id"
-                :label="`Zone ${zone.zoneNumber}${zone.text ? ` - ${zone.text}` : ''}`"
+                :label="'Zone ' + zone.zoneNumber"
                 :value="zone.id"
               />
             </el-select>
@@ -1274,13 +1294,13 @@ function segmentTouchesDevice(
 
         <!-- 3. 回路连线 (Loops) -->
         <div class="toolbar-section loop-controls" :aria-label="t('fire.loopToolbar.loop')">
-          <span class="section-tag">回路连线</span>
+          <span class="section-tag">Loops</span>
           <div class="btn-group">
             <el-select
               :model-value="selectedLoopId"
               size="small"
               class="loop-select-dock"
-              :placeholder="t('fire.loopToolbar.loop')"
+              placeholder="Select Loop"
               clearable
               @update:model-value="(value) => (selectedLoopId = value || null)"
             >
@@ -1406,7 +1426,7 @@ function segmentTouchesDevice(
           class="toolbar-section view-controls-section"
           :aria-label="t('fire.planner.iconScale')"
         >
-          <span class="section-tag">视图缩放</span>
+          <span class="section-tag">Icon Size</span>
           <div class="btn-group">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -1438,38 +1458,6 @@ function segmentTouchesDevice(
           </div>
         </div>
       </header>
-      <!-- Floor Navigator Panel -->
-      <div
-        v-if="
-          project.buildings.length > 0 && (project.buildings.length > 1 || sortedFloors.length > 0)
-        "
-        class="floor-navigator-panel"
-      >
-        <!-- Building Selector -->
-        <div v-if="project.buildings.length > 1" class="building-tabs">
-          <button
-            v-for="b in project.buildings"
-            :key="b.id"
-            :class="['building-tab-btn', { active: selectedBuildingId === b.id }]"
-            @click="selectedBuildingId = b.id"
-          >
-            {{ b.name }}
-          </button>
-        </div>
-
-        <!-- Floor Buttons Stack -->
-        <div :class="['floor-grid', { 'multi-column': isMultiColumn }]">
-          <button
-            v-for="f in sortedFloors"
-            :key="f.id"
-            :class="['floor-btn', { active: selectedFloorId === f.id, 'rect-btn': isMultiColumn }]"
-            :title="f.name"
-            @click="selectedFloorId = f.id"
-          >
-            {{ getFloorAbbr(f.name) }}
-          </button>
-        </div>
-      </div>
 
       <svg
         ref="svgRef"
@@ -2089,26 +2077,102 @@ function segmentTouchesDevice(
   gap: 8px;
 }
 
-/* Floor Navigator Panel */
-.floor-navigator-panel {
+/* Left Sidebar Wrapper & Panels */
+.left-sidebar-wrapper {
   position: absolute;
   top: 15px;
-  right: 15px;
+  left: 15px;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  max-height: calc(100% - 30px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: auto;
-  max-height: calc(100% - 30px);
-  overflow-y: auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 15px;
+  pointer-events: none;
+}
+
+.left-panel-base {
+  width: 56px;
+  box-sizing: border-box;
+  padding: 10px 6px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  pointer-events: auto;
+}
+
+.panel-title-tag {
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  text-align: center;
+  line-height: 1;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.vertical-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 5px;
+}
+
+.button-pair-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawing-upload-btn {
+  color: #0071e3 !important;
+}
+
+.drawing-clear-btn {
+  color: #ef4444 !important;
+}
+
+.icon-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.2px solid #ffffff;
+}
+
+.icon-badge.plus {
+  background-color: #22c55e;
+}
+
+.icon-badge.minus {
+  background-color: #ef4444;
+}
+
+.left-floors-panel {
+  gap: 8px;
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.left-floors-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.left-controls-panel .toolbar-btn {
+  position: relative;
 }
 
 /* Building Tabs (Segmented Control style) */
