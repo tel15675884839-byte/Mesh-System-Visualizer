@@ -6,9 +6,7 @@ import {
   ArrowRight,
   DocumentAdd,
   FolderOpened,
-  Refresh,
-  VideoCamera,
-  MapLocation
+  Refresh
 } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
@@ -134,15 +132,29 @@ function errorMessage(error: unknown): string {
       <section class="center-pane">
         <div class="view-tabs">
           <el-radio-group v-model="viewMode" size="small">
-            <el-radio-button value="2d">
-              <el-icon><MapLocation /></el-icon>
+            <el-radio-button label="2d">
+              <el-icon>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z" />
+                  <path d="M9 3v15" />
+                  <path d="M15 6v15" />
+                </svg>
+              </el-icon>
               {{ t('fire.app.view2d') }}
             </el-radio-button>
-            <el-radio-button value="3d">
-              <el-icon><VideoCamera /></el-icon>
-              {{ t('fire.app.view3d') }}
-            </el-radio-button>
-          </el-radio-group>
+            <el-radio-button label="3d">
+              <el-icon>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 7v10" />
+                  <path d="M12 12v10" />
+                  <path d="M22 7v10" />
+                </svg>
+              </el-icon>
+            {{ t('fire.app.view3d') }}
+          </el-radio-button>
+        </el-radio-group>
           <el-tooltip
             :content="isRightPanelOpen ? t('fire.app.hidePanel') : t('fire.app.showPanel')"
             placement="bottom"
