@@ -1,16 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type Component } from 'vue'
-import {
-  Bell,
-  Check,
-  Close,
-  Connection,
-  Crop,
-  Finished,
-  Search,
-  SwitchButton,
-  WarningFilled
-} from '@element-plus/icons-vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
@@ -33,23 +23,19 @@ const expandedKeys = ref<string[]>([])
 const selectedIds = ref<Set<string>>(new Set())
 const lastSelectedDeviceId = ref<string | null>(null)
 
-const groupModeOptions = computed<Array<{ label: string; value: GroupMode; icon: Component }>>(
-  () => [
-    { label: t('fire.tree.group.loop'), value: 'loop', icon: Connection },
-    { label: t('fire.tree.group.zone'), value: 'zone', icon: Crop },
-    { label: t('fire.tree.group.type'), value: 'type', icon: Search },
-    { label: t('fire.tree.group.sounderGroup'), value: 'sounderGroup', icon: Bell },
-    { label: t('fire.tree.group.ioGroup'), value: 'ioGroup', icon: SwitchButton }
-  ]
-)
+const groupModeOptions = computed<Array<{ label: string; value: GroupMode }>>(() => [
+  { label: t('fire.tree.group.loop'), value: 'loop' },
+  { label: t('fire.tree.group.zone'), value: 'zone' },
+  { label: t('fire.tree.group.type'), value: 'type' },
+  { label: t('fire.tree.group.sounderGroup'), value: 'sounderGroup' },
+  { label: t('fire.tree.group.ioGroup'), value: 'ioGroup' }
+])
 
-const statusOptions = computed<
-  Array<{ label: string; value: DeviceStatusFilter; icon: Component }>
->(() => [
-  { label: t('fire.tree.filter.all'), value: 'all', icon: Finished },
-  { label: t('fire.tree.filter.unplaced'), value: 'unplaced', icon: Close },
-  { label: t('fire.tree.filter.placed'), value: 'placed', icon: Check },
-  { label: t('fire.tree.filter.issues'), value: 'issues', icon: WarningFilled }
+const statusOptions = computed<Array<{ label: string; value: DeviceStatusFilter }>>(() => [
+  { label: t('fire.tree.filter.all'), value: 'all' },
+  { label: t('fire.tree.filter.unplaced'), value: 'unplaced' },
+  { label: t('fire.tree.filter.placed'), value: 'placed' },
+  { label: t('fire.tree.filter.issues'), value: 'issues' }
 ])
 
 const treeData = computed(() =>
@@ -221,7 +207,83 @@ function issueClass(node: FireTreeNode): string {
               :aria-pressed="treeGroupMode === option.value"
               @click="treeGroupMode = option.value"
             >
-              <el-icon><component :is="option.icon" /></el-icon>
+              <el-icon>
+                <!-- LOOP -->
+                <svg
+                  v-if="option.value === 'loop'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="8" />
+                  <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+                  <circle cx="20" cy="12" r="1.5" fill="currentColor" />
+                  <circle cx="12" cy="20" r="1.5" fill="currentColor" />
+                  <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+                </svg>
+                <!-- ZONE (Square) -->
+                <svg
+                  v-else-if="option.value === 'zone'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3.5 3.5" />
+                  <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                </svg>
+                <!-- TYPE (Category Grid) -->
+                <svg
+                  v-else-if="option.value === 'type'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                  <circle cx="17.5" cy="17.5" r="3.5" />
+                </svg>
+                <!-- SOUNDER (Vibrating Bell) -->
+                <svg
+                  v-else-if="option.value === 'sounderGroup'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  <path d="M22 8a7.92 7.92 0 0 0-.7-3" />
+                  <path d="M22 14a7.92 7.92 0 0 1-.7 3" />
+                  <path d="M2 8a7.92 7.92 0 0 1 .7-3" />
+                  <path d="M2 14a7.92 7.92 0 0 0 .7 3" />
+                </svg>
+                <!-- I/O (Pure vector lines) -->
+                <svg
+                  v-else-if="option.value === 'ioGroup'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="5" y1="8" x2="5" y2="16" />
+                  <line x1="9.5" y1="18" x2="13.5" y2="6" />
+                  <circle cx="18" cy="12" r="4" />
+                </svg>
+              </el-icon>
             </el-button>
           </el-tooltip>
         </el-button-group>
@@ -242,7 +304,66 @@ function issueClass(node: FireTreeNode): string {
               :aria-pressed="deviceStatusFilter === option.value"
               @click="deviceStatusFilter = option.value"
             >
-              <el-icon><component :is="option.icon" /></el-icon>
+              <el-icon>
+                <!-- ALL -->
+                <svg
+                  v-if="option.value === 'all'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 6H21" />
+                  <path d="M12 12H21" />
+                  <path d="M12 18H21" />
+                  <path d="M3 6L4.5 7.5L8 4" />
+                  <path d="M3 12L4.5 13.5L8 10" />
+                  <path d="M3 18L4.5 19.5L8 16" />
+                </svg>
+                <!-- UNPLACED -->
+                <svg
+                  v-else-if="option.value === 'unplaced'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+                <!-- PLACED -->
+                <svg
+                  v-else-if="option.value === 'placed'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                <!-- ISSUES -->
+                <svg
+                  v-else-if="option.value === 'issues'"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+                  />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </el-icon>
             </el-button>
           </el-tooltip>
         </el-button-group>
@@ -293,12 +414,36 @@ function issueClass(node: FireTreeNode): string {
 
           <span v-if="data.kind !== 'device'" class="count-pill">{{ data.count }}</span>
           <span v-else-if="data.issueCount" class="issue-pill">
-            <el-icon><WarningFilled /></el-icon>
+            <el-icon>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+                />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </el-icon>
             {{ data.issueCount }}
           </span>
-          <el-icon v-else-if="data.placementStatus === 'placed'" class="placed-mark"
-            ><Check
-          /></el-icon>
+          <el-icon v-else-if="data.placementStatus === 'placed'" class="placed-mark">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </el-icon>
         </div>
       </template>
     </el-tree>
@@ -494,5 +639,11 @@ function issueClass(node: FireTreeNode): string {
 
 .placed-mark {
   color: #059669;
+}
+
+.placed-mark svg,
+.issue-pill svg {
+  width: 12px;
+  height: 12px;
 }
 </style>
