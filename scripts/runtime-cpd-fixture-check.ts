@@ -98,6 +98,21 @@ assert(
     delayEdgeManualOutput.reason === 'zone-delayed-sounders',
   'delay-edge Zone 1 manual call point did not keep the Zone sounder delay'
 )
+for (const address of [1, 2, 3, 4, 7, 8]) {
+  const outputs = trigger(delayEdge, address)
+  assert(
+    outputs.every((output) => output.state !== 'active'),
+    `delay-edge address ${address} produced an immediate active output`
+  )
+  assert(
+    outputById(outputs, `io-group:${delayEdgePanelId}:1`).state === 'delayActive',
+    `delay-edge address ${address} did not keep the I/O delay`
+  )
+  assert(
+    outputById(outputs, `fire-brigade:${delayEdgePanelId}`).state === 'delayActive',
+    `delay-edge address ${address} did not keep the fire brigade delay`
+  )
+}
 
 const noDelayedPanelId = noDelayedSounders.network.panels[0].id
 const noDelayedOutput = outputById(
@@ -151,6 +166,7 @@ const report: RuntimeResult = {
   simulation: {
     detectorDelay: 'passed',
     delayEdgeZone1ManualCallPointDelay: 'passed',
+    delayEdgeNoImmediateZone1Outputs: 'passed',
     zoneNoDelayedSounders: 'passed',
     manualOverride: 'passed',
     zoneStage2: 'passed',

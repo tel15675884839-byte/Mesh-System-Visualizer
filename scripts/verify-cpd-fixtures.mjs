@@ -85,6 +85,13 @@ function validateFixture(fileName, data, expected) {
     `${fileName}: expected ${expectedSounderDelaySeconds} second sounder delay`
   )
 
+  const expectedFireBrigadeDelaySeconds = Number(expected?.fireBrigadeDelaySeconds ?? 0)
+  assert(
+    totalDelaySeconds(data.panels[0].general, 'FireBrigadeDelayMM', 'FireBrigadeDelaySS') ===
+      expectedFireBrigadeDelaySeconds,
+    `${fileName}: expected ${expectedFireBrigadeDelaySeconds} second fire brigade delay`
+  )
+
   const expectedDelayedSounders = Boolean(expected?.delayedSounders)
   for (const zoneNumber of [1, 2, 3]) {
     assert(

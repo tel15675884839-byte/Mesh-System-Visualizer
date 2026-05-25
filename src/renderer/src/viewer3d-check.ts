@@ -16,6 +16,7 @@ import type { FireDevice } from './domain/fire/types'
 import { getViewer3DDeviceAnimationFrame } from './domain/fire/viewer3DSimulationVisual'
 import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
 import en from './i18n/en'
+import delayEdgeRaw from '../../../fixtures/cpd/extracted/6002-delay-edge-fields.json?raw'
 import globalDelayRaw from '../../../fixtures/cpd/extracted/6002-global-sounder-delay.json?raw'
 import noDelayedRaw from '../../../fixtures/cpd/extracted/6002-zone-no-delayed-sounders.json?raw'
 
@@ -33,6 +34,9 @@ interface Viewer3DCheckResult {
   cpdSounder3D: {
     delayedState: DeviceSimulationOutput | null
     delayedColor: string | null
+    delayEdgeAddress4SounderState: DeviceSimulationOutput | null
+    delayEdgeAddress4IoState: DeviceSimulationOutput | null
+    delayEdgeAddress4ActiveOutputCount: number
     nonDelayedState: DeviceSimulationOutput | null
     nonDelayedColor: string | null
   }
@@ -201,7 +205,14 @@ const project: FireProjectDocument = {
 
 const pinia = createPinia()
 const store = useFireProjectStore(pinia)
-store.loadFireProject(project)
+const mountedDelayEdge = adaptFixture(delayEdgeRaw)
+store.loadFireProject(makePlacedProjectDocument(mountedDelayEdge))
+store.enterSimulationMode()
+store.dispatchSimulationAction({
+  type: 'activate-input',
+  deviceId: deviceByAddress(mountedDelayEdge, 4).id,
+  at: Date.now()
+})
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
 const app = createApp({
@@ -217,7 +228,7 @@ function runVisualCheck(): Viewer3DCheckResult {
   const checks: Record<string, boolean> = {}
   const errors: string[] = []
   const cpdSounder3D = runCpdSounder3DCheck()
-  const statuses = store.project.devices.map((device) => {
+  const statuses = project.devices.map((device) => {
     const appearance = getDeviceStatusAppearance(device)
     return {
       id: device.id,
@@ -262,6 +273,24 @@ function runVisualCheck(): Viewer3DCheckResult {
     cpdSounder3D.delayedState?.state === 'delayActive' && cpdSounder3D.delayedColor === '#0ea5e9'
   )
   record(
+    'cpd-delay-edge-zone1-has-no-immediate-active-3d-outputs',
+    cpdSounder3D.delayEdgeAddress4SounderState?.state === 'delayActive' &&
+      cpdSounder3D.delayEdgeAddress4IoState?.state === 'delayActive' &&
+      cpdSounder3D.delayEdgeAddress4ActiveOutputCount === 0
+  )
+  record(
+    'mounted-delay-edge-store-has-no-immediate-active-outputs',
+    simulationActiveOutputCount() === 0
+  )
+  record(
+    'mounted-delay-edge-renders-delayed-sounder-output',
+    mountedDeviceOutputState(94)?.state === 'delayActive'
+  )
+  record(
+    'mounted-delay-edge-renders-delayed-io-output',
+    mountedDeviceOutputState(7)?.state === 'delayActive'
+  )
+  record(
     'cpd-non-delayed-zone-renders-active-3d-sounder',
     cpdSounder3D.nonDelayedState?.state === 'active' && cpdSounder3D.nonDelayedColor === '#ef4444'
   )
@@ -277,13 +306,27 @@ function runVisualCheck(): Viewer3DCheckResult {
 
 function runCpdSounder3DCheck(): Viewer3DCheckResult['cpdSounder3D'] {
   const delayed = adaptFixture(globalDelayRaw)
+  const delayEdge = adaptFixture(delayEdgeRaw)
   const nonDelayed = adaptFixture(noDelayedRaw)
   const delayedSounder = deviceByAddress(delayed, 94)
+  const delayEdgeSounder = deviceByAddress(delayEdge, 94)
+  const delayEdgeIo = deviceByAddress(delayEdge, 7)
+  const delayEdgeAddress4Outputs = trigger(delayEdge, 4)
   const nonDelayedSounder = deviceByAddress(nonDelayed, 94)
   const delayedState = getDeviceSimulationOutput(
     makeProjectDocument(delayed),
     trigger(delayed, 1),
     delayedSounder
+  )
+  const delayEdgeAddress4SounderState = getDeviceSimulationOutput(
+    makeProjectDocument(delayEdge),
+    delayEdgeAddress4Outputs,
+    delayEdgeSounder
+  )
+  const delayEdgeAddress4IoState = getDeviceSimulationOutput(
+    makeProjectDocument(delayEdge),
+    delayEdgeAddress4Outputs,
+    delayEdgeIo
   )
   const nonDelayedState = getDeviceSimulationOutput(
     makeProjectDocument(nonDelayed),
@@ -300,6 +343,11 @@ function runCpdSounder3DCheck(): Viewer3DCheckResult['cpdSounder3D'] {
       sounderPattern: delayedState?.sounderPattern,
       isSounder: delayedSounder.isSounder
     }).color,
+    delayEdgeAddress4SounderState,
+    delayEdgeAddress4IoState,
+    delayEdgeAddress4ActiveOutputCount: delayEdgeAddress4Outputs.filter(
+      (output) => output.state === 'active'
+    ).length,
     nonDelayedState,
     nonDelayedColor: getViewer3DDeviceAnimationFrame({
       baseSize: 10,
@@ -334,6 +382,51 @@ function makeProjectDocument(result: CpdAdapterResult): FireProjectDocument {
   }
 }
 
+function makePlacedProjectDocument(result: CpdAdapterResult): FireProjectDocument {
+  const document = makeProjectDocument(result)
+  const buildingId = 'cpd-delay-edge-building'
+  const floorId = 'cpd-delay-edge-floor'
+
+  return {
+    ...document,
+    buildings: [
+      {
+        id: buildingId,
+        name: 'Delay Edge Building',
+        floors: [
+          {
+            id: floorId,
+            buildingId,
+            name: 'Floor 1',
+            levelIndex: 0,
+            mapWidth: 1200,
+            mapHeight: 800,
+            camera2D: { x: 0, y: 0, scale: 1 },
+            floorHeight3D: 3,
+            floorScale3D: 1
+          }
+        ],
+        position: { x: 0, y: 0 },
+        size: { width: 1200, depth: 800 },
+        rotation: 0
+      }
+    ],
+    devices: result.devices.map((device, index) => ({
+      ...device,
+      placement: {
+        status: 'placed',
+        buildingId,
+        floorId,
+        position: {
+          x: 120 + (index % 5) * 190,
+          y: 130 + Math.floor(index / 5) * 140,
+          z: 0
+        }
+      }
+    }))
+  }
+}
+
 function deviceByAddress(result: CpdAdapterResult, address: number): FireDevice {
   const device = result.devices.find((candidate) => candidate.address === address)
   if (!device) {
@@ -341,6 +434,27 @@ function deviceByAddress(result: CpdAdapterResult, address: number): FireDevice 
   }
 
   return device
+}
+
+function mountedDeviceByAddress(address: number): FireDevice {
+  const device = store.project.devices.find((candidate) => candidate.address === address)
+  if (!device) {
+    throw new Error(`mounted project did not include address ${address}`)
+  }
+
+  return device
+}
+
+function mountedDeviceOutputState(address: number): DeviceSimulationOutput | null {
+  return getDeviceSimulationOutput(
+    store.project,
+    store.simulationState.outputs,
+    mountedDeviceByAddress(address)
+  )
+}
+
+function simulationActiveOutputCount(): number {
+  return store.simulationState.outputs.filter((output) => output.state === 'active').length
 }
 
 function trigger(result: CpdAdapterResult, address: number): OutputActivation[] {

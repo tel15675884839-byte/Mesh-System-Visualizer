@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-05-25T05:55:26.0444039Z",
+  "generatedAt": "2026-05-25T06:20:19.1528705Z",
   "sourceTemplate": "Configurator templet project/6002.cpd",
   "fixtures": [
     {
       "fileName": "6002-basic-zone-linkage.cpd",
       "purpose": "Basic Zone first-stage local sounder and second-stage evacuation linkage.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 0, "fireBrigadeDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -15,7 +15,7 @@
     {
       "fileName": "6002-global-sounder-delay.cpd",
       "purpose": "Global sounder delay for ordinary detector activation.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "delayedSounders": true, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "fireBrigadeDelaySeconds": 0, "delayedSounders": true, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -24,7 +24,7 @@
     {
       "fileName": "6002-zone-no-delayed-sounders.cpd",
       "purpose": "Global sounder delay configured while Zone Delayed Sounders is off; ordinary detector activation should not be delayed.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "fireBrigadeDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -33,7 +33,7 @@
     {
       "fileName": "6002-manual-callpoint-override-delay.cpd",
       "purpose": "Manual call points override the configured global sounder delay.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "delayedSounders": true, "manualOverride": true, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 0, "fireBrigadeDelaySeconds": 0, "delayedSounders": true, "manualOverride": true, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -42,7 +42,7 @@
     {
       "fileName": "6002-disabled-and-inhibited.cpd",
       "purpose": "Disabled detector and inhibited relay module behavior.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 21, "inhibitedRelayAddress": 17, "ioGroups": [] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 0, "fireBrigadeDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 21, "inhibitedRelayAddress": 17, "ioGroups": [] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -51,7 +51,7 @@
     {
       "fileName": "6002-io-stage-linkage.cpd",
       "purpose": "Zone 1 first-stage and second-stage I/O linkage.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 30, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 0, "inputOutputDelaySeconds": 30, "fireBrigadeDelaySeconds": 0, "delayedSounders": false, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []
@@ -60,7 +60,7 @@
     {
       "fileName": "6002-delay-edge-fields.cpd",
       "purpose": "Optional delay edge fields when supported by the source tables.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 45, "delayedSounders": true, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 45, "fireBrigadeDelaySeconds": 30, "delayedSounders": true, "manualOverride": false, "disabledAddress": 0, "inhibitedRelayAddress": 0, "ioGroups": [1, 2] },
       "optionalFields": {
         "present": ["DelayedSounders", "IOOverrideDelay", "SetEvacuateTimer"],
         "skipped": []
@@ -69,7 +69,7 @@
     {
       "fileName": "6002-realistic-building-composite.cpd",
       "purpose": "Composite 6002 building fixture with delay, override, staged sounder and I/O linkage, disabled maintenance detector, and inhibited relay.",
-      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 30, "delayedSounders": true, "manualOverride": true, "disabledAddress": 21, "inhibitedRelayAddress": 17, "ioGroups": [1, 2] },
+      "expected": { "deviceCount": 20, "zones": [1, 2, 3], "sounderGroups": [1, 2, 3, 10], "sounderDelaySeconds": 60, "inputOutputDelaySeconds": 30, "fireBrigadeDelaySeconds": 0, "delayedSounders": true, "manualOverride": true, "disabledAddress": 21, "inhibitedRelayAddress": 17, "ioGroups": [1, 2] },
       "optionalFields": {
         "present": ["DelayedSounders"],
         "skipped": []

@@ -52,9 +52,10 @@ namespace CpdFixtureGenerator
                     DelayedSounders = true,
                     SounderDelaySeconds = 60,
                     InputOutputDelaySeconds = 45,
+                    FireBrigadeDelaySeconds = 30,
                     IoStage = true,
                     OptionalEdgeFields = true,
-                    IoOverrideDelayAddress4 = true,
+                    IoOverrideDelayAddress4 = false,
                     SetEvacuateTimerAddress4 = false
                 }),
             new FixtureDefinition(
@@ -377,8 +378,8 @@ namespace CpdFixtureGenerator
             SetRequired(row, "SounderDelaySS", options.SounderDelaySeconds % 60);
             SetRequired(row, "InputOutputDelayMM", options.InputOutputDelaySeconds / 60);
             SetRequired(row, "InputOutputDelaySS", options.InputOutputDelaySeconds % 60);
-            SetRequired(row, "FireBrigadeDelayMM", 0);
-            SetRequired(row, "FireBrigadeDelaySS", 0);
+            SetRequired(row, "FireBrigadeDelayMM", options.FireBrigadeDelaySeconds / 60);
+            SetRequired(row, "FireBrigadeDelaySS", options.FireBrigadeDelaySeconds % 60);
             SetRequired(row, "EvacuteDelayMM", 0);
             SetRequired(row, "EvacuteDelaySS", 0);
         }
@@ -550,6 +551,7 @@ namespace CpdFixtureGenerator
                 { "sounderGroups", new[] { 1, 2, 3, 10 } },
                 { "sounderDelaySeconds", options.SounderDelaySeconds },
                 { "inputOutputDelaySeconds", options.InputOutputDelaySeconds },
+                { "fireBrigadeDelaySeconds", options.FireBrigadeDelaySeconds },
                 { "delayedSounders", options.DelayedSounders },
                 { "manualOverride", options.ManualOverride },
                 { "disabledAddress", options.DisableDevice21 ? 21 : 0 },
@@ -776,6 +778,7 @@ namespace CpdFixtureGenerator
         public bool DelayedSounders;
         public int SounderDelaySeconds;
         public int InputOutputDelaySeconds;
+        public int FireBrigadeDelaySeconds;
         public bool ManualOverride;
         public bool DisableDevice21;
         public bool InhibitRelays17;

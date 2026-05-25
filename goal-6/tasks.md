@@ -126,10 +126,34 @@ Fix the generated `.cpd` fixture data so Zone-to-Sounder delayed activation corr
 - [x] Added failing regression coverage.
   - Test: `cpdFixtureSimulation.test.ts` now requires address `04` in `6002-delay-edge-fields.json` to keep the Zone Sounder Group in `delayActive` for 60 seconds.
 - [x] Fixed the generator.
-  - `6002-delay-edge-fields.cpd` no longer sets manual override or evacuate timer on address `04`; it still records the optional edge columns and keeps `IOOverrideDelay=true` for I/O-specific coverage.
+  - `6002-delay-edge-fields.cpd` no longer sets manual override or evacuate timer on address `04`; the later 3D follow-up also removed `IOOverrideDelay=true` from this clean delayed-positive fixture.
   - Manual call point override behavior remains covered by `6002-manual-callpoint-override-delay.cpd`.
 - [x] Regenerated and verified fixtures.
   - Verified: `.\tools\CpdFixtureGenerator\generate.ps1`.
   - Verified: `node .\scripts\verify-cpd-fixtures.mjs`.
   - Verified: `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`.
   - Verified: `node .\scripts\runtime-cpd-fixture-check.mjs`.
+
+## Follow-up Fix: 2026-05-25 `6002-delay-edge-fields.cpd` 3D immediate outputs
+
+- [x] Reproduced the reported 3D/Simulation still-immediate symptom.
+  - Evidence: Sounder Group was delayed, but the same file still produced immediate active outputs because Zone 1 had a zero Fire Brigade delay and address `04` still had `IOOverrideDelay=true`.
+- [x] Added failing regression coverage.
+  - Test: `cpdFixtureSimulation.test.ts` now requires every Zone 1 trigger in `6002-delay-edge-fields.json` to produce zero immediate `active` outputs.
+  - Expected delays: Sounder Group 1 = 60s, I/O Group 1 = 45s, Fire Brigade = 30s.
+- [x] Fixed the generator and regenerated the CPD.
+  - `6002-delay-edge-fields.cpd` now keeps Zone 1 Sounder, I/O, and Fire Brigade outputs delayed for addresses `01`, `02`, `03`, `04`, `07`, and `08`.
+  - Address `04` now has `IOOverrideDelay=false`, `OverrideDelays=false`, and `SetEvacuateTimer=false`.
+  - Manual/override behavior remains isolated in the override fixtures so this file is a clean delayed-positive case.
+- [x] Extended runtime and 3D verification.
+  - `scripts/runtime-cpd-fixture-check.ts` now fails if any Zone 1 trigger in delay-edge creates an immediate `active` output.
+  - `src/renderer/src/viewer3d-check.ts` now verifies delay-edge address `04` has no immediate active 3D outputs while the non-delayed fixture still activates immediately.
+- [x] Completed full verification.
+  - Verified: `.\tools\CpdFixtureGenerator\generate.ps1`.
+  - Verified: `node .\scripts\verify-cpd-fixtures.mjs`.
+  - Verified: `node .\scripts\runtime-cpd-fixture-check.mjs`.
+  - Verified: `node .\scripts\viewer3d-fixture-browser-check.mjs`.
+  - Verified: `npm run lint`.
+  - Verified: `npm run typecheck`.
+  - Verified: `npm run test`.
+  - Verified: `npm run build`.
