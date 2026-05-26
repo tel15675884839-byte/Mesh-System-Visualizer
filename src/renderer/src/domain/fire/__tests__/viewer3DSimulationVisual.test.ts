@@ -216,11 +216,11 @@ describe('viewer 3D simulation visuals', () => {
       isIO: false
     })
 
-    expect(framePeak.color).toBe('#dc2626')
+    expect(framePeak.color).toBeNull()
     expect(framePeak.scale).toBeCloseTo(12, 5)
     expect(framePeak.ringOpacity).toBeCloseTo(0.89, 5)
 
-    expect(frameTrough.color).toBe('#dc2626')
+    expect(frameTrough.color).toBeNull()
     expect(frameTrough.scale).toBeCloseTo(10, 5)
     expect(frameTrough.ringOpacity).toBeCloseTo(0.55, 5)
   })

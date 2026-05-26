@@ -114,10 +114,46 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
   const textureLoader = new THREE.TextureLoader()
   const textureCache = new Map<string, THREE.Texture>()
 
+  let glowTextureRed: THREE.Texture | null = null
+  let glowTextureBlue: THREE.Texture | null = null
+
+  function getGlowTexture(colorType: 'red' | 'blue'): THREE.Texture {
+    if (colorType === 'red') {
+      if (!glowTextureRed) {
+        glowTextureRed = createGlowCanvasTexture('rgba(239, 68, 68, 0.72)')
+      }
+      return glowTextureRed
+    } else {
+      if (!glowTextureBlue) {
+        glowTextureBlue = createGlowCanvasTexture('rgba(37, 99, 235, 0.72)')
+      }
+      return glowTextureBlue
+    }
+  }
+
+  function createGlowCanvasTexture(colorStr: string): THREE.Texture {
+    const canvas = document.createElement('canvas')
+    canvas.width = 128
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 60)
+      gradient.addColorStop(0, colorStr)
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, 128, 128)
+    }
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.userData.preserveOnSceneClear = true
+    return texture
+  }
+
   interface AnimatedDeviceObject {
     sprite: THREE.Sprite
     spriteMaterial: THREE.SpriteMaterial
     ringMaterial: THREE.MeshBasicMaterial | null
+    glowSprite: THREE.Sprite | null
     baseSize: number
     baseColor: THREE.ColorRepresentation
     baseOpacity: number
@@ -375,12 +411,37 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     const inputActive = hasActiveInput(device.id)
     const isIO = device.type === 'input_output' || device.type === 'wireless_input_output'
     const shouldAnimate = inputActive || (outputState !== null && !isDelayedSounder)
+    const outputActive = outputState?.state === 'active'
+
+    const showGlow = (device.isSounder && outputActive) || 
+                     (!device.isSounder && !isIO && inputActive) || 
+                     (isIO && (inputActive || outputActive))
+
+    let glowSprite: THREE.Sprite | null = null
+    if (showGlow) {
+      const glowTexture = getGlowTexture((isIO && outputActive && !inputActive) ? 'blue' : 'red')
+      const glowMaterial = new THREE.SpriteMaterial({
+        map: glowTexture,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: true,
+        depthWrite: false,
+        toneMapped: false
+      })
+      glowSprite = new THREE.Sprite(glowMaterial)
+      glowSprite.position.copy(point)
+      const glowSize = size * 1.8
+      glowSprite.scale.set(glowSize, glowSize, glowSize)
+      glowSprite.renderOrder = -1
+      scene?.add(glowSprite)
+    }
 
     if (shouldAnimate) {
       animatedDeviceObjects.push({
         sprite,
         spriteMaterial: material,
         ringMaterial,
+        glowSprite,
         baseSize: size,
         baseColor: deviceColor,
         baseOpacity: highlightAppearance.opacity * statusAppearance.iconOpacity,
@@ -392,7 +453,6 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       })
     }
 
-    const outputActive = outputState?.state === 'active'
     const showRipples = (device.isSounder && outputActive) || (isIO && (inputActive || outputActive))
     if (showRipples) {
       const rippleColor = (isIO && outputActive && !inputActive) ? '#2563eb' : '#ef4444'
@@ -647,6 +707,17 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       texture.dispose()
     }
     textureCache.clear()
+
+    if (glowTextureRed) {
+      glowTextureRed.userData.preserveOnSceneClear = false
+      glowTextureRed.dispose()
+      glowTextureRed = null
+    }
+    if (glowTextureBlue) {
+      glowTextureBlue.userData.preserveOnSceneClear = false
+      glowTextureBlue.dispose()
+      glowTextureBlue = null
+    }
   }
   return {
     initScene,

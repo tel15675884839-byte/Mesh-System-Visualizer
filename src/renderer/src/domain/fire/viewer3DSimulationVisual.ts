@@ -42,7 +42,7 @@ export function getViewer3DDeviceAnimationFrame({
 
   if (inputActive && !isIO) {
     const scale = baseSize * (1.1 + 0.1 * Math.sin(elapsedMs * 0.005))
-    const color = '#dc2626'
+    const color = null
     const ringOpacity = 0.72 + 0.17 * Math.sin(elapsedMs * 0.005)
     return {
       color,

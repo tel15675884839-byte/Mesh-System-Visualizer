@@ -11,6 +11,7 @@ interface AnimatedDeviceObject {
   sprite: THREE.Sprite
   spriteMaterial: THREE.SpriteMaterial
   ringMaterial: THREE.MeshBasicMaterial | null
+  glowSprite: THREE.Sprite | null
   baseSize: number
   baseColor: THREE.ColorRepresentation
   baseOpacity: number
@@ -81,6 +82,12 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
       if (object.ringMaterial) {
         object.ringMaterial.color.set(frame.color ?? object.baseColor)
         object.ringMaterial.opacity = object.baseOpacity * frame.ringOpacity
+      }
+
+      if (object.glowSprite) {
+        object.glowSprite.scale.setScalar(frame.scale * 1.8)
+        const mat = object.glowSprite.material as THREE.SpriteMaterial
+        mat.opacity = 0.55 + Math.sin(elapsedMs * 0.003) * 0.15
       }
 
       if (object.isSounder && object.outputState === 'active') {
