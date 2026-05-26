@@ -356,11 +356,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
           deviceSize: size
         })
       }
-    } else if (
-      hasActiveInput(device.id) ||
-      hasActiveFault(device.id) ||
-      (outputState !== null && !isDelayedSounder)
-    ) {
+    } else if (hasActiveFault(device.id)) {
       ringMaterial = new THREE.MeshBasicMaterial({
         color: deviceColor,
         transparent: true,
@@ -396,10 +392,13 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       })
     }
 
-    if (device.isSounder && outputState?.state === 'active') {
+    const outputActive = outputState?.state === 'active'
+    const showRipples = (device.isSounder && outputActive) || (isIO && (inputActive || outputActive))
+    if (showRipples) {
+      const rippleColor = (isIO && outputActive && !inputActive) ? '#2563eb' : '#ef4444'
       for (let i = 0; i < 3; i++) {
         const rippleMat = new THREE.MeshBasicMaterial({
-          color: '#ef4444',
+          color: rippleColor,
           transparent: true,
           opacity: 0.8,
           side: THREE.DoubleSide,
