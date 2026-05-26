@@ -17,6 +17,8 @@ interface AnimatedDeviceObject {
   outputState: Viewer3DDeviceOutputState
   sounderPattern?: SounderOutputPattern
   isSounder: boolean
+  inputActive: boolean
+  isIO: boolean
 }
 
 interface RadarRipple {
@@ -35,6 +37,7 @@ interface Viewer3DSceneAnimationDependencies {
   animatedDeviceObjects: AnimatedDeviceObject[]
   radarRipples: RadarRipple[]
   radarZones: RadarZone[]
+  sounderRipples: RadarRipple[]
   getControls: () => OrbitControls | null
   getRenderer: () => THREE.WebGLRenderer | null
   getScene: () => THREE.Scene | null
@@ -52,6 +55,7 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     animatedDeviceObjects,
     radarRipples,
     radarZones,
+    sounderRipples,
     getControls,
     getRenderer,
     getScene,
@@ -65,7 +69,9 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
         elapsedMs,
         outputState: object.outputState,
         sounderPattern: object.sounderPattern,
-        isSounder: object.isSounder
+        isSounder: object.isSounder,
+        inputActive: object.inputActive,
+        isIO: object.isIO
       })
 
       object.sprite.scale.setScalar(frame.scale)
@@ -75,6 +81,12 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
       if (object.ringMaterial) {
         object.ringMaterial.color.set(frame.color ?? object.baseColor)
         object.ringMaterial.opacity = object.baseOpacity * frame.ringOpacity
+      }
+
+      if (object.isSounder && object.outputState === 'active') {
+        object.spriteMaterial.rotation = Math.sin(elapsedMs * 0.04) * 0.08
+      } else {
+        object.spriteMaterial.rotation = 0
       }
     }
   }
@@ -97,6 +109,20 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     })
   }
 
+  function updateSounderRippleAnimations(deltaMs: number): void {
+    sounderRipples.forEach((ripple) => {
+      ripple.progress += deltaMs / 600
+      if (ripple.progress > 1) ripple.progress = 0
+
+      const easeOutProgress = 1.0 - Math.pow(1.0 - ripple.progress, 2)
+      const scale = 0.8 + easeOutProgress * 2.7
+      ripple.mesh.scale.setScalar(scale)
+
+      const mat = ripple.mesh.material as THREE.MeshBasicMaterial
+      mat.opacity = 0.8 * (1.0 - easeOutProgress)
+    })
+  }
+
   function renderFrame(): void {
     animationFrame = 0
     const now = performance.now()
@@ -109,6 +135,7 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     if (animatedDeviceCount > 0) {
       updateDeviceAnimations(now)
       updateRadarHighlightAnimations(now, deltaMs)
+      updateSounderRippleAnimations(deltaMs)
     }
 
     const renderer = getRenderer()
