@@ -210,7 +210,7 @@
     >
       <img class="simulation-action-icon" src="/panel bottom/sounders active_silence.svg" alt="" />
       <span v-if="soundersActive" class="active-dot"></span>
-      <span>SOUNDERS ACTIVE/SILENCE</span>
+      <span class="tooltip-text">SOUNDERS ACTIVE/SILENCE</span>
     </button>
     <button
       type="button"
@@ -223,7 +223,7 @@
     >
       <img class="simulation-action-icon" src="/panel bottom/delays active.svg" alt="" />
       <span v-if="sounderDelaysEnabled" class="active-dot"></span>
-      <span>DELAYS ACTIVE</span>
+      <span class="tooltip-text">DELAYS ACTIVE</span>
     </button>
     <button
       v-if="hasDelayedSounderOutputs"
@@ -232,7 +232,7 @@
       @click="skipSounderDelays"
     >
       <img class="simulation-action-icon" src="/panel bottom/delays active.svg" alt="" />
-      <span>SKIP DELAY</span>
+      <span class="tooltip-text">SKIP DELAY</span>
     </button>
     <button
       type="button"
@@ -240,7 +240,7 @@
       @click="dispatchSimulation('buzzer-silence')"
     >
       <img class="simulation-action-icon" src="/panel bottom/buzzer silence.svg" alt="" />
-      <span>{{ t('fire.simulation.buzzerSilence') }}</span>
+      <span class="tooltip-text">{{ t('fire.simulation.buzzerSilence') }}</span>
     </button>
     <button
       type="button"
@@ -248,7 +248,7 @@
       @click="dispatchSimulation('system-reset')"
     >
       <img class="simulation-action-icon" src="/panel bottom/system reset.svg" alt="" />
-      <span>{{ t('fire.simulation.systemReset') }}</span>
+      <span class="tooltip-text">{{ t('fire.simulation.systemReset') }}</span>
     </button>
   </div>
 </section>

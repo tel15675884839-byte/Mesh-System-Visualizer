@@ -70,7 +70,7 @@
   transform: scale(1.1);
 }
 
-.simulation-action span {
+.simulation-action .tooltip-text {
   position: absolute;
   top: 52px;
   left: 50%;
@@ -93,7 +93,7 @@
   z-index: 10;
 }
 
-.simulation-action span::after {
+.simulation-action .tooltip-text::after {
   content: '';
   position: absolute;
   bottom: 100%;
@@ -104,7 +104,7 @@
   border-color: transparent transparent rgba(15, 23, 42, 0.95) transparent;
 }
 
-.simulation-action:hover span {
+.simulation-action:hover .tooltip-text {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
