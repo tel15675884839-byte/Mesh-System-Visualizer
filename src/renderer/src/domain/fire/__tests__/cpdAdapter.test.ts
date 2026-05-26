@@ -327,6 +327,37 @@ describe('adaptCpdExport', () => {
     ])
   })
 
+  it('does not synthesize group membership from direct fields on initiating devices', () => {
+    const result = adaptCpdExport(
+      {
+        ...fixture,
+        devices: [
+          {
+            panelNumber: 1,
+            loopId: 1,
+            address: 20,
+            type: 'manual_call_point',
+            sounderGroup: 12,
+            ioGroup: 14,
+            raw: { Zone: 6, SounderGroup: 12, IOGroup: 14 }
+          }
+        ],
+        zones: [],
+        sounderGroups: [],
+        ioGroups: []
+      },
+      1234
+    )
+
+    const panel = result.network.panels[0]
+    expect(panel.sounderGroups).toEqual([])
+    expect(panel.ioGroups).toEqual([])
+    expect(result.devices[0]).toMatchObject({
+      sounderGroupId: 12,
+      ioGroupId: 14
+    })
+  })
+
   it('keeps extractor Zone and Group rows when only the single panel is present', () => {
     const result = adaptCpdExport(
       {
@@ -387,7 +418,7 @@ describe('adaptCpdExport', () => {
         sounderGroupAlarm1: 2
       }
     ])
-    expect(panel.sounderGroups.map((group) => group.groupId)).toEqual([7, 10])
+    expect(panel.sounderGroups.map((group) => group.groupId)).toEqual([10])
     expect(panel.sounderGroups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

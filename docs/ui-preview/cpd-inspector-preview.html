@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CPD Inspector Preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f7;
+        --panel: #ffffff;
+        --panel-soft: #f8fafc;
+        --line: #d8dee8;
+        --line-soft: #e6ebf2;
+        --text: #172033;
+        --muted: #64748b;
+        --faint: #94a3b8;
+        --primary: #1f6feb;
+        --primary-soft: #e8f1ff;
+        --green: #0f8a5f;
+        --green-soft: #e8f7f0;
+        --amber: #b26a00;
+        --amber-soft: #fff4d8;
+        --violet: #6d45b8;
+        --violet-soft: #f0eafd;
+        --blue: #1769aa;
+        --blue-soft: #e8f3fb;
+        --danger: #b42318;
+        --danger-soft: #fff0ee;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft YaHei', sans-serif;
+        font-size: 13px;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 56px minmax(0, 1fr);
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .brand {
+        display: grid;
+        min-width: 0;
+        gap: 2px;
+      }
+
+      .brand strong {
+        font-size: 16px;
+        line-height: 20px;
+      }
+
+      .brand span {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 16px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--text);
+        white-space: nowrap;
+      }
+
+      .button.primary {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(280px, 328px) minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .device-tree {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .tree-toolbar {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toolbar-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .toolbar-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .icon-group {
+        display: inline-flex;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+
+      .icon-button {
+        display: grid;
+        width: 32px;
+        height: 28px;
+        place-items: center;
+        border: 0;
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--muted);
+      }
+
+      .icon-button:last-child {
+        border-right: 0;
+      }
+
+      .icon-button.active {
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--muted);
+      }
+
+      .search input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+      }
+
+      .tree-list {
+        min-height: 0;
+        overflow: auto;
+        padding: 8px 8px 14px;
+      }
+
+      .tree-node {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        color: var(--text);
+      }
+
+      .tree-node.group {
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .tree-node.selected {
+        background: var(--primary-soft);
+        color: #1555b8;
+      }
+
+      .tree-node .count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .indent-1 {
+        padding-left: 24px;
+      }
+
+      .indent-2 {
+        padding-left: 42px;
+      }
+
+      .indent-3 {
+        padding-left: 60px;
+      }
+
+      .center-pane {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .view-tabs {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .segmented {
+        display: inline-flex;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+
+      .segment {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 92px;
+        height: 30px;
+        justify-content: center;
+        border: 0;
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      .segment:last-child {
+        border-right: 0;
+      }
+
+      .segment.active {
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .panel-toggle {
+        width: 30px;
+        min-width: 30px;
+        padding: 0;
+      }
+
+      .preview-shell {
+        display: grid;
+        grid-template-columns: 196px minmax(0, 1fr);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .preview-nav {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+        border-right: 1px solid var(--line);
+        background: #f8fafc;
+      }
+
+      .preview-title {
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .preview-title strong {
+        display: block;
+        font-size: 14px;
+        line-height: 20px;
+      }
+
+      .preview-title span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .nav-items {
+        padding: 10px 8px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 9px;
+        border-radius: 4px;
+        color: var(--text);
+        text-decoration: none;
+      }
+
+      .nav-item.active {
+        background: var(--primary-soft);
+        color: #1555b8;
+        font-weight: 600;
+      }
+
+      .nav-item .badge {
+        margin-left: auto;
+      }
+
+      .preview-content {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .content-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .content-header h1 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 24px;
+      }
+
+      .content-header p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .read-only {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 26px;
+        padding: 0 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .content-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 14px 16px 18px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(100px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .metric {
+        min-width: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+      }
+
+      .metric span {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 22px;
+        line-height: 26px;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
+        gap: 12px;
+        min-height: 520px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 48px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .panel-header h2 {
+        margin: 0;
+        font-size: 14px;
+        line-height: 20px;
+      }
+
+      .panel-header p {
+        margin: 1px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .filter {
+        height: 30px;
+        min-width: 104px;
+        padding: 0 9px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      th,
+      td {
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--line-soft);
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f8fafc;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      tr.selected-row td {
+        background: var(--primary-soft);
+      }
+
+      td strong {
+        display: block;
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      td small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 22px;
+        padding: 2px 7px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 16px;
+        white-space: nowrap;
+      }
+
+      .chip.blue {
+        border-color: #b9d6ec;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .chip.green {
+        border-color: #bfe7d4;
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .chip.amber {
+        border-color: #f4d07a;
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .chip.violet {
+        border-color: #d9c9f5;
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .chip.danger {
+        border-color: #fac5bd;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .detail {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .detail-body {
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .detail-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .detail-stat {
+        padding: 9px 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 5px;
+        background: var(--panel-soft);
+      }
+
+      .detail-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .detail-stat strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 15px;
+      }
+
+      .relation-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .relation {
+        display: grid;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 5px;
+        background: var(--panel);
+      }
+
+      .relation-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 600;
+      }
+
+      .device-mini-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .device-mini {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 7px 8px;
+        border: 1px solid var(--line-soft);
+        border-radius: 4px;
+        background: var(--panel-soft);
+      }
+
+      .device-mini span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .mono {
+        font-family: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+      }
+
+      @media (max-width: 1180px) {
+        .metrics {
+          grid-template-columns: repeat(3, minmax(100px, 1fr));
+        }
+
+        .section-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <div class="brand">
+          <strong>Numens Fire Alarm Simulator</strong>
+          <span>Exam_6002_Answer_Advanced.cpd</span>
+        </div>
+        <nav class="actions" aria-label="Project actions">
+          <button class="button primary">New from CPD</button>
+          <button class="button">Open Project</button>
+          <button class="button">Save Project</button>
+          <button class="button">Re-import CPD</button>
+        </nav>
+      </header>
+
+      <section class="workspace">
+        <aside class="device-tree">
+          <header class="tree-toolbar">
+            <div class="toolbar-row">
+              <span class="toolbar-label">Group by</span>
+              <div class="icon-group" aria-label="Grouping mode">
+                <button class="icon-button">L</button>
+                <button class="icon-button active">Z</button>
+                <button class="icon-button">T</button>
+                <button class="icon-button">S</button>
+                <button class="icon-button">I</button>
+              </div>
+            </div>
+            <div class="search">
+              <span>Search</span>
+              <input aria-label="Search devices" value="" />
+            </div>
+          </header>
+          <div class="tree-list">
+            <div class="tree-node group">Network <span class="count">1</span></div>
+            <div class="tree-node indent-1 group">Panel 6002 <span class="count">20</span></div>
+            <div class="tree-node indent-2 selected">Zone 001 <span class="count">6</span></div>
+            <div class="tree-node indent-3">L1-001 MCP</div>
+            <div class="tree-node indent-3">L1-004 Optical Smoke</div>
+            <div class="tree-node indent-3">L1-008 Sounder Beacon</div>
+            <div class="tree-node indent-2">Zone 002 <span class="count">4</span></div>
+            <div class="tree-node indent-2">Zone 003 <span class="count">3</span></div>
+            <div class="tree-node indent-2">Zone 004 <span class="count">0</span></div>
+            <div class="tree-node indent-2">Zone 005 <span class="count">2</span></div>
+            <div class="tree-node indent-2">Zone 006 <span class="count">5</span></div>
+          </div>
+        </aside>
+
+        <section class="center-pane">
+          <div class="view-tabs">
+            <div class="segmented" aria-label="Main view">
+              <button class="segment active">CPD Preview</button>
+              <button class="segment">2D</button>
+              <button class="segment">3D</button>
+              <button class="segment">Simulation</button>
+            </div>
+            <button class="button panel-toggle" aria-label="Toggle right panel">›</button>
+          </div>
+
+          <section class="preview-shell">
+            <nav class="preview-nav" aria-label="CPD preview sections">
+              <div class="preview-title">
+                <strong>CPD Inspector</strong>
+                <span>Read-only configuration view</span>
+              </div>
+              <div class="nav-items">
+                <a class="nav-item" href="#">
+                  Overview
+                  <span class="badge chip">Open</span>
+                </a>
+                <a class="nav-item active" href="#">
+                  Zones
+                  <span class="badge chip blue">128</span>
+                </a>
+                <a class="nav-item" href="#">
+                  Sounder Groups
+                  <span class="badge chip blue">4</span>
+                </a>
+                <a class="nav-item" href="#">
+                  Devices
+                  <span class="badge chip blue">20</span>
+                </a>
+              </div>
+            </nav>
+
+            <section class="preview-content">
+              <header class="content-header">
+                <div>
+                  <h1>Zones</h1>
+                  <p>Shows the CPD zone structure and the sounder groups each zone drives.</p>
+                </div>
+                <span class="read-only">Read-only CPD data</span>
+              </header>
+
+              <div class="content-scroll">
+                <section class="metrics" aria-label="CPD summary">
+                  <div class="metric">
+                    <span>Panels</span>
+                    <strong>1</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Loops</span>
+                    <strong>2</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Devices</span>
+                    <strong>20</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Zones</span>
+                    <strong>128</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Sounder Groups</span>
+                    <strong>4</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Delayed Zones</span>
+                    <strong>3</strong>
+                  </div>
+                </section>
+
+                <section class="section-grid">
+                  <article class="panel">
+                    <header class="panel-header">
+                      <div>
+                        <h2>Zone Configuration</h2>
+                        <p>Click a zone to inspect its CPD relations.</p>
+                      </div>
+                      <div class="filters">
+                        <select class="filter" aria-label="Delay filter">
+                          <option>All delays</option>
+                          <option>Delayed only</option>
+                          <option>No delay</option>
+                        </select>
+                        <select class="filter" aria-label="Sounder group filter">
+                          <option>All groups</option>
+                          <option>SG 1</option>
+                          <option>SG 2</option>
+                          <option>SG 3</option>
+                          <option>SG 4</option>
+                        </select>
+                      </div>
+                    </header>
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Zone</th>
+                            <th>Name / Text</th>
+                            <th>Devices</th>
+                            <th>Sounder Groups</th>
+                            <th>Delay</th>
+                            <th>I/O Groups</th>
+                            <th>Mode</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr class="selected-row">
+                            <td><strong>001</strong><small>Panel 6002</small></td>
+                            <td>Ground Floor Reception</td>
+                            <td>6</td>
+                            <td>
+                              <div class="chip-row">
+                                <span class="chip blue">SG 1</span>
+                                <span class="chip blue">SG 2</span>
+                              </div>
+                            </td>
+                            <td><span class="chip amber">60s</span></td>
+                            <td><span class="chip violet">IO 1</span></td>
+                            <td><span class="chip green">Double knock</span></td>
+                          </tr>
+                          <tr>
+                            <td><strong>002</strong><small>Panel 6002</small></td>
+                            <td>Office Area</td>
+                            <td>4</td>
+                            <td><span class="chip blue">SG 1</span></td>
+                            <td><span class="muted">-</span></td>
+                            <td><span class="chip violet">IO 2</span></td>
+                            <td><span class="chip">Single</span></td>
+                          </tr>
+                          <tr>
+                            <td><strong>003</strong><small>Panel 6002</small></td>
+                            <td>Warehouse</td>
+                            <td>3</td>
+                            <td>
+                              <div class="chip-row">
+                                <span class="chip blue">SG 3</span>
+                                <span class="chip blue">SG 4</span>
+                              </div>
+                            </td>
+                            <td><span class="chip amber">120s</span></td>
+                            <td><span class="muted">-</span></td>
+                            <td><span class="chip">Single</span></td>
+                          </tr>
+                          <tr>
+                            <td><strong>004</strong><small>Panel 6002</small></td>
+                            <td>Plant Room</td>
+                            <td>0</td>
+                            <td><span class="chip blue">SG 2</span></td>
+                            <td><span class="muted">-</span></td>
+                            <td><span class="muted">-</span></td>
+                            <td><span class="chip">Single</span></td>
+                          </tr>
+                          <tr>
+                            <td><strong>005</strong><small>Panel 6002</small></td>
+                            <td>Staircase</td>
+                            <td>2</td>
+                            <td><span class="chip blue">SG 1</span></td>
+                            <td><span class="chip amber">30s</span></td>
+                            <td><span class="chip violet">IO 1</span></td>
+                            <td><span class="chip">Single</span></td>
+                          </tr>
+                          <tr>
+                            <td><strong>006</strong><small>Panel 6002</small></td>
+                            <td>Loading Bay</td>
+                            <td>5</td>
+                            <td><span class="chip blue">SG 4</span></td>
+                            <td><span class="muted">-</span></td>
+                            <td><span class="chip violet">IO 3</span></td>
+                            <td><span class="chip green">Double knock</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+
+                  <aside class="panel detail">
+                    <header class="panel-header">
+                      <div>
+                        <h2>Zone 001 Detail</h2>
+                        <p>Ground Floor Reception</p>
+                      </div>
+                      <span class="chip amber">Delayed</span>
+                    </header>
+
+                    <div class="detail-body">
+                      <div class="detail-summary">
+                        <div class="detail-stat">
+                          <span>Devices</span>
+                          <strong>6</strong>
+                        </div>
+                        <div class="detail-stat">
+                          <span>Delay time</span>
+                          <strong>60s</strong>
+                        </div>
+                        <div class="detail-stat">
+                          <span>Sounder groups</span>
+                          <strong>SG 1, SG 2</strong>
+                        </div>
+                        <div class="detail-stat">
+                          <span>I/O groups</span>
+                          <strong>IO 1</strong>
+                        </div>
+                      </div>
+
+                      <section class="relation-list" aria-label="Selected zone relations">
+                        <div class="relation">
+                          <div class="relation-title">
+                            <span>Alarm 1 output</span>
+                            <span class="chip blue">SG 1</span>
+                          </div>
+                          <div class="chip-row">
+                            <span class="chip amber">Uses sounder delay</span>
+                            <span class="chip">Stage 1</span>
+                          </div>
+                        </div>
+
+                        <div class="relation">
+                          <div class="relation-title">
+                            <span>Alarm 2 output</span>
+                            <span class="chip blue">SG 2</span>
+                          </div>
+                          <div class="chip-row">
+                            <span class="chip">Stage 2</span>
+                            <span class="chip green">Escalation path</span>
+                          </div>
+                        </div>
+
+                        <div class="relation">
+                          <div class="relation-title">
+                            <span>I/O output</span>
+                            <span class="chip violet">IO 1</span>
+                          </div>
+                          <div class="chip-row">
+                            <span class="chip">Fire brigade relay</span>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section>
+                        <div
+                          class="panel-header"
+                          style="padding: 0 0 8px; border: 0; min-height: 0"
+                        >
+                          <div>
+                            <h2>Zone devices</h2>
+                            <p>Read from CPD device assignments.</p>
+                          </div>
+                        </div>
+                        <div class="device-mini-list">
+                          <div class="device-mini">
+                            <span><strong>L1-001</strong> MCP</span>
+                            <span class="chip green">Input</span>
+                          </div>
+                          <div class="device-mini">
+                            <span><strong>L1-004</strong> Optical Smoke</span>
+                            <span class="chip green">Input</span>
+                          </div>
+                          <div class="device-mini">
+                            <span><strong>L1-008</strong> Sounder Beacon</span>
+                            <span class="chip blue">Sounder</span>
+                          </div>
+                          <div class="device-mini">
+                            <span><strong>L2-012</strong> Relay Output</span>
+                            <span class="chip violet">Output</span>
+                          </div>
+                          <div class="device-mini">
+                            <span><strong>L2-019</strong> Heat Detector</span>
+                            <span class="chip danger">Disabled</span>
+                          </div>
+                        </div>
+                      </section>
+                    </div>
+                  </aside>
+                </section>
+              </div>
+            </section>
+          </section>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

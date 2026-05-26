@@ -42,40 +42,82 @@ export function reduceSimulation(
   action: SimulationAction
 ): SimulationState {
   if (action.type === 'tick') {
-    return {
+    const outputs = tickDelayedOutputs(state.outputs, action.elapsedSeconds)
+    const nextState = {
       ...state,
-      outputs: tickDelayedOutputs(state.outputs, action.elapsedSeconds)
+      outputs
+    }
+    const expiredOutputs = getExpiredDelayOutputs(state.outputs, outputs)
+    if (expiredOutputs.length === 0) {
+      return nextState
+    }
+
+    const eventLog = expiredOutputs.reduce(
+      (log, output) =>
+        appendEvent(
+          log,
+          action.at,
+          'delay-expired',
+          `Delay expired for ${output.outputId}`,
+          nextState,
+          undefined,
+          output.outputId
+        ),
+      state.eventLog
+    )
+
+    return {
+      ...nextState,
+      eventLog
     }
   }
 
   if (action.type === 'skip-delay') {
-    return {
+    const outputs = skipOutputDelay(state.outputs, action.outputId)
+    const nextState = {
       ...state,
-      outputs: skipOutputDelay(state.outputs, action.outputId),
+      outputs
+    }
+
+    return {
+      ...nextState,
       eventLog: appendEvent(
         state.eventLog,
         action.at,
         'skip-delay',
-        `Skipped delay for ${action.outputId}`
+        `Skipped delay for ${action.outputId}`,
+        nextState,
+        undefined,
+        action.outputId
       )
     }
   }
 
   if (action.type === 'skip-sounder-delays') {
-    return {
+    const outputs = skipSounderOutputDelays(state.outputs, input.devices)
+    const nextState = {
       ...state,
-      outputs: skipSounderOutputDelays(state.outputs, input.devices),
+      outputs
+    }
+
+    return {
+      ...nextState,
       eventLog: appendEvent(
         state.eventLog,
         action.at,
         'skip-sounder-delays',
-        'Skipped sounder delays'
+        'Skipped sounder delays',
+        nextState
       )
     }
   }
 
   if (action.type === 'system-reset') {
-    return createInitialSimulationState()
+    const nextState = createInitialSimulationState()
+    return {
+      ...nextState,
+      eventLog: appendEvent(state.eventLog, action.at, action.type, eventMessage(action), nextState)
+    }
   }
 
   const nextSources = reduceSources(state, action)
@@ -100,22 +142,31 @@ export function reduceSimulation(
     buzzerSilenced || (soundersSilenced && resolved.soundState === 'fire')
       ? 'silent'
       : resolved.soundState
-
-  return {
+  const nextState: SimulationState = {
     ...state,
     ...nextSources,
     systemState: resolved.systemState,
     soundState,
     buzzerSilenced,
     soundersSilenced,
-    outputs: mergeContinuingOutputState(state.outputs, resolvedOutputs),
-    eventLog: appendEvent(
-      state.eventLog,
-      action.at,
-      action.type,
-      eventMessage(action),
-      actionDeviceId(action)
-    )
+    outputs: mergeContinuingOutputState(state.outputs, resolvedOutputs)
+  }
+  let eventLog = appendEvent(
+    state.eventLog,
+    action.at,
+    action.type,
+    eventMessage(action),
+    nextState,
+    actionDeviceId(action)
+  )
+
+  if (state.soundersSilenced && !soundersSilenced && shouldLogAlarmReactivation(action)) {
+    eventLog = appendEvent(eventLog, action.at, 'alarm-reactivated', 'Alarm reactivated', nextState)
+  }
+
+  return {
+    ...nextState,
+    eventLog
   }
 }
 
@@ -302,7 +353,9 @@ function appendEvent(
   timestamp: number,
   type: string,
   message: string,
-  relatedDeviceId?: string
+  state: SimulationState,
+  relatedDeviceId?: string,
+  relatedOutputId?: string
 ): SimulationEvent[] {
   return [
     ...eventLog,
@@ -311,9 +364,38 @@ function appendEvent(
       timestamp,
       type,
       message,
+      condition: formatConditionSummary(state),
+      relatedOutputId,
       relatedDeviceId
     }
   ]
+}
+
+function getExpiredDelayOutputs(
+  previousOutputs: SimulationState['outputs'],
+  nextOutputs: SimulationState['outputs']
+): SimulationState['outputs'] {
+  const previousById = new Map(previousOutputs.map((output) => [output.outputId, output]))
+
+  return nextOutputs.filter((next) => {
+    const previous = previousById.get(next.outputId)
+    return (
+      previous?.state === 'delayActive' &&
+      next.state === 'active' &&
+      (previous.remainingDelaySeconds ?? 0) > 0 &&
+      (next.remainingDelaySeconds ?? 0) === 0
+    )
+  })
+}
+
+function shouldLogAlarmReactivation(action: SimulationAction): boolean {
+  return action.type === 'activate-input' || action.type === 'evacuate'
+}
+
+function formatConditionSummary(state: SimulationState): string {
+  return `${state.systemState} / ${state.soundState} / inputs ${
+    state.activeInputAlarms.length
+  } / faults ${state.activeFaults.length} / outputs ${state.outputs.length}`
 }
 
 function eventMessage(action: SimulationAction): string {

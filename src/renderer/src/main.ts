@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import App from './App.vue'
-import { useFireProjectStore } from './stores/fireProjectStore'
+import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
 import { i18n } from './i18n'
 
 // [新增] 1. 引入 Element Plus 暗黑模式专用变量
@@ -16,8 +16,28 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-useFireProjectStore(pinia)
+const fireProjectStore = useFireProjectStore(pinia)
 app.use(ElementPlus)
 app.use(i18n)
 
 app.mount('#app')
+
+void loadDevFireProjectFromQuery(fireProjectStore)
+
+async function loadDevFireProjectFromQuery(store: typeof fireProjectStore): Promise<void> {
+  if (!import.meta.env.DEV || typeof window === 'undefined') {
+    return
+  }
+
+  const projectUrl = new URL(window.location.href).searchParams.get('debugFireProject')
+  if (!projectUrl) {
+    return
+  }
+
+  const response = await fetch(projectUrl)
+  if (!response.ok) {
+    throw new Error(`Failed to load debug fire project: ${response.status} ${response.statusText}`)
+  }
+
+  store.loadFireProject((await response.json()) as FireProjectDocument)
+}

@@ -9,7 +9,10 @@ import {
   getViewer3DDeviceHighlightAppearance,
   isZoneHighlighted
 } from '../../domain/fire/viewer3DHighlight'
-import type { Viewer3DDeviceOutputState } from '../../domain/fire/viewer3DSimulationVisual'
+import {
+  getSelectedDeviceBracketPoints,
+  type Viewer3DDeviceOutputState
+} from '../../domain/fire/viewer3DSimulationVisual'
 import {
   getDeviceStatusAppearance,
   type DeviceStatusAppearance
@@ -71,6 +74,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
   const radarRipples: RadarRipple[] = []
   const radarZones: RadarZone[] = []
   const sounderRipples: RadarRipple[] = []
+  let selectedBracketsMesh: THREE.LineSegments | null = null
 
   const PLAN_SCALE = 0.08
   const DEFAULT_FLOOR_WIDTH = 1200
@@ -83,7 +87,6 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     getDeviceColor,
     getSelectedZoneBounds,
     hasActiveInput,
-    hasActiveFault,
     getDeviceOutputState
   } = createViewer3DSceneCalculations(context, {
     planScale: PLAN_SCALE,
@@ -109,51 +112,16 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     getControls: () => controls,
     getRenderer: () => renderer,
     getScene: () => scene,
-    getCamera: () => camera
+    getCamera: () => camera,
+    getSelectedBracketsMesh: () => selectedBracketsMesh
   })
   const textureLoader = new THREE.TextureLoader()
   const textureCache = new Map<string, THREE.Texture>()
-
-  let glowTextureRed: THREE.Texture | null = null
-  let glowTextureBlue: THREE.Texture | null = null
-
-  function getGlowTexture(colorType: 'red' | 'blue'): THREE.Texture {
-    if (colorType === 'red') {
-      if (!glowTextureRed) {
-        glowTextureRed = createGlowCanvasTexture('rgba(239, 68, 68, 0.72)')
-      }
-      return glowTextureRed
-    } else {
-      if (!glowTextureBlue) {
-        glowTextureBlue = createGlowCanvasTexture('rgba(37, 99, 235, 0.72)')
-      }
-      return glowTextureBlue
-    }
-  }
-
-  function createGlowCanvasTexture(colorStr: string): THREE.Texture {
-    const canvas = document.createElement('canvas')
-    canvas.width = 128
-    canvas.height = 128
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
-      const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 60)
-      gradient.addColorStop(0, colorStr)
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
-      ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, 128, 128)
-    }
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.userData.preserveOnSceneClear = true
-    return texture
-  }
 
   interface AnimatedDeviceObject {
     sprite: THREE.Sprite
     spriteMaterial: THREE.SpriteMaterial
     ringMaterial: THREE.MeshBasicMaterial | null
-    glowSprite: THREE.Sprite | null
     baseSize: number
     baseColor: THREE.ColorRepresentation
     baseOpacity: number
@@ -195,6 +163,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
 
   function rebuildScene(): void {
     if (!scene) return
+    disposeSelectedBracketsMesh()
     clearViewer3DScene(scene, radarRipples, radarZones)
     sounderRipples.forEach((ripple) => {
       ripple.mesh.geometry.dispose()
@@ -339,7 +308,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     )
     const highlighted = highlightAppearance.highlighted
     const outputState = getDeviceOutputState(device)
-    const isDelayedSounder = device.isSounder && outputState?.state === 'delayActive'
+    const isDelayedOutput = outputState?.state === 'delayActive'
     const statusAppearance = getDeviceStatusAppearance(device)
     const deviceColor = getDeviceColor(device)
     const material = new THREE.SpriteMaterial({
@@ -360,20 +329,23 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     pickableDeviceObjects.push(sprite)
     scene?.add(sprite)
 
-    let ringMaterial: THREE.MeshBasicMaterial | null = null
-    const isSelectedOrHighlighted = device.id === selectedDeviceId.value || highlighted
+    const isSelected = device.id === selectedDeviceId.value
+    const inputActive = hasActiveInput(device.id)
+    const isIO = device.type === 'input_output' || device.type === 'wireless_input_output'
+    const outputActive = outputState?.state === 'active'
 
     if (statusAppearance.state !== 'normal') {
       renderDeviceStatusMarker(point, size, statusAppearance, highlightAppearance.opacity)
     }
 
-    if (isSelectedOrHighlighted) {
-      // Use a stronger ripple for the selected device and a softer one for grouped highlights.
-      const rippleColor = device.id === selectedDeviceId.value ? '#00ff66' : '#52c41a'
-      // Render three expanding radar rings around the device.
+    if (isSelected) {
+      renderSelectedBrackets(point, size)
+    }
+
+    if (highlighted && !isSelected) {
       for (let i = 0; i < 3; i++) {
         const rippleMat = new THREE.MeshBasicMaterial({
-          color: rippleColor,
+          color: '#52c41a',
           transparent: true,
           opacity: 0.7,
           side: THREE.DoubleSide
@@ -392,56 +364,19 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
           deviceSize: size
         })
       }
-    } else if (hasActiveFault(device.id)) {
-      ringMaterial = new THREE.MeshBasicMaterial({
-        color: deviceColor,
-        transparent: true,
-        opacity: 0.85
-      })
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(size * 0.62, 0.22, 8, 36), ringMaterial)
-      ring.position.copy(point)
-      ring.rotation.x = Math.PI / 2
-      scene?.add(ring)
     }
 
-    if (isDelayedSounder) {
+    if (isDelayedOutput) {
       renderDelayCountdownLabel(point, size, outputState?.remainingDelaySeconds)
     }
 
-    const inputActive = hasActiveInput(device.id)
-    const isIO = device.type === 'input_output' || device.type === 'wireless_input_output'
-    const shouldAnimate = inputActive || (outputState !== null && !isDelayedSounder)
-    const outputActive = outputState?.state === 'active'
-
-    const showGlow = (device.isSounder && outputActive) || 
-                     (!device.isSounder && !isIO && inputActive) || 
-                     (isIO && (inputActive || outputActive))
-
-    let glowSprite: THREE.Sprite | null = null
-    if (showGlow) {
-      const glowTexture = getGlowTexture((isIO && outputActive && !inputActive) ? 'blue' : 'red')
-      const glowMaterial = new THREE.SpriteMaterial({
-        map: glowTexture,
-        transparent: true,
-        opacity: 0.8,
-        depthTest: true,
-        depthWrite: false,
-        toneMapped: false
-      })
-      glowSprite = new THREE.Sprite(glowMaterial)
-      glowSprite.position.copy(point)
-      const glowSize = size * 1.8
-      glowSprite.scale.set(glowSize, glowSize, glowSize)
-      glowSprite.renderOrder = -1
-      scene?.add(glowSprite)
-    }
+    const shouldAnimate = outputState?.state === 'active'
 
     if (shouldAnimate) {
       animatedDeviceObjects.push({
         sprite,
         spriteMaterial: material,
-        ringMaterial,
-        glowSprite,
+        ringMaterial: null,
         baseSize: size,
         baseColor: deviceColor,
         baseOpacity: highlightAppearance.opacity * statusAppearance.iconOpacity,
@@ -453,9 +388,9 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       })
     }
 
-    const showRipples = (device.isSounder && outputActive) || (isIO && (inputActive || outputActive))
+    const showRipples = (device.isSounder && outputActive) || (isIO && outputActive)
     if (showRipples) {
-      const rippleColor = (isIO && outputActive && !inputActive) ? '#2563eb' : '#ef4444'
+      const rippleColor = isIO && !inputActive ? '#2563eb' : '#ef4444'
       for (let i = 0; i < 3; i++) {
         const rippleMat = new THREE.MeshBasicMaterial({
           color: rippleColor,
@@ -550,6 +485,38 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     ring.position.y += Math.max(0.04, size * 0.04)
     ring.rotation.x = Math.PI / 2
     scene?.add(ring)
+  }
+
+  function renderSelectedBrackets(point: THREE.Vector3, size: number): void {
+    const geometry = new THREE.BufferGeometry().setFromPoints(
+      getSelectedDeviceBracketPoints(size).map((next) => new THREE.Vector3(next.x, next.y, next.z))
+    )
+    const material = new THREE.LineBasicMaterial({
+      color: '#00ff66',
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false
+    })
+    const mesh = new THREE.LineSegments(geometry, material)
+    mesh.position.copy(point)
+    mesh.position.y += 0.05
+    mesh.renderOrder = 25
+    scene?.add(mesh)
+    selectedBracketsMesh = mesh
+  }
+
+  function disposeSelectedBracketsMesh(): void {
+    if (!selectedBracketsMesh) return
+
+    scene?.remove(selectedBracketsMesh)
+    selectedBracketsMesh.geometry.dispose()
+    const material = selectedBracketsMesh.material
+    if (Array.isArray(material)) {
+      material.forEach((next) => next.dispose())
+    } else {
+      material.dispose()
+    }
+    selectedBracketsMesh = null
   }
 
   function renderLoop(loop: FireLoop, deviceObjects: Map<string, THREE.Vector3>): void {
@@ -672,6 +639,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     renderer?.domElement.removeEventListener('dblclick', handleRendererDoubleClick)
     renderer?.domElement.removeEventListener('contextmenu', handleRendererContextMenu)
     renderer?.dispose()
+    disposeSelectedBracketsMesh()
     clearViewer3DScene(scene, radarRipples, radarZones)
     sounderRipples.forEach((ripple) => {
       ripple.mesh.geometry.dispose()
@@ -707,17 +675,6 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       texture.dispose()
     }
     textureCache.clear()
-
-    if (glowTextureRed) {
-      glowTextureRed.userData.preserveOnSceneClear = false
-      glowTextureRed.dispose()
-      glowTextureRed = null
-    }
-    if (glowTextureBlue) {
-      glowTextureBlue.userData.preserveOnSceneClear = false
-      glowTextureBlue.dispose()
-      glowTextureBlue = null
-    }
   }
   return {
     initScene,

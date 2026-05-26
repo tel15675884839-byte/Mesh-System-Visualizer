@@ -376,7 +376,7 @@ export default defineComponent({
       window.removeEventListener('mousemove', handleWindowMouseMove)
       window.removeEventListener('mouseup', handleWindowMouseUp)
     })
-    const locateDevice = (deviceId: string) => {
+    const locateDevice = (deviceId: string): void => {
       const device = deviceById.value.get(deviceId)
       if (!device || device.placement.status !== 'placed') return
       if (device.placement.buildingId) {

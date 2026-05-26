@@ -1,0 +1,424 @@
+# Goal 8 Tasks: 6002 Manual Simulation Alignment and Project Preview Group Semantics
+
+## Goal
+
+Align the 3D simulator and Project Preview with the confirmed 6002 CIE manual scope: CPD-driven cause/effect behavior should follow the manual where requested, the 3D selected-device visual should use the approved bracket marker, while access levels, pre-alarm/test/lamp-test behavior, detailed fault categories, and 2D simulation triggering remain out of scope.
+
+## Confirmed Scope
+
+- Keep current `SYSTEM RESET` behavior unchanged.
+- Fix disabled/evacuation, Sounder Group, I/O Group, inhibit, and delay behavior according to the manual.
+- Read configuration from `.cpd`; do not build an in-app configuration menu for those manual settings.
+- For CPD-backed preview/simulation behavior, `.cpd` is the source of truth when `.fireproj` device fields disagree with the CPD extraction.
+- Add manual-style event/log display in the 3D simulation interface.
+- Keep fault behavior generic: devices can enter/restore fault, but no detailed loop/power/supervision taxonomy is required.
+- Keep 2D as configuration/planning only; no 2D trigger actions are needed.
+- In Project Preview, Zone membership means input devices only.
+- In Project Preview, Sounder Group membership means Sounder devices only, including Wireless Sounder.
+- In Project Preview, I/O Group membership means `Input_Output` and Wireless I/O devices only, including normalized `input_output` and `wireless_input_output`.
+- A Sounder Group field on an input device is a direct output assignment for that initiating device, not membership of that input device inside the Sounder Group.
+- The same I/O module may appear under a Zone as an initiating/input device and under an I/O Group as an output group member; those are different meanings and must not be merged.
+- Project Preview needs a direct-assignment Devices area beside Zone: it should show only per-device Sounder Group / I/O Group bindings and their links, separate from group membership.
+- Common group 512 is active only when it exists in CPD data or is explicitly referenced by CPD/manual-applicable configuration; do not synthesize it without evidence.
+- Any evacuation path, including manual EVACUATE and CPD automatic evacuation rules, should operate disabled sounders.
+- `DelayOffAtNight` should use current local time only when CPD provides enough day/night schedule data; otherwise keep it parsed and document that runtime night detection was not applied.
+- I/O delay must be represented and triggered independently from Sounder Group delay; the simulator must not share one sounder delay timer/state for both output types.
+- Use `D:\Users\30741\Desktop\程序开发\报警模拟器\6002-delay-edge-fields.fireproj` together with `fixtures/cpd/6002-delay-edge-fields.cpd` as a concrete verification pair; in this pair, Zone 1 device L1-004 must not show `Set Evacuate Timer` because the CPD device field is false.
+- Replace the 3D current-selected-device radar marker with restrained green floating L-shaped targeting brackets, while preserving existing group highlight and simulation output visuals.
+
+## Out of Scope
+
+- Access levels, passcodes, and permission enforcement.
+- Pre-alarm, test zones, sounder tests, lamp/indicator test.
+- Detailed fault categories such as loop open/short, mains, battery, or supervision fault.
+- 2D alarm/fault/evacuation triggers.
+- Editing 6002 configuration settings inside the simulator UI.
+
+## Key Files
+
+- `src/renderer/src/domain/fire/deviceIcons.ts`
+- `src/renderer/src/domain/fire/types.ts`
+- `src/renderer/src/domain/fire/cpdAdapter.ts`
+- `src/renderer/src/domain/fire/cpdAdapterGroups.ts`
+- `src/renderer/src/domain/fire/cpdInspectorModel.ts`
+- `src/renderer/src/domain/fire/tree.ts`
+- `src/renderer/src/domain/fire/viewer3DHighlight.ts`
+- `src/renderer/src/domain/fire/simulation/types.ts`
+- `src/renderer/src/domain/fire/simulation/engine.ts`
+- `src/renderer/src/domain/fire/simulation/causeEffect.ts`
+- `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+- `src/renderer/src/domain/fire/simulationOutputMapping.ts`
+- `src/renderer/src/domain/fire/simulationAudio.ts`
+- `src/renderer/src/components/fire/CpdInspector.vue`
+- `src/renderer/src/components/fire/CpdInspectorDeviceColumn.vue`
+- `src/renderer/src/components/fire/CpdInspectorGroupColumn.vue`
+- `src/renderer/src/components/fire/Viewer3D.ts`
+- `src/renderer/src/components/fire/Viewer3D.template.html`
+- `src/renderer/src/components/fire/Viewer3DScene.ts`
+- `src/renderer/src/components/fire/Viewer3DSceneAnimation.ts`
+- `src/renderer/src/components/fire/Viewer3DSceneInteraction.ts`
+- `src/renderer/src/i18n/*`
+- Existing focused tests under `src/renderer/src/domain/fire/__tests__`
+- Existing 3D visual tests under `src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts`
+- Existing simulation tests under `src/renderer/src/domain/fire/simulation/__tests__`
+- Existing runtime harness scripts under `scripts/`
+
+## Manual Behavior Contract
+
+- Sounder Group membership contains only actual sounders; Wireless Sounder is a sounder.
+- I/O Group membership contains only input/output module devices, including Wireless I/O.
+- Zone membership contains initiating/input devices only; Sounders should not count as Zone devices even if their CPD row carries a Zone-like field.
+- A direct Sounder Group or I/O Group value on an initiating device is a cause/effect assignment used when that device triggers alarm.
+- Direct initiating-device Sounder Group / I/O Group assignments should be displayed in a separate Project Preview Devices relation area, not as membership rows in Sounder Group or I/O Group.
+- Zone first-stage and second-stage output groups should be applied from Zone configuration.
+- Common group 512 should be treated as common only when the CPD data includes or explicitly references it.
+- Sounder output effect precedence is `Continuous > Pulsing > Silent`.
+- Disabled sounders do not operate in normal Alarm Condition, but every evacuation path should activate disabled sounders.
+- Sounder/I/O inhibit must respect the manual's `NONE`, `COMMON`, `ZONAL`, and `ALL` intent where CPD provides those values.
+- Sounder/I/O delay must respect CPD delay settings, trigger source filters, override flags, delay cancellation, delay expiry, and night bypass where those values are present.
+- Sounder delay and I/O delay must have independent output states, countdowns, and expiry behavior; a delayed I/O output should not borrow the Sounder Group countdown.
+- Device-level CPD flags such as `SetEvacuateTimer`, `ImmediateEvacuate`, `OverrideDelays`, and `IOOverrideDelay` should display and simulate from the specific device row, not from another device, Zone, panel rule, or stale `.fireproj` value.
+- In `6002-delay-edge-fields.cpd`, Zone 1 L1-004 has `setEvacuateTimer: false` / raw `SetEvacuateTimer: false`; Project Preview should not show `Set Evacuate Timer` for that device even if the paired `.fireproj` currently contains `setEvacuateTimer: true`.
+- 3D logs should record operator-visible events and state transitions: fire, fault, evacuation, alarm silence/reactivation, buzzer silence, delay cancellation/skip, delay expiry, and reset.
+
+## 3D Selection Visual Contract
+
+- Current selected device:
+  - Use four green L-shaped bracket corners around the device bottom plane.
+  - Color is `#00ff66`.
+  - Brackets should have a small gap from the device body, like a precise target lock.
+  - Do not use circles, rings, or radar spread for the selected device.
+  - Do not recolor the device icon or sprite.
+  - Animate only the brackets with subtle breathing scale and opacity.
+- Group highlighted devices:
+  - Keep the existing pale green radar spread circle.
+  - This remains the visual meaning for associated devices inside a group, not the currently selected device.
+- Simulation state devices:
+  - Do not change simulation semantics in this visual task.
+  - Sounder active and I/O active continue using output ripples.
+  - I/O `delayActive` continues to show countdown.
+  - Alarm input sources do not get ripple or bracket-target animation.
+- Geometry:
+  - In `Viewer3DScene.ts`, create one `THREE.LineSegments` marker for the selected device.
+  - Draw in the XZ plane from the device center with four L corners.
+  - Each corner has two line segments: 8 segments total, 16 points total.
+  - Lift the marker by `y += 0.05` to avoid map/device-bottom flicker.
+  - Suggested constants: `const D = size * 0.82` and `const L = size * 0.26`.
+- Animation:
+  - In `Viewer3DSceneAnimation.ts`, add `getSelectedBracketsMesh: () => THREE.LineSegments | null`.
+  - Per frame, compute `breath = Math.sin(now * 0.004)`, `scale = 1 + breath * 0.08`, and `opacity = 0.8 + breath * 0.15`.
+  - Effective scale should be about `0.92` to `1.08`; opacity should be about `0.65` to `0.95`.
+  - Animation applies only to the bracket marker, not to the device sprite.
+- Resource management:
+  - Maintain `let selectedBracketsMesh: THREE.LineSegments | null = null` in `Viewer3DScene.ts`.
+  - During `rebuildScene()` and `cleanupScene()`, remove the marker from the scene, dispose its geometry and material, and set the reference to null.
+  - Avoid stale markers after scene rebuild and avoid double disposal.
+- Verification for this visual task:
+  - No browser verification is required for this task.
+  - Run the focused visual test, typecheck, targeted eslint on touched files, and build.
+
+## Tasks
+
+- [x] Task 1: Write this task list and freeze the implementation boundary.
+  - Completion notes:
+    - User confirmed access/test/pre-alarm/detailed-fault/2D-trigger features are out of scope.
+    - User confirmed `.cpd` remains the configuration source.
+    - User added Project Preview grouping rules and direct device output assignment distinction.
+
+- [x] Task 2: Add a shared device-role helper for grouping semantics.
+  - Scope:
+    - Create or extend a domain helper so all Project Preview and tree/highlight code can ask:
+      - is Zone member: `device.isInputCapable && !device.isSounder`
+      - is Sounder Group member: `device.isSounder`, including `sounder` and `wireless_sounder`
+      - is I/O Group member: normalized type `input_output` or `wireless_input_output`
+      - is direct initiating-device Sounder Group assignment: input-capable non-sounder with `sounderGroupId > 0`
+      - is direct initiating-device I/O Group assignment: input-capable device with `ioGroupId > 0`
+      - can appear in both Zone and I/O Group: input/output module devices, with separate relation meanings.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/deviceIcons.ts` or create a focused helper next to it.
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/deviceIcons.test.ts` or a new helper test.
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/deviceIcons.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added shared helpers for Zone, Sounder Group, I/O Group, and direct initiating-device assignment semantics.
+    - Verified `npm run test -- src/renderer/src/domain/fire/__tests__/deviceIcons.test.ts` and `npm run typecheck`.
+
+- [x] Task 3: Fix Project Preview Zone/Sounder Group/I/O Group membership.
+  - Scope:
+    - Update `buildCpdInspectorModel` so Zone device counts and Zone device filtering exclude Sounder and Wireless Sounder devices.
+    - Update Sounder Group membership so a device appears in a Sounder Group only when it is an actual sounder member by CPD group member table/address match.
+    - Do not treat `device.sounderGroupId` on a detector, call point, zone monitor, or I/O module as Sounder Group membership.
+    - Update I/O Group membership so only input/output modules, including Wireless I/O, appear as I/O Group members.
+    - Allow an input/output module or Wireless I/O module to be counted as a Zone input device and also as an I/O Group member when both CPD relations exist.
+    - Keep direct output assignment visible in device details as a device-level assignment, not as group membership.
+    - Fix Project Preview device flag display so L1-004 in Zone 1 of `6002-delay-edge-fields.cpd` does not show `Set Evacuate Timer`; the Preview must use the CPD device row's `setEvacuateTimer` value rather than a stale or generated `.fireproj` value.
+    - Add a regression test for the provided fixture pair proving the CPD value wins when `.fireproj` and `.cpd` disagree for device-level flags.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/cpdInspectorModel.ts`
+    - Modify: `src/renderer/src/components/fire/CpdInspectorDeviceDetails.vue`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/cpdInspectorModel.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdInspectorModel.test.ts`
+  - Completion notes:
+    - Project Preview model now counts Zone devices with input non-sounder semantics only.
+    - Sounder Group and I/O Group membership now uses true output member tables plus device role filters, not direct initiating-device fields.
+    - Added regression coverage proving CPD re-import makes L1-004 `SetEvacuateTimer=false` win over stale `.fireproj` device data.
+
+- [x] Task 4: Add the Project Preview direct-assignment Devices relation area.
+  - Scope:
+    - Add a Devices area beside the Zone area in Project Preview for direct per-device output bindings.
+    - This Devices area should include only input/initiating devices that have direct `sounderGroupId` or `ioGroupId` assignments.
+    - Draw/represent links from those direct-assignment devices to their assigned Sounder Group or I/O Group.
+    - Do not show normal Sounder Group or I/O Group members in this direct-assignment Devices area.
+    - Keep Sounder Group and I/O Group member lists restricted to actual output members.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/cpdInspectorModel.ts`
+    - Modify: `src/renderer/src/components/fire/CpdInspector.vue`
+    - Modify: `src/renderer/src/components/fire/CpdInspectorDeviceColumn.vue`
+    - Modify: `src/renderer/src/components/fire/CpdInspectorGroupColumn.vue`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/cpdInspectorModel.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdInspectorModel.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added `directGroupIds` and `directDevices` to the Project Preview model.
+    - Added a Devices column between Zone and Group for selected-Zone direct device Sounder Group / I/O Group bindings.
+    - Group and output member lists remain based on true membership only.
+    - Verified `npm run test -- src/renderer/src/domain/fire/__tests__/cpdInspectorModel.test.ts` and `npm run typecheck`.
+
+- [x] Task 5: Fix tree and 3D highlight grouping semantics to match Project Preview.
+  - Scope:
+    - Update `tree.ts` so Sounder Group view does not group initiating devices by `device.sounderGroupId`.
+    - Update `tree.ts` so I/O Group view does not group non-I/O devices by `device.ioGroupId`.
+    - Update `viewer3DHighlight.ts` so selecting a Sounder Group highlights real group member sounders, while separately allowing cause/effect tracing to show initiating devices only when that is an explicit relation UI state.
+    - Keep Loop and Type grouping unchanged.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/tree.ts`
+    - Modify: `src/renderer/src/domain/fire/viewer3DHighlight.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/tree.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/viewer3DHighlight.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/tree.test.ts src/renderer/src/domain/fire/__tests__/viewer3DHighlight.test.ts`
+  - Completion notes:
+    - Device Tree Sounder Group and I/O Group views now ignore direct initiating-device assignment fields.
+    - 3D group highlight now highlights true Sounder / Wireless Sounder or I/O member devices only.
+    - Verified `npm run test -- src/renderer/src/domain/fire/__tests__/deviceIcons.test.ts src/renderer/src/domain/fire/__tests__/tree.test.ts src/renderer/src/domain/fire/__tests__/viewer3DHighlight.test.ts`.
+
+- [x] Task 6: Separate group membership from direct initiating-device output assignment in the simulation model.
+  - Scope:
+    - Keep `SounderGroup.addressableMembers` and `IOGroup.members` as output-device membership.
+    - Treat `device.sounderGroupId` on input devices as "when this device alarms, also activate this Sounder Group".
+    - Treat `device.ioGroupId` on input devices as "when this device alarms, also activate this I/O Group".
+    - Avoid synthesizing Sounder Group members from input devices just because they carry `sounderGroupId`.
+    - Avoid synthesizing I/O Group members from non-I/O devices just because they carry `ioGroupId`.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/cpdAdapter.ts`
+    - Modify: `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+  - Completion notes:
+    - CPD adapter synthesizes group membership only from true Sounder / I/O member devices.
+    - Direct initiating-device `sounderGroupId` / `ioGroupId` is handled as cause/effect output assignment, not group membership.
+    - Verified with `cpdAdapter.test.ts` and `causeEffect.test.ts`.
+
+- [x] Task 7: Implement manual-aligned Sounder Group and I/O Group output aggregation.
+  - Scope:
+    - For a fire source, aggregate:
+      - direct initiating-device Sounder Group assignment;
+      - Zone first-fire Sounder Group;
+      - Zone second-fire Sounder Group when applicable;
+      - common Sounder Group 512 only where CPD includes or explicitly references it.
+    - For I/O outputs, aggregate:
+      - direct initiating-device I/O Group assignment;
+      - Zone first-fire I/O groups;
+      - Zone second-fire I/O group where applicable;
+      - common I/O Group 512 only where CPD includes or explicitly references it.
+    - Apply Sounder Group effect precedence: continuous wins over pulsing, pulsing wins over silent.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+    - Modify: `src/renderer/src/domain/fire/simulationOutputMapping.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/simulationOutputMapping.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts src/renderer/src/domain/fire/__tests__/simulationOutputMapping.test.ts`
+  - Completion notes:
+    - Direct, zonal, and CPD-present common outputs are aggregated separately for Sounder and I/O groups.
+    - Common group 512 is only used when present in imported panel group data.
+    - Output mapping tests confirm output state still maps into 3D device visual state correctly.
+
+- [x] Task 8: Fix disabled sounder behavior for Alarm Condition versus Evacuation.
+  - Scope:
+    - Alarm Condition: disabled sounders should remain inactive.
+    - Evacuation: disabled sounders should operate according to the manual.
+    - Apply the same disabled-sounder evacuation behavior for manual EVACUATE and CPD automatic evacuation paths such as `ImmediateEvacuate`, `OnManualCallPoints`, `OnTwoDevices`, and Evacuate Timer.
+    - Ensure `getDeviceSimulationOutput` does not globally suppress disabled sounders when the current output came from evacuation.
+    - Ensure 3D visual/audio behavior follows the output state, not only the static disabled flag.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+    - Modify: `src/renderer/src/domain/fire/simulationOutputMapping.ts`
+    - Modify: `src/renderer/src/domain/fire/simulationAudio.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/simulationOutputMapping.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/simulationAudio.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/simulation src/renderer/src/domain/fire/__tests__/simulationOutputMapping.test.ts src/renderer/src/domain/fire/__tests__/simulationAudio.test.ts`
+  - Completion notes:
+    - Normal Alarm Condition still suppresses disabled sounders.
+    - Evacuation paths can activate disabled sounders, and visual/audio mapping follows active evacuation output state.
+    - Verified with focused cause/effect, output mapping, and audio tests.
+
+- [x] Task 9: Implement manual-aligned inhibit handling from CPD values.
+  - Scope:
+    - Interpret CPD inhibit values as `NONE`, `COMMON`, `ZONAL`, or `ALL` when present.
+    - `ALL` suppresses relevant output group activations from that initiating source.
+    - `COMMON` suppresses common group behavior but not direct device-assigned group behavior.
+    - `ZONAL` suppresses Zone-derived group behavior but not direct device-assigned group behavior.
+    - Preserve current boolean behavior as a fallback when CPD only provides boolean-like values.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/types.ts`
+    - Modify: `src/renderer/src/domain/fire/cpdAdapter.ts`
+    - Modify: `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/cpdAdapter.test.ts src/renderer/src/domain/fire/simulation/__tests__/causeEffect.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - `NONE`, `COMMON`, `ZONAL`, and `ALL` inhibit modes are interpreted from CPD raw values where present.
+    - Boolean inhibit remains the fallback and maps to `ALL`.
+    - Verified with cause/effect tests and `npm run typecheck`.
+
+- [x] Task 10: Implement manual-aligned independent Sounder and I/O delay behavior from CPD values.
+  - Scope:
+    - Apply Sounder delay mode and source filter values from CPD where present.
+    - Apply I/O delay values from CPD where present.
+    - Maintain separate Sounder output delay and I/O output delay state; I/O outputs must not reuse Sounder Group delay countdowns or activation state.
+    - Trigger I/O delay independently when an I/O Group output is activated by direct device assignment, Zone first/second-stage I/O configuration, or common I/O configuration.
+    - Allow Sounder output and I/O output for the same fire source to have different delay values and different active/delay states at the same simulated time.
+    - Apply `overrideDelays` and device activation override behavior from CPD.
+    - Apply delay cancellation/skip behavior already exposed in 3D controls.
+    - Apply delay expiry behavior so later relevant fire events after expiry operate immediately until reset, except where current reset behavior intentionally resets all state.
+    - Apply `delayOffAtNight` using current local time only if CPD provides enough day/night schedule data; otherwise record it as parsed-but-not-runtime-applied in the task completion note.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/simulation/types.ts`
+    - Modify: `src/renderer/src/domain/fire/simulation/engine.ts`
+    - Modify: `src/renderer/src/domain/fire/simulation/causeEffectOutputs.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/causeEffectDelays.test.ts`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/causeEffectDelays.test.ts src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
+  - Completion notes:
+    - Sounder and I/O outputs keep independent output IDs, delay reasons, countdowns, skip behavior, and expiry behavior.
+    - The 3D delay toggle continues to control sounder delays only; delayed I/O outputs remain independent.
+    - `DelayOffAtNight` remains parsed but not runtime-applied unless enough schedule data is available.
+    - Verified with delay and engine tests.
+
+- [x] Task 11: Add manual-style 3D simulation event log.
+  - Scope:
+    - Add a visible log panel in the 3D simulation interface.
+    - Log fire activation/restoration, fault activation/restoration, evacuation, buzzer silence, alarm silence/reactivation, delay cancellation/skip, delay expiry, and reset.
+    - Log entries should include timestamp/order, event type, device or output label when applicable, and current condition summary.
+    - Keep the log local to simulator runtime state unless a persistence requirement is later added.
+    - Do not implement the manual's 3000-event persistent history as a separate feature in this task.
+  - Files:
+    - Modify: `src/renderer/src/domain/fire/simulation/types.ts`
+    - Modify: `src/renderer/src/domain/fire/simulation/engine.ts`
+    - Modify: `src/renderer/src/components/fire/Viewer3D.ts`
+    - Modify: `src/renderer/src/components/fire/Viewer3D.template.html`
+    - Modify: `src/renderer/src/i18n/*`
+    - Modify tests: `src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/simulation/__tests__/engine.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added simulation event condition summaries and output references for delay expiry / skip events.
+    - System reset clears active simulation state while keeping a reset log entry in the runtime event log.
+    - Added a compact 3D event log panel showing time, type, target, message, and condition summary.
+    - Verified with `engine.test.ts`, source UI regression test, browser harness, and `npm run typecheck`.
+
+- [x] Task 12: Replace selected-device radar marker with floating L-shaped brackets.
+  - Scope:
+    - Replace the current selected-device radar spread marker with four green L-shaped brackets around the selected device bottom plane.
+    - Keep group-highlighted devices on the existing pale green radar spread circle.
+    - Keep Sounder active and I/O active output ripples unchanged.
+    - Keep I/O `delayActive` countdown unchanged.
+    - Do not add ripple, bracket-target animation, or color changes to alarm input sources.
+    - Implement the selected marker as `THREE.LineSegments` in `Viewer3DScene.ts`, with 8 line segments and 16 points in the XZ plane.
+    - Use `#00ff66`, a small gap from the device body, and slight `y += 0.05` lift.
+    - Use `D = size * 0.82` and `L = size * 0.26` as the starting geometry proportions.
+    - Add `getSelectedBracketsMesh: () => THREE.LineSegments | null` to `Viewer3DSceneAnimation.ts` inputs and animate only the marker scale/opacity with the approved breathing formula.
+    - Dispose marker geometry/material and clear the scene reference during `rebuildScene()` and `cleanupScene()`.
+    - Avoid using `linewidth` as the only visibility mechanism; if standard WebGL lines are too thin in implementation review, switch to thin rectangle geometry in a later focused adjustment.
+  - Files:
+    - Modify: `src/renderer/src/components/fire/Viewer3DScene.ts`
+    - Modify: `src/renderer/src/components/fire/Viewer3DSceneAnimation.ts`
+    - Modify tests: `src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts`
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts`
+    - `npm run typecheck`
+    - `npx eslint src/renderer/src/components/fire/Viewer3DScene.ts src/renderer/src/components/fire/Viewer3DSceneAnimation.ts src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts`
+    - `npm run build`
+  - Completion notes:
+    - Selected devices now use a single green `THREE.LineSegments` bracket marker with 8 segments / 16 points.
+    - Group-highlighted devices keep the existing pale green radar ripple, and input alarm sources remain visually still.
+    - Bracket breathing updates scale and opacity only; device sprites are not recolored by selection.
+    - Focused visual tests and typecheck passed; targeted eslint/build are part of final verification below.
+
+- [x] Task 13: Extend 3D runtime/browser verification for the corrected behavior.
+  - Scope:
+    - Add or extend a fixture/browser harness that imports a CPD-backed project and proves:
+      - Project Preview Zone excludes Sounders;
+      - Project Preview Sounder Group only lists Sounder/Wireless Sounder members;
+      - Project Preview I/O Group only lists Input_Output and Wireless I/O members;
+      - an I/O module or Wireless I/O module can appear both as a Zone input device and as an I/O Group output member when CPD says so;
+      - Project Preview direct-assignment Devices area shows input-device Sounder Group / I/O Group bindings separately from group membership;
+      - Zone 1 L1-004 from `6002-delay-edge-fields.cpd` does not show `Set Evacuate Timer` when the CPD value is false, even if the paired `.fireproj` contains a different stored value;
+      - direct input-device Sounder Group assignment drives output activation without making the input device a Sounder Group member;
+      - disabled sounders remain silent in Alarm Condition but operate under every evacuation path covered by CPD/manual controls;
+      - Sounder delay and I/O delay produce independent countdown/activation behavior;
+      - 3D event log records the operator-visible actions.
+  - Files:
+    - Modify: existing fixture checks under `scripts/`
+    - Modify: existing browser harness files under `src/renderer/`
+  - Verification:
+    - `node .\scripts\runtime-cpd-fixture-check.mjs`
+    - `node .\scripts\viewer3d-fixture-browser-check.mjs`
+  - Completion notes:
+    - Runtime CPD harness now checks Preview Zone/Group membership semantics, direct device assignment separation, L1-004 `SetEvacuateTimer=false`, direct assignment output activation, and event log delay/reset entries.
+    - Browser harness now checks 3D event log rendering and delay-expiry event logging alongside existing delayed Sounder/I/O visual checks.
+    - Verified both scripts successfully.
+
+- [x] Task 14: Run final full verification and record results.
+  - Scope:
+    - Run the full repo checks after the focused behavior is implemented.
+    - Update this task file with command results and any residual manual gaps.
+    - Do not stage unrelated dirty files.
+  - Verification:
+    - `npm run lint`
+    - `npm run typecheck`
+    - `npm run test`
+    - `npm run build`
+    - `git status --short`
+  - Completion notes:
+    - `npx eslint src/renderer/src/components/fire/Viewer3DScene.ts src/renderer/src/components/fire/Viewer3DSceneAnimation.ts src/renderer/src/domain/fire/__tests__/viewer3DSimulationVisual.test.ts` passed.
+    - `node .\scripts\runtime-cpd-fixture-check.mjs` passed.
+    - `node .\scripts\viewer3d-fixture-browser-check.mjs` passed.
+    - `npm run lint` passed.
+    - `npm run typecheck` passed.
+    - `npm run test` passed: 35 test files, 230 tests.
+    - `npm run build` passed.
+    - `git status --short` was reviewed; the worktree still contains many pre-existing dirty/untracked files, plus generated build/runtime reports from verification.
+
+## Completion Criteria
+
+- Project Preview grouping follows the user's CPD semantics exactly.
+- Project Preview shows direct per-device Sounder Group / I/O Group assignments in a separate Devices relation area.
+- 3D simulation uses `.cpd` cause/effect fields without requiring an in-app configuration editor.
+- Manual-aligned sounder/I-O aggregation, disable/evacuation, inhibit, and independent Sounder/I/O delay behavior is covered by focused tests.
+- 3D interface displays a useful event log for simulation operation.
+- 3D selected-device marker uses green floating L-shaped brackets; group highlight radar, output ripples, and input-source non-animation semantics remain unchanged.
+- 2D remains configuration-only.
+- Out-of-scope manual features remain intentionally unimplemented and documented here.

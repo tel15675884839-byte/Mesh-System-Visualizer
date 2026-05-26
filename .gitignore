@@ -9,3 +9,5 @@ release
 *.log
 .superpowers/
 tools/CpdFixtureGenerator/bin/
+public/debug-fireproj/
+public/assets/maps/Generated-Image-May-23-2026---10_03AM-*.jpg

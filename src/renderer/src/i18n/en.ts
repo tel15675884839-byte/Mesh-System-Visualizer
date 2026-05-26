@@ -23,6 +23,7 @@ export default {
       zones: 'Zones',
       outputGroups: 'Output Groups',
       outputDevices: 'Output Devices',
+      directDevices: 'Devices',
       devices: 'Devices',
       special: 'Special',
       configured: 'Configured',
@@ -32,6 +33,9 @@ export default {
       hasOutputs: 'Has Outputs',
       specialDevices: 'Special Devices',
       modeUnavailable: 'Mode unavailable',
+      searchDirectDevices: 'Search Device Bindings...',
+      searchOutputDevices: 'Search Outputs...',
+      noDirectDevices: 'No direct device bindings in this Zone',
       noOutputDevices: 'No output devices in this group',
       noSpecialProperties: 'No non-default simulation properties'
     },
@@ -110,7 +114,9 @@ export default {
       loop: 'Loop',
       zone: 'Zone',
       sounderGroup: 'Sounder',
-      ioGroup: 'I/O'
+      ioGroup: 'I/O',
+      eventLog: 'Event Log',
+      noEvents: 'No events'
     },
     zoneToolbar: {
       zone: 'Zone',

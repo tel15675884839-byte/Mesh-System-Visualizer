@@ -1,0 +1,318 @@
+# Goal 4 Tasks
+
+- [x] Task 1: Add lifecycle cleanup tests for Building and Floor deletion
+  - Scope:
+    - Write failing store tests before implementation.
+    - Cover deleting a Building with devices, Zone visual areas, maps, per-floor 3D opacity, and selected IDs pointing at it.
+    - Cover deleting a Floor with the same dependent data.
+    - Define deterministic cleanup rules:
+      - devices on deleted Building/Floor become `unplaced`;
+      - Zone visual areas on deleted Building/Floor are removed;
+      - deleted floors disappear from `project.buildings`;
+      - floor-level view overrides on deleted floors disappear with the floor;
+      - unrelated buildings/floors/devices/Zone areas remain unchanged.
+  - Owned files:
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `src/renderer/src/stores/fireProjectStore.ts`
+  - Required red test:
+    - Add tests that call `store.removeBuilding(buildingId)` and `store.removeFloor(buildingId, floorId)` before those functions exist.
+    - Expected first run: type/test failure because the actions are missing.
+  - Verification before Task 2:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added red tests for `removeBuilding(buildingId)` and `removeFloor(buildingId, floorId)`.
+    - Red run failed as expected with missing store actions; the same run also exposed an existing partial group normalization regression.
+
+- [x] Task 2: Implement store-level Building/Floor delete actions and reference cleanup
+  - Scope:
+    - Add `removeBuilding(buildingId)` and `removeFloor(buildingId, floorId)` to `useFireProjectStore`.
+    - Both actions must use `withPlanningSnapshot()` so undo/redo works.
+    - Prevent impossible empty planning state by ensuring at least one default Building/Floor remains after deletion when the project otherwise still needs a drawing target.
+    - Clean dependent references in one store transaction:
+      - unplace affected devices;
+      - remove affected Zone visual areas;
+      - clear selected device when it is affected;
+      - remove deleted floor/building records.
+    - Keep manual Loop order intact unless deleted device placements require only visual unplacement; do not alter CPD loop configuration.
+  - Owned files:
+    - `src/renderer/src/stores/fireProjectStore.ts`
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+  - Verification before Task 3:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added undoable `removeBuilding` and `removeFloor` store actions.
+    - Device and non-addressable point placements on removed targets become `unplaced`; affected Zone visual areas are removed; selected affected device is cleared.
+    - Deleting the last floor/building leaves a valid default planning target.
+    - Fixed partial old-project sounder/I/O group normalization while in this store path.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`; `npm run typecheck`.
+
+- [x] Task 3: Add floor drawing clear/unassign lifecycle
+  - Scope:
+    - Add a store action `clearFloorMapAsset(buildingId, floorId)` or `clearFloorMapAsset(floorId)` using the existing local pattern.
+    - Clearing a drawing must remove `mapAssetId` from the floor and reset map dimensions only if the current dimensions were derived from that imported drawing.
+    - Do not remove the asset object from `project.assets` unless no floors reference it and the implementation can prove that cleanup is safe.
+    - Add undo/redo coverage.
+  - Owned files:
+    - `src/renderer/src/stores/fireProjectStore.ts`
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+  - Verification before Task 4:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added red test for `clearFloorMapAsset(buildingId, floorId)`.
+    - Implemented undoable floor map unassignment that clears `mapAssetId`, restores default canvas dimensions, and preserves assets, placed devices, and Zone visual areas.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`; `npm run typecheck`.
+
+- [x] Task 4: Add 2D UI controls for delete Building, delete Floor, and clear drawing
+  - Scope:
+    - Add compact icon buttons with tooltips in `Planner2D.vue`.
+    - Use existing Element Plus/lucide-equivalent icon style already used in the fire toolbar.
+    - Building delete:
+      - visible when a current Building exists;
+      - disabled or confirm-guarded when deleting would affect placed devices/Zone areas;
+      - after delete, select a valid remaining Building/Floor.
+    - Floor delete:
+      - visible when a current Floor exists;
+      - after delete, select a valid remaining Floor or create/select default floor through store rules.
+    - Clear drawing:
+      - visible/enabled only when current floor has `mapAssetId`;
+      - leaves devices and Zone areas in place unless the user separately deletes them.
+    - Use i18n for all labels/tooltips.
+  - Owned files:
+    - `src/renderer/src/components/fire/Planner2D.vue`
+    - `src/renderer/src/i18n/en.ts`
+    - `src/renderer/src/i18n/zh.ts`
+  - Verification before Review Cycle A:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added compact toolbar icon buttons for clear drawing, delete Building, and delete Floor in `Planner2D.vue`.
+    - Delete actions confirm before cleanup and then select a valid remaining Building/Floor.
+    - Added English and Chinese i18n keys.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`; `npm run typecheck`.
+
+- [x] Review Cycle A: Building/Floor/Drawing lifecycle review
+  - Scope:
+    - Recheck Task 1-4 changes for orphan references and UI selection state bugs.
+    - Search for every `buildingId`, `floorId`, `mapAssetId`, and `visualAreas` mutation path touched by delete/clear.
+    - Confirm undo/redo restores exact previous project state.
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts src/renderer/src/domain/fire/__tests__/projectPackagePayload.test.ts`
+    - `npm run typecheck`
+  - Completion requirement:
+    - Do not continue to Zone UI work until lifecycle cleanup is stable.
+  - Completion notes:
+    - Searched Building/Floor/map/Zone mutation paths and confirmed lifecycle writes route through store actions.
+    - Confirmed undo/redo restores deleted Building/Floor and cleared drawing state in store tests.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts src/renderer/src/domain/fire/__tests__/projectPackagePayload.test.ts`; `npm run typecheck`.
+
+- [x] Task 5: Add Zone visual area selection and delete support in 2D
+  - Scope:
+    - Make saved Zone polygons selectable without interfering with device drag/drop or Loop wiring.
+    - Add `selectedZoneAreaId` local state in `Planner2D.vue`.
+    - Add visual selected-area styling that remains distinct from Zone fill and Loop lines.
+    - `Delete` / `Backspace` should delete selected Zone area before deleting selected device.
+    - Add an explicit delete Zone area icon/button when an area is selected.
+    - Use existing `store.removeZoneArea(areaId)` and verify it is undoable.
+  - Owned files:
+    - `src/renderer/src/components/fire/Planner2D.vue`
+    - `src/renderer/src/i18n/en.ts`
+    - `src/renderer/src/i18n/zh.ts`
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+  - Verification before Task 6:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Saved Zone areas are selectable in `Planner2D.vue` with distinct selected styling.
+    - Delete/Backspace deletes selected Zone area before device removal.
+    - Added explicit delete Zone area toolbar control.
+    - Verified through store Zone visual-area lifecycle tests plus `npm run typecheck`.
+
+- [x] Task 6: Add Zone visual area edit/move support or an explicit scoped replacement flow
+  - Scope:
+    - Implement the smallest complete edit path:
+      - either drag/move selected Zone area points/shape;
+      - or provide a clear "replace selected Zone area" mode that deletes the selected area and starts a new rectangle/polygon for the same Zone/floor.
+    - The chosen edit path must be discoverable from the 2D UI and undoable.
+    - Keep CPD Zone assignment unchanged.
+    - Do not change simulation logic.
+  - Owned files:
+    - `src/renderer/src/components/fire/Planner2D.vue`
+    - `src/renderer/src/stores/fireProjectStore.ts` if a dedicated update action is needed
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `src/renderer/src/i18n/en.ts`
+    - `src/renderer/src/i18n/zh.ts`
+  - Verification before Task 7:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added undoable `replaceZoneArea(areaId, nextArea)` store action.
+    - Added Planner2D "Replace Zone Area" flow that keeps the selected Zone/floor scope, starts rectangle redraw, and commits a one-snapshot replacement when drawing completes.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`; `npm run typecheck`.
+
+- [x] Task 7: Harden Zone polygon geometry validation
+  - Scope:
+    - Add domain tests for invalid polygons:
+      - fewer than three unique points;
+      - duplicate adjacent points;
+      - tiny area below a practical threshold;
+      - self-intersection.
+    - Add helper functions in `zoneGeometry.ts` such as `validateZonePolygon(points)` or equivalent.
+    - Prevent invalid polygons from being persisted through `finishPolygon()`.
+    - Provide user-visible feedback or a disabled finish path; do not silently save bad geometry.
+  - Owned files:
+    - `src/renderer/src/domain/fire/zoneGeometry.ts`
+    - `src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts`
+    - `src/renderer/src/components/fire/Planner2D.vue`
+    - `src/renderer/src/i18n/en.ts`
+    - `src/renderer/src/i18n/zh.ts`
+  - Verification before Task 8:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added polygon validation coverage for too few unique points, adjacent duplicates, tiny areas, self-intersection, and a valid polygon.
+    - Store `addZoneArea` and `replaceZoneArea` reject invalid polygon areas before persistence.
+    - Planner2D shows a user-visible warning instead of saving invalid polygon drafts.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`; `npm run typecheck`.
+
+- [x] Task 8: Fix 3D Zone area scope filtering and focus bounds
+  - Scope:
+    - Ensure saved and temporary Zone areas follow the same Building/Floor visibility rules as 3D floors/devices.
+    - Update `renderZoneArea()` or its caller to skip areas outside current scope unless they are required relation context.
+    - Update `getSelectedZoneBounds()` so camera focus only includes visible/current-scope Zone areas and highlighted devices.
+    - Add or extend pure tests in `viewer3DViewState.test.ts` or a new helper test if logic is extracted from `Viewer3D.vue`.
+  - Owned files:
+    - `src/renderer/src/components/fire/Viewer3D.vue`
+    - `src/renderer/src/domain/fire/viewer3DViewState.ts` if extracting helper logic
+    - `src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts`
+  - Verification before Task 9:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added `shouldRenderViewer3DZoneArea()` and tests for Building/Floor scope filtering.
+    - Viewer3D now skips out-of-scope saved/temporary Zone areas and excludes out-of-scope saved areas from Zone focus bounds.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts`; `npm run typecheck`.
+
+- [x] Task 9: Fix saved-area plus temporary-area Zone resolution per floor
+  - Scope:
+    - Replace all-or-nothing logic in `resolveViewer3DZoneAreas()`.
+    - Saved areas should be returned for floors where they exist.
+    - For highlighted Zones, temporary areas should still be generated for other floors/buildings with placed Zone devices that have no saved area.
+    - Temporary areas must never duplicate a floor/building that already has a saved area for the same Zone.
+    - Temporary areas must remain `temporary: true` and must not be written to project state.
+  - Owned files:
+    - `src/renderer/src/domain/fire/viewer3DZoneArea.ts`
+    - `src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts`
+    - `src/renderer/src/components/fire/Viewer3D.vue` only if rendering assumptions need adjustment
+  - Verification before Review Cycle B:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - `resolveViewer3DZoneAreas()` now returns saved areas and adds temporary bounds only for Building/Floor keys without saved areas.
+    - Temporary areas remain `temporary: true` and render-time only.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts`; `npm run typecheck`.
+
+- [x] Review Cycle B: Zone 2D/3D behavior review
+  - Scope:
+    - Recheck Zone visual lifecycle and 3D rendering with saved areas, temporary areas, multiple floors, multiple buildings, and current scope.
+    - Confirm no code path changes CPD Zone assignment.
+    - Confirm 2D still contains no runtime simulation behavior.
+  - Verification:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts src/renderer/src/domain/fire/__tests__/planner2DConfigOnly.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Rechecked Zone visual lifecycle, saved+temporary 3D areas, and Building/Floor scope filtering.
+    - Searched 2D Planner paths for simulation actions and CPD Zone assignment mutation; 2D remains configuration-only and Zone visual areas remain visual-only.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/zoneGeometry.test.ts src/renderer/src/domain/fire/__tests__/viewer3DZoneArea.test.ts src/renderer/src/domain/fire/__tests__/viewer3DViewState.test.ts src/renderer/src/domain/fire/__tests__/planner2DConfigOnly.test.ts`; `npm run typecheck`.
+
+- [x] Task 10: Add persistence and re-open regression coverage for lifecycle cleanup
+  - Scope:
+    - Add tests proving `.fireproj` payload includes valid remaining Buildings/Floors/Zone areas after delete/clear operations.
+    - Add a normalize/open test proving old or malformed projects with orphan floor/building references are handled deterministically.
+    - Add test coverage for CPD re-import preserving surviving Zone areas while not resurrecting areas for deleted floors/buildings.
+  - Owned files:
+    - `src/renderer/src/domain/fire/__tests__/projectPackagePayload.test.ts`
+    - `src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts`
+    - `src/renderer/src/domain/fire/__tests__/cpdDiff.test.ts`
+    - `src/renderer/src/stores/fireProjectStore.ts` if normalize cleanup is needed
+    - `src/renderer/src/domain/fire/cpdDiff.ts` if re-import preservation needs filtering
+  - Verification before Task 11:
+    - `npm run test -- src/renderer/src/domain/fire/__tests__/projectPackagePayload.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts src/renderer/src/domain/fire/__tests__/cpdDiff.test.ts`
+    - `npm run typecheck`
+  - Completion notes:
+    - Added payload coverage for cleaned lifecycle state without orphan planning references.
+    - Added open/normalize coverage for malformed projects with deleted Building/Floor references.
+    - Added CPD re-import coverage so Zone areas on deleted Building/Floor targets are not preserved.
+    - Verified: `npm run test -- src/renderer/src/domain/fire/__tests__/projectPackagePayload.test.ts src/renderer/src/domain/fire/__tests__/fireProjectStore.test.ts src/renderer/src/domain/fire/__tests__/cpdDiff.test.ts`; `npm run typecheck`.
+
+- [x] Task 11: Runtime renderer harness for 2D lifecycle and Zone behavior
+  - Scope:
+    - Extend `src/renderer/planner-check.html` / `src/renderer/src/planner-check.ts` or add a dedicated temporary checked-in harness if needed.
+    - Runtime check must exercise:
+      - add Building;
+      - delete Building;
+      - add Floor;
+      - delete Floor;
+      - import/assign or fixture-assign drawing;
+      - clear drawing;
+      - draw Zone rectangle;
+      - select/delete Zone area;
+      - confirm no console errors.
+    - Use a renderer-aware Vite setup with `@vitejs/plugin-vue`.
+  - Owned files:
+    - `src/renderer/planner-check.html`
+    - `src/renderer/src/planner-check.ts`
+    - optional script under `scripts/` if automation is useful
+  - Verification before Task 12:
+    - `npm run typecheck`
+    - runtime harness report or screenshot notes copied into this task completion note.
+  - Completion notes:
+    - Extended `planner-check.ts` with a renderer lifecycle harness and a DOM-readable `#planner-check-report`.
+    - Added `scripts/planner-check.vite.config.mjs` for a Vue-aware Vite runtime check.
+    - Browser harness verified add/delete Building, add/delete Floor, assign/clear Drawing, draw/delete Zone area, no console errors/warnings, and no initial toolbar overflow at `http://127.0.0.1:5174/planner-check.html`.
+    - Verified: `npm run typecheck`; runtime harness report `ok: true`.
+
+- [x] Task 12: Clean text/encoding and i18n regressions in touched 2D/3D files
+  - Scope:
+    - Remove or rewrite mojibake comments and user-visible strings in touched fire files.
+    - Keep source files UTF-8.
+    - Ensure new controls use i18n in English and Chinese.
+    - Do not rewrite unrelated legacy Mesh components unless they are active in the Fire workflow.
+  - Owned files:
+    - `src/renderer/src/components/fire/Planner2D.vue`
+    - `src/renderer/src/components/fire/Viewer3D.vue`
+    - `src/renderer/src/i18n/en.ts`
+    - `src/renderer/src/i18n/zh.ts`
+    - `docs/superpowers/specs/2026-05-24-2d-floor-building-selector-redesign.md` only if it remains part of the active handoff
+  - Verification before Final Validation:
+    - `npm run lint`
+    - `npm run typecheck`
+  - Completion notes:
+    - Reworked `getFloorAbbr()` to avoid broad Chinese digit substring matches and to recognize explicit basement/Chinese floor labels.
+    - Rewrote active Viewer3D radar comments in English and scanned touched Fire files for replacement characters/common mojibake sequences.
+    - Verified: `npm run lint`; `npm run typecheck`.
+
+- [x] Final Validation
+  - Scope:
+    - Run full static and runtime validation.
+    - Inspect dirty worktree and list only files intentionally touched by this goal.
+    - Update `goal-4/tasks.md` completion notes and `docs/2026-05-23-implementation-handoff.md` with fixed behavior, commands, and residual risks.
+  - Required commands:
+    - `npm run lint`
+    - `npm run typecheck`
+    - `npm run test`
+    - `npm run build`
+  - Required runtime checks:
+    - 2D lifecycle harness passes with no console errors.
+    - 3D Zone scope/focus behavior checked with saved and temporary Zone areas.
+  - Completion requirement:
+    - Do not mark Goal 4 complete if Building/Floor/Zone/Drawing lifecycle actions work only by undo or only on the happy path.
+  - Completion notes:
+    - Full verification passed: `npm run lint`; `npm run typecheck`; `npm run test`; `npm run build`.
+    - Full test result: 25 test files passed, 153 tests passed.
+    - Runtime 2D harness passed with `ok: true`: add/delete Building, add/delete Floor, assign/clear Drawing, draw/delete Zone area, no console errors/warnings, no initial toolbar overflow.
+    - 3D saved/temporary Zone scope/focus behavior was rechecked through `viewer3DZoneArea.test.ts` and `viewer3DViewState.test.ts`: 2 test files passed, 8 tests passed.
+    - Dirty worktree was inspected. Intentional Goal 4 edits include `goal-4/tasks.md`, `docs/2026-05-23-implementation-handoff.md`, `scripts/planner-check.vite.config.mjs`, `Planner2D.vue`, `Viewer3D.vue`, `fireProjectStore.ts`, fire i18n files, Zone/3D/CPD diff/payload helpers, and their focused tests.
+    - Existing/generated status entries such as `.codex-dev-run/`, `.eslintcache`, `out/renderer/`, and unrelated Fire adapter files were not cleaned or reverted.

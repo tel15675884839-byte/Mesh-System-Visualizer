@@ -111,12 +111,6 @@ export function createViewer3DSceneCalculations(
   }
 
   function getDeviceColor(device: FireDevice): THREE.ColorRepresentation {
-    if (hasActiveInput(device.id)) return '#dc2626'
-    if (hasActiveFault(device.id)) return '#d97706'
-    const outputState = getDeviceOutputState(device)
-    if (outputState?.state === 'delayActive') return '#0ea5e9'
-    if (outputState?.state === 'active' && device.isSounder) return '#ef4444'
-    if (outputState?.state === 'active') return '#2563eb'
     return getDeviceStatusAppearance(device).spriteColor
   }
 

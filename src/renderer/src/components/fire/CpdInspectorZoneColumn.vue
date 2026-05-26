@@ -2,7 +2,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CpdInspectorZone, CpdInspectorDevice } from '../../domain/fire/cpdInspectorModel'
-import { getDeviceIconHrefByType } from '../../domain/fire/deviceIcons'
+import { getDeviceIconHrefByType, isZoneMemberDevice } from '../../domain/fire/deviceIcons'
 
 const props = defineProps<{
   zones: CpdInspectorZone[]
@@ -82,7 +82,9 @@ function toggleExpandDevices(zoneNumber: number, event: Event): void {
 }
 
 const getZoneDevices = (zoneNumber: number): CpdInspectorDevice[] => {
-  return props.devices.filter((d) => d.rawDevice.zoneNumber === zoneNumber)
+  return props.devices.filter(
+    (d) => d.rawDevice.zoneNumber === zoneNumber && isZoneMemberDevice(d.rawDevice)
+  )
 }
 
 const getBadgeLabel = (badge: string): string => {
@@ -101,8 +103,6 @@ const getBadgeLabel = (badge: string): string => {
     <div class="column-search">
       <el-input v-model="searchQuery" size="small" placeholder="Search Zones..." clearable />
     </div>
-
-
 
     <!-- Scrollable zones list -->
     <div id="list-zones" class="card-list">
@@ -137,9 +137,7 @@ const getBadgeLabel = (badge: string): string => {
             "
             class="card-tags"
           >
-            <span v-if="zone.delayedSounders" class="badge delay">
-              Delay
-            </span>
+            <span v-if="zone.delayedSounders" class="badge delay"> Delay </span>
             <span class="badge">{{ zone.devicesCount }} {{ t('fire.cpdInspector.devices') }}</span>
           </div>
 

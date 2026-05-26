@@ -7,7 +7,12 @@ import type {
   GroupMember,
   GroupMode
 } from './types'
-import { getDeviceIconByType } from './deviceIcons'
+import {
+  getDeviceIconByType,
+  isIOGroupMemberDevice,
+  isSounderGroupMemberDevice,
+  isZoneMemberDevice
+} from './deviceIcons'
 
 export type FireTreeNodeKind = 'network' | 'panel' | 'group' | 'device'
 
@@ -184,7 +189,7 @@ function groupByZone(panel: FirePanel, devices: FireDevice[]): GroupBucket[] {
   }
 
   for (const device of devices) {
-    if (!hasValidGroupNumber(device.zoneNumber) || !device.isInputCapable) continue
+    if (!hasValidGroupNumber(device.zoneNumber) || !isZoneMemberDevice(device)) continue
     const key = String(device.zoneNumber)
     const bucket =
       buckets.get(key) ??
@@ -237,9 +242,13 @@ function groupBySounderGroup(panel: FirePanel, devices: FireDevice[]): GroupBuck
   }
 
   for (const device of devices) {
-    const memberGroupId =
-      validGroupNumber(device.sounderGroupId) ??
-      validGroups.find((group) => isDeviceInMembers(device, group.addressableMembers))?.groupId
+    if (!isSounderGroupMemberDevice(device)) {
+      continue
+    }
+
+    const memberGroupId = validGroups.find((group) =>
+      isDeviceInMembers(device, group.addressableMembers)
+    )?.groupId
 
     if (memberGroupId === undefined) {
       continue
@@ -274,9 +283,13 @@ function groupByIOGroup(panel: FirePanel, devices: FireDevice[]): GroupBucket[] 
   }
 
   for (const device of devices) {
-    const memberGroupId =
-      validGroupNumber(device.ioGroupId) ??
-      validGroups.find((group) => isDeviceInMembers(device, group.members))?.groupId
+    if (!isIOGroupMemberDevice(device)) {
+      continue
+    }
+
+    const memberGroupId = validGroups.find((group) =>
+      isDeviceInMembers(device, group.members)
+    )?.groupId
 
     if (memberGroupId === undefined) {
       continue
@@ -471,10 +484,6 @@ function compareMaybeNumber(left: number | undefined, right: number | undefined)
   if (left === undefined) return 1
   if (right === undefined) return -1
   return left - right
-}
-
-function validGroupNumber(value: number | undefined): number | undefined {
-  return hasValidGroupNumber(value) ? value : undefined
 }
 
 function hasValidGroupNumber(value: number | undefined): value is number {

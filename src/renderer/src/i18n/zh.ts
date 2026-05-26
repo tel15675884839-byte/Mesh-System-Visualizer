@@ -23,6 +23,7 @@ export default {
       zones: '分区',
       outputGroups: '输出组',
       outputDevices: '输出设备',
+      directDevices: '设备',
       devices: '设备',
       special: '特殊',
       configured: '已配置',
@@ -32,6 +33,9 @@ export default {
       hasOutputs: '有输出',
       specialDevices: '特殊设备',
       modeUnavailable: '无有效模式',
+      searchDirectDevices: '搜索设备绑定...',
+      searchOutputDevices: '搜索输出...',
+      noDirectDevices: '此分区无单设备绑定',
       noOutputDevices: '此组中无输出设备',
       noSpecialProperties: '无非默认模拟属性'
     },
@@ -107,7 +111,9 @@ export default {
       loop: '回路',
       zone: '分区',
       sounderGroup: '声光组',
-      ioGroup: 'I/O 组'
+      ioGroup: 'I/O 组',
+      eventLog: '事件记录',
+      noEvents: '暂无事件'
     },
     zoneToolbar: {
       zone: '分区',

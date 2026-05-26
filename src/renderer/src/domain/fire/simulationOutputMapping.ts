@@ -23,15 +23,15 @@ export function getDeviceSimulationOutput(
   outputs: OutputActivation[],
   device: FireDevice
 ): DeviceSimulationOutput | null {
-  if (device.disabled) {
-    return null
-  }
-
   const panel = findPanel(project, device.panelId)
   let delayedOutput: DeviceSimulationOutput | null = null
 
   for (const output of outputs) {
     if (output.state !== 'active' && output.state !== 'delayActive') {
+      continue
+    }
+
+    if (device.disabled && !disabledDeviceCanFollowOutput(output, device)) {
       continue
     }
 
@@ -59,6 +59,12 @@ export function getDeviceSimulationOutput(
   }
 
   return delayedOutput
+}
+
+function disabledDeviceCanFollowOutput(output: OutputActivation, device: FireDevice): boolean {
+  return (
+    device.isSounder && output.outputId === `device:${device.id}` && output.reason === 'evacuate'
+  )
 }
 
 function outputMatchesDevice(

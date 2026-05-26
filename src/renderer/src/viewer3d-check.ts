@@ -52,6 +52,13 @@ interface Viewer3DCheckResult {
     afterDelayShouldPlayAudio: boolean
     afterDelayActiveOutputCount: number
   }
+  eventLog: {
+    count: number
+    hasActivation: boolean
+    hasDelayExpiry: boolean
+    hasConditionSummary: boolean
+    panelRendered: boolean
+  }
 }
 
 declare global {
@@ -241,6 +248,7 @@ function runVisualCheck(): Viewer3DCheckResult {
   const errors: string[] = []
   const cpdSounder3D = runCpdSounder3DCheck()
   const mountedDelayEdge3D = runMountedDelayEdge3DCheck()
+  const eventLog = runEventLogCheck()
   const statuses = project.devices.map((device) => {
     const appearance = getDeviceStatusAppearance(device)
     return {
@@ -321,6 +329,10 @@ function runVisualCheck(): Viewer3DCheckResult {
     'cpd-non-delayed-zone-renders-active-3d-sounder',
     cpdSounder3D.nonDelayedState?.state === 'active' && cpdSounder3D.nonDelayedColor === '#ef4444'
   )
+  record('viewer3d-event-log-records-activation', eventLog.hasActivation)
+  record('viewer3d-event-log-records-delay-expiry', eventLog.hasDelayExpiry)
+  record('viewer3d-event-log-shows-condition-summary', eventLog.hasConditionSummary)
+  record('viewer3d-event-log-panel-rendered', eventLog.panelRendered)
 
   return {
     ok: errors.length === 0,
@@ -328,7 +340,8 @@ function runVisualCheck(): Viewer3DCheckResult {
     errors,
     statuses,
     cpdSounder3D,
-    mountedDelayEdge3D
+    mountedDelayEdge3D,
+    eventLog
   }
 }
 
@@ -370,7 +383,7 @@ function runCpdSounder3DCheck(): Viewer3DCheckResult['cpdSounder3D'] {
       outputState: delayedState?.state ?? null,
       sounderPattern: delayedState?.sounderPattern,
       isSounder: delayedSounder.isSounder
-    }).color,
+    }).accentColor,
     delayEdgeAddress4SounderState,
     delayEdgeAddress4IoState,
     delayEdgeAddress4ActiveOutputCount: delayEdgeAddress4Outputs.filter(
@@ -383,7 +396,7 @@ function runCpdSounder3DCheck(): Viewer3DCheckResult['cpdSounder3D'] {
       outputState: nonDelayedState?.state ?? null,
       sounderPattern: nonDelayedState?.sounderPattern,
       isSounder: nonDelayedSounder.isSounder
-    }).color
+    }).accentColor
   }
 }
 
@@ -528,9 +541,20 @@ function runMountedDelayEdge3DCheck(): Viewer3DCheckResult['mountedDelayEdge3D']
       outputState: afterDelaySounderState?.state ?? null,
       sounderPattern: afterDelaySounderState?.sounderPattern,
       isSounder: afterDelaySounder.isSounder
-    }).color,
+    }).accentColor,
     afterDelayShouldPlayAudio: mountedShouldPlayAudio(),
     afterDelayActiveOutputCount: mountedActiveOutputCount()
+  }
+}
+
+function runEventLogCheck(): Viewer3DCheckResult['eventLog'] {
+  const events = store.simulationState.eventLog
+  return {
+    count: events.length,
+    hasActivation: events.some((event) => event.type === 'activate-input'),
+    hasDelayExpiry: events.some((event) => event.type === 'delay-expired'),
+    hasConditionSummary: events.some((event) => Boolean(event.condition)),
+    panelRendered: Boolean(document.querySelector('.viewer-event-log-panel'))
   }
 }
 

@@ -1,4 +1,9 @@
 import type { FireDevice, FirePanel, FireProject, GroupMember } from './types'
+import {
+  isIOGroupMemberDevice,
+  isSounderGroupMemberDevice,
+  isZoneMemberDevice
+} from './deviceIcons'
 
 export type Viewer3DHighlightKind = 'none' | 'loop' | 'zone' | 'sounderGroup' | 'ioGroup' | 'type'
 
@@ -97,23 +102,25 @@ export function isDeviceHighlighted(
 
   if (selection.kind === 'zone') {
     const zone = panel.zones.find((candidate) => candidate.id === selection.targetId)
-    return Boolean(zone && getDeviceCpdZoneNumber(device) === zone.zoneNumber)
+    return Boolean(
+      zone && isZoneMemberDevice(device) && getDeviceCpdZoneNumber(device) === zone.zoneNumber
+    )
   }
 
   if (selection.kind === 'sounderGroup') {
     const group = panel.sounderGroups.find((candidate) => candidate.id === selection.targetId)
     return Boolean(
       group &&
-      (device.sounderGroupId === group.groupId ||
-        group.addressableMembers.some((member) => memberMatchesDevice(member, device)))
+      isSounderGroupMemberDevice(device) &&
+      group.addressableMembers.some((member) => memberMatchesDevice(member, device))
     )
   }
 
   const group = panel.ioGroups.find((candidate) => candidate.id === selection.targetId)
   return Boolean(
     group &&
-    (device.ioGroupId === group.groupId ||
-      group.members.some((member) => memberMatchesDevice(member, device)))
+    isIOGroupMemberDevice(device) &&
+    group.members.some((member) => memberMatchesDevice(member, device))
   )
 }
 

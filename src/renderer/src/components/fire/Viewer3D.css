@@ -28,16 +28,14 @@
   box-sizing: border-box;
 }
 
-
-
 .viewer-simulation-actions {
   position: absolute;
-  top: 12px; /* Placed at the top by default */
-  right: 12px;
+  top: 92px;
+  right: 18px;
   z-index: 90;
   display: flex;
-  flex-direction: row;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   width: auto;
   padding: 0;
@@ -48,9 +46,98 @@
   box-sizing: border-box;
 }
 
-@media (max-width: 1024px) {
+.viewer-event-log-panel {
+  position: absolute;
+  right: 92px;
+  bottom: 18px;
+  z-index: 80;
+  width: min(360px, calc(100% - 132px));
+  max-height: 220px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.94);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #172033;
+}
+
+.event-log-title {
+  padding: 9px 10px 7px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.7);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.viewer-event-log-list {
+  display: grid;
+  gap: 0;
+  max-height: 178px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.viewer-event-log-item {
+  display: grid;
+  grid-template-columns: 68px minmax(72px, auto) minmax(0, 1fr);
+  gap: 4px 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+  font-size: 12px;
+}
+
+.viewer-event-log-item time {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer-event-log-item small {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.event-type {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.event-target,
+.event-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-target {
+  grid-column: 3;
+  color: #334155;
+  font-weight: 700;
+}
+
+.event-message {
+  grid-column: 1 / -1;
+  color: #172033;
+}
+
+.viewer-event-log-empty {
+  padding: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 850px) {
   .viewer-simulation-actions {
-    top: 72px; /* Pushed down below the highlight toolbar only on medium/narrow viewports to prevent overlap */
+    top: 92px;
   }
 }
 
@@ -78,9 +165,9 @@
 
 .simulation-action .tooltip-text {
   position: absolute;
-  top: 74px; /* Adjusted for 66px button height */
-  left: 50%;
-  transform: translateX(-50%) translateY(-10px);
+  top: 50%;
+  right: 76px;
+  transform: translateY(-50%) translateX(8px);
   background: rgba(15, 23, 42, 0.95);
   color: #ffffff;
   padding: 6px 10px;
@@ -102,17 +189,17 @@
 .simulation-action .tooltip-text::after {
   content: '';
   position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
   border-width: 5px;
   border-style: solid;
-  border-color: transparent transparent rgba(15, 23, 42, 0.95) transparent;
+  border-color: transparent transparent transparent rgba(15, 23, 42, 0.95);
 }
 
 .simulation-action:hover .tooltip-text {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(-50%) translateX(0);
 }
 
 .simulation-action-icon {
@@ -267,7 +354,7 @@
   position: relative;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.15);
   background: #ffffff;
   color: #1d1d1f;
@@ -275,18 +362,21 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
+  justify-content: flex-start;
+  padding: 0 0 0 5px;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
   transition:
     background-color 0.2s,
     border-color 0.2s,
     box-shadow 0.2s,
-    color 0.2s;
+    color 0.2s,
+    width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.drawing-btn:hover {
+.drawing-btn:hover:not(.disabled) {
+  width: 140px;
   background-color: #f1f5f9;
   border-color: #cbd5e1;
 }
@@ -296,6 +386,11 @@
   border-color: #0071e3;
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);
+}
+
+.drawing-btn.active:hover:not(.disabled) {
+  background: #0071e3;
+  border-color: #0071e3;
 }
 
 .drawing-btn.disabled {
@@ -324,7 +419,68 @@
   color: inherit;
 }
 
+/* Opacity slider inside button */
+.inline-slider-wrap {
+  position: absolute;
+  left: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease 0.05s,
+    visibility 0.15s ease 0.05s;
+}
 
+.drawing-btn:hover:not(.disabled) .inline-slider-wrap {
+  opacity: 1;
+  visibility: visible;
+}
+
+.inline-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 58px;
+  height: 3px;
+  background: #cbd5e1;
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+
+.drawing-btn.active .inline-slider {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.inline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0071e3;
+  cursor: pointer;
+}
+
+.drawing-btn.active .inline-slider::-webkit-slider-thumb {
+  background: #ffffff;
+}
+
+.inline-val {
+  font-size: 9px;
+  font-weight: 800;
+  min-width: 28px;
+  text-align: right;
+  color: #64748b;
+  user-select: none;
+}
+
+.drawing-btn.active .inline-val {
+  color: rgba(255, 255, 255, 0.9);
+}
 
 .viewer-3d :deep(canvas) {
   display: block;
@@ -356,6 +512,32 @@
     flex-wrap: wrap;
     justify-content: stretch;
     width: auto;
+  }
+
+  .viewer-event-log-panel {
+    right: 12px;
+    bottom: 96px;
+    width: calc(100% - 24px);
+    max-height: 180px;
+  }
+
+  .simulation-action .tooltip-text {
+    top: auto;
+    right: auto;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+  }
+
+  .simulation-action .tooltip-text::after {
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
+  }
+
+  .simulation-action:hover .tooltip-text {
+    transform: translateX(-50%) translateY(0);
   }
 
   .simulation-action {

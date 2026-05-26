@@ -156,4 +156,31 @@ describe('simulation audio gate', () => {
       })
     ).toBe(true)
   })
+
+  it('plays evacuation audio when a disabled sounder is directly operated by evacuation', () => {
+    const result = adaptFixture('6002-zone-no-delayed-sounders.json')
+    const sounder = result.devices.find((candidate) => candidate.isSounder)
+    if (!sounder) {
+      throw new Error('fixture did not import an addressable sounder')
+    }
+    const disabledSounder = { ...sounder, disabled: true }
+
+    expect(
+      shouldPlaySimulationAlarmAudio({
+        simulationMode: true,
+        soundEnabled: true,
+        soundState: 'fire',
+        project: makeProject(result),
+        devices: [disabledSounder],
+        outputs: [
+          {
+            outputId: `device:${disabledSounder.id}`,
+            state: 'active',
+            causes: ['manual-evacuate'],
+            reason: 'evacuate'
+          }
+        ]
+      })
+    ).toBe(true)
+  })
 })

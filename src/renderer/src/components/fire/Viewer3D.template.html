@@ -182,6 +182,19 @@
                 <path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01" />
               </svg>
             </span>
+            <div class="inline-slider-wrap" @click.stop @pointerdown.stop @wheel.stop>
+              <input
+                type="range"
+                class="inline-slider"
+                min="0"
+                max="1"
+                step="0.05"
+                :value="getBuildingOpacity(b)"
+                :disabled="hiddenBuildingIds.has(b.id)"
+                @input="setBuildingOpacity(b, $event)"
+              />
+              <span class="inline-val">{{ Math.round(getBuildingOpacity(b) * 100) }}%</span>
+            </div>
           </div>
 
           <div
@@ -192,10 +205,41 @@
             @click="toggleFloorVisibility(f.id)"
           >
             <span class="btn-text">{{ getShortFloorName(f.name) }}</span>
+            <div class="inline-slider-wrap" @click.stop @pointerdown.stop @wheel.stop>
+              <input
+                type="range"
+                class="inline-slider"
+                min="0"
+                max="1"
+                step="0.05"
+                :value="getFloorOpacity(f)"
+                :disabled="hiddenFloorIds.has(f.id) || hiddenBuildingIds.has(b.id)"
+                @input="setFloorOpacity(f, $event)"
+              />
+              <span class="inline-val">{{ Math.round(getFloorOpacity(f) * 100) }}%</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="viewer-event-log-panel" @pointerdown.stop @wheel.stop>
+    <div class="event-log-title">{{ t('fire.viewer3d.eventLog') }}</div>
+    <ol class="viewer-event-log-list">
+      <li v-for="event in recent3DEvents" :key="event.id" class="viewer-event-log-item">
+        <time>{{ format3DEventTime(event.timestamp) }}</time>
+        <span class="event-type">{{ event.type }}</span>
+        <span v-if="get3DEventTarget(event)" class="event-target">
+          {{ get3DEventTarget(event) }}
+        </span>
+        <span class="event-message">{{ event.message }}</span>
+        <small v-if="event.condition">{{ event.condition }}</small>
+      </li>
+      <li v-if="recent3DEvents.length === 0" class="viewer-event-log-empty">
+        {{ t('fire.viewer3d.noEvents') }}
+      </li>
+    </ol>
   </div>
 
   <div class="viewer-simulation-actions" @pointerdown.stop @wheel.stop>

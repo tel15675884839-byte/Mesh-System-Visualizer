@@ -1,7 +1,9 @@
 import {
   getFriendlyDeviceTypeName,
   isInputCapableType,
+  isIOGroupMemberDevice,
   isOutputCapableType,
+  isSounderGroupMemberDevice,
   isSounderType,
   isWirelessDeviceType,
   normalizeDeviceType
@@ -284,7 +286,8 @@ function mergeSounderGroups(
   devices: FireDevice[]
 ): SounderGroup[] {
   const existingIds = new Set(groups.map((group) => group.groupId))
-  const synthesized = uniqueGroupIds(devices.map((device) => device.sounderGroupId))
+  const outputMemberDevices = devices.filter(isSounderGroupMemberDevice)
+  const synthesized = uniqueGroupIds(outputMemberDevices.map((device) => device.sounderGroupId))
     .filter((groupId) => !existingIds.has(groupId))
     .map((groupId) => ({
       id: `${panel.id}-sounder-group-${groupId}`,
@@ -292,7 +295,7 @@ function mergeSounderGroups(
       panelId: panel.id,
       groupId,
       title: `Sounder Group ${groupId}`,
-      addressableMembers: devices
+      addressableMembers: outputMemberDevices
         .filter((device) => device.sounderGroupId === groupId)
         .map(deviceToGroupMember),
       nonAddressableMembers: [],
@@ -304,14 +307,17 @@ function mergeSounderGroups(
 
 function mergeIOGroups(panel: FirePanel, groups: IOGroup[], devices: FireDevice[]): IOGroup[] {
   const existingIds = new Set(groups.map((group) => group.groupId))
-  const synthesized = uniqueGroupIds(devices.map((device) => device.ioGroupId))
+  const outputMemberDevices = devices.filter(isIOGroupMemberDevice)
+  const synthesized = uniqueGroupIds(outputMemberDevices.map((device) => device.ioGroupId))
     .filter((groupId) => !existingIds.has(groupId))
     .map((groupId) => ({
       id: `${panel.id}-io-group-${groupId}`,
       networkId: panel.networkId,
       panelId: panel.id,
       groupId,
-      members: devices.filter((device) => device.ioGroupId === groupId).map(deviceToGroupMember),
+      members: outputMemberDevices
+        .filter((device) => device.ioGroupId === groupId)
+        .map(deviceToGroupMember),
       raw: { synthesizedFromDeviceGroups: true }
     }))
 

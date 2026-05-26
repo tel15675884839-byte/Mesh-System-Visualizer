@@ -73,6 +73,22 @@ describe('simulation output mapping', () => {
     ).toBeNull()
   })
 
+  it('allows disabled sounders to render active when evacuation directly operates them', () => {
+    const project = makeProject()
+    const [, sounderMember] = project.devices as FireDevice[]
+    const disabledSounder = { ...sounderMember, disabled: true }
+    const outputs: OutputActivation[] = [
+      {
+        outputId: `device:${disabledSounder.id}`,
+        state: 'active',
+        causes: ['manual-evacuate'],
+        reason: 'evacuate'
+      }
+    ]
+
+    expect(getDeviceSimulationOutputState(project, outputs, disabledSounder)).toBe('active')
+  })
+
   it('uses sounder group member status to determine addressable sounder output pattern', () => {
     const project = makeProject()
     const [, sounderMember] = project.devices as FireDevice[]

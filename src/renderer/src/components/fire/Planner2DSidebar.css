@@ -1,0 +1,182 @@
+.left-sidebar-wrapper {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 100;
+  max-height: calc(100% - 30px);
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 15px;
+  pointer-events: none;
+}
+
+.left-panel-base {
+  width: 56px;
+  box-sizing: border-box;
+  padding: 10px 6px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.panel-title-tag {
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  text-align: center;
+  line-height: 1;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.vertical-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 5px;
+}
+
+.button-pair-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawing-upload-btn {
+  color: #0071e3 !important;
+}
+
+.drawing-clear-btn {
+  color: #ef4444 !important;
+}
+
+.icon-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.2px solid #ffffff;
+}
+
+.icon-badge.plus {
+  background-color: #22c55e;
+}
+
+.icon-badge.minus {
+  background-color: #ef4444;
+}
+
+.left-floors-panel {
+  gap: 8px;
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.left-floors-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.left-controls-panel .toolbar-btn {
+  position: relative;
+}
+
+/* Building Tabs (Segmented Control style) */
+.building-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.building-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #515154;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.building-tab-btn.active {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Floor Grid */
+.floor-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.floor-grid.multi-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+/* Floor Buttons */
+.floor-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #ffffff;
+  color: #1d1d1f;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.floor-btn:hover:not(.active) {
+  background: #f5f5f7;
+  transform: scale(1.05);
+}
+
+.floor-btn:active {
+  transform: scale(0.95);
+}
+
+.floor-btn.active {
+  background: #0071e3;
+  border-color: #0071e3;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.4);
+}
+
+/* Rounded rectangle style for multi-column layout */
+.floor-btn.rect-btn {
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 11px;
+}

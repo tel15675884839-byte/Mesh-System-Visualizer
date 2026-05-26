@@ -1,0 +1,583 @@
+<section class="planner-2d" @click="closeContextMenu">
+  <div class="canvas-shell" :class="{ 'has-map': mapAssetHref }">
+    <!-- 左侧包裹容器 -->
+    <div class="left-sidebar-wrapper">
+      <!-- 1. Controls Panel (等宽 56px, 单列分组) -->
+      <div class="left-panel-base left-controls-panel">
+        <span class="panel-title-tag">Controls</span>
+        <div class="vertical-groups">
+          <!-- 组1: 图纸操作 (Upload / Clear) -->
+          <div class="button-pair-col" title="Drawing: Upload / Clear">
+            <el-tooltip :content="t('fire.planner.importDrawing')" placement="right">
+              <button class="toolbar-btn drawing-upload-btn" @click="importDrawingForCurrentFloor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.clearDrawing')" placement="right">
+              <button
+                class="toolbar-btn danger drawing-clear-btn"
+                :disabled="!currentFloor?.mapAssetId"
+                @click="clearDrawing"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <path d="m20 20-5-5" />
+                  <path d="M12 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7.5" />
+                  <path d="m8.5 12.5 4-4" />
+                </svg>
+              </button>
+            </el-tooltip>
+          </div>
+          <!-- 组2: 楼栋操作 (Add / Delete) -->
+          <div class="button-pair-col" title="Building: Add / Delete">
+            <el-tooltip :content="t('fire.planner.addBuilding')" placement="right">
+              <button class="toolbar-btn" @click="addBuilding">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <rect x="4" y="2" width="8" height="20" rx="1" />
+                  <rect x="12" y="8" width="8" height="14" rx="1" />
+                </svg>
+                <span class="icon-badge plus"></span>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.deleteBuilding')" placement="right">
+              <button
+                class="toolbar-btn danger"
+                :disabled="!currentBuilding"
+                @click="deleteBuilding"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <rect x="4" y="2" width="8" height="20" rx="1" />
+                  <rect x="12" y="8" width="8" height="14" rx="1" />
+                </svg>
+                <span class="icon-badge minus"></span>
+              </button>
+            </el-tooltip>
+          </div>
+          <!-- 组3: 楼层操作 (Add / Delete) -->
+          <div class="button-pair-col" title="Floor: Add / Delete">
+            <el-tooltip :content="t('fire.planner.addFloor')" placement="right">
+              <button class="toolbar-btn" @click="addFloor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span class="icon-badge plus"></span>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.deleteFloor')" placement="right">
+              <button class="toolbar-btn danger" :disabled="!currentFloor" @click="deleteFloor">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span class="icon-badge minus"></span>
+              </button>
+            </el-tooltip>
+          </div>
+        </div>
+      </div>
+      <!-- 2. Floors Panel (等宽 56px, 原右侧切换器挪至此) -->
+      <div
+        v-if="
+            project.buildings.length > 0 &&
+            (project.buildings.length > 1 || sortedFloors.length > 0)
+          "
+        class="left-panel-base left-floors-panel"
+      >
+        <span class="panel-title-tag">Floors</span>
+        <!-- Building Selector -->
+        <div v-if="project.buildings.length > 1" class="building-tabs">
+          <button
+            v-for="b in project.buildings"
+            :key="b.id"
+            :class="['building-tab-btn', { active: selectedBuildingId === b.id }]"
+            @click="selectedBuildingId = b.id"
+          >
+            {{ b.name }}
+          </button>
+        </div>
+        <!-- Floor Buttons Stack -->
+        <div :class="['floor-grid', { 'multi-column': isMultiColumn }]">
+          <button
+            v-for="f in sortedFloors"
+            :key="f.id"
+            :class="[
+                'floor-btn',
+                { active: selectedFloorId === f.id, 'rect-btn': isMultiColumn }
+              ]"
+            :title="f.name"
+            @click="selectedFloorId = f.id"
+          >
+            {{ getFloorAbbr(f.name) }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <header class="planner-toolbar" @click.stop>
+      <!-- 2. 探测防区 (Zones) -->
+      <div class="toolbar-section zone-controls" :aria-label="t('fire.zoneToolbar.zone')">
+        <span class="section-tag">Zones</span>
+        <div class="btn-group">
+          <el-select
+            :model-value="selectedZoneId"
+            size="small"
+            class="zone-select-dock"
+            placeholder="Select Zone"
+            clearable
+            @update:model-value="(value) => (selectedZoneId = value || null)"
+          >
+            <el-option
+              v-for="zone in zones"
+              :key="zone.id"
+              :label="'Zone ' + zone.zoneNumber"
+              :value="zone.id"
+            />
+          </el-select>
+          <el-tooltip :content="t('fire.zoneToolbar.select')" placement="bottom">
+            <button
+              :class="['toolbar-btn', { active: activeTool === 'select' }]"
+              @click="store.activeTool = 'select'"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="svg-icon"
+              >
+                <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                <path d="m13 13 6 6" />
+              </svg>
+            </button>
+          </el-tooltip>
+          <el-tooltip :content="t('fire.zoneToolbar.rectangle')" placement="bottom">
+            <button
+              :class="['toolbar-btn', { active: activeTool === 'zoneRectangle' }]"
+              @click="store.activeTool = 'zoneRectangle'"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="svg-icon"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3" />
+              </svg>
+            </button>
+          </el-tooltip>
+          <el-tooltip :content="t('fire.zoneToolbar.polygon')" placement="bottom">
+            <button
+              :class="['toolbar-btn', { active: activeTool === 'zonePolygon' }]"
+              @click="store.activeTool = 'zonePolygon'"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="svg-icon"
+              >
+                <path
+                  d="m12 3-1.912 5.886L4 10.077l5.318 4.38L7.18 21 12 17.562 16.82 21l-2.138-6.543L20 10.077l-6.088-.191L12 3z"
+                />
+              </svg>
+            </button>
+          </el-tooltip>
+          <el-tooltip :content="t('fire.zoneToolbar.cancelPolygon')" placement="bottom">
+            <button
+              class="toolbar-btn"
+              :disabled="polygonDraft.length === 0"
+              @click="polygonDraft = []"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="svg-icon"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </el-tooltip>
+          <span v-if="polygonDraft.length > 0" class="point-count-badge"
+            >{{ polygonDraft.length }}</span
+          >
+          <!-- Zone Area Controls -->
+          <template v-if="selectedZoneAreaId">
+            <div class="sub-divider"></div>
+            <el-tooltip :content="t('fire.planner.replaceZoneArea')" placement="bottom">
+              <button
+                :class="['toolbar-btn', { active: replacingZoneAreaId === selectedZoneAreaId }]"
+                @click="startReplaceSelectedZoneArea"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+              </button>
+            </el-tooltip>
+            <el-tooltip :content="t('fire.planner.deleteZoneArea')" placement="bottom">
+              <button class="toolbar-btn danger" @click="deleteSelectedZoneArea">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="svg-icon"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path
+                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                  />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </button>
+            </el-tooltip>
+          </template>
+        </div>
+      </div>
+      <div class="toolbar-divider"></div>
+      <!-- 3. 回路连线 (Loops) -->
+      <!-- 4. 视图缩放 (Viewport) -->
+      <div class="toolbar-section view-controls-section" :aria-label="t('fire.planner.iconScale')">
+        <span class="section-tag">Icon Size</span>
+        <div class="btn-group">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="svg-icon view-icon-svg"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+          <el-slider
+            v-model="deviceIconScale2D"
+            size="small"
+            :min="0.4"
+            :max="3"
+            :step="0.1"
+            :show-tooltip="false"
+            class="view-slider-dock"
+          />
+          <span class="control-value-dock">{{ deviceIconScale2D.toFixed(1) }}x</span>
+          <span class="zoom-value-dock">{{ mapZoomPercent }}%</span>
+        </div>
+      </div>
+    </header>
+    <svg
+      ref="svgRef"
+      :class="['planner-canvas', { 'is-panning': isPanning, 'has-map': mapAssetHref }]"
+      :viewBox="viewBox"
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      @dragover.prevent
+      @drop="handleDrop"
+      @mousedown="handleCanvasMouseDown"
+      @mousemove="handleCanvasMouseMove"
+      @mouseup="handleCanvasMouseUp"
+      @wheel.prevent="handleCanvasWheel"
+      @auxclick.prevent
+      @click="handleCanvasClick"
+      @dblclick="handleCanvasDoubleClick"
+    >
+      <rect v-if="!mapAssetHref" class="canvas-bg" :width="mapWidth" :height="mapHeight" />
+      <image
+        v-if="mapAssetHref"
+        class="floor-map"
+        x="0"
+        y="0"
+        :width="mapWidth"
+        :height="mapHeight"
+        preserveAspectRatio="xMidYMid meet"
+        :href="mapAssetHref"
+        :opacity="project.viewSettings.mapOpacity"
+      />
+      <g class="zone-layer">
+        <polygon
+          v-for="area in zoneAreas"
+          :key="area.id"
+          class="zone-area"
+          :class="{ selected: selectedZoneAreaId === area.id, replacing: replacingZoneAreaId === area.id }"
+          :points="areaPoints(area.points)"
+          :fill="area.color"
+          :fill-opacity="area.opacity"
+          :stroke="selectedZoneAreaId === area.id ? '#111827' : area.color"
+          :stroke-dasharray="replacingZoneAreaId === area.id ? '9 5' : undefined"
+          :stroke-width="selectedZoneAreaId === area.id ? 4 : 2"
+          @click="selectZoneArea(area.id, $event)"
+        />
+        <polygon
+          v-if="rectanglePreview"
+          :points="areaPoints(rectanglePreview)"
+          fill="#ef4444"
+          fill-opacity="0.12"
+          stroke="#ef4444"
+          stroke-dasharray="8 6"
+          stroke-width="2"
+        />
+        <polygon
+          v-if="pendingZoneArea"
+          class="pending-zone-area"
+          :points="areaPoints(pendingZoneArea.points)"
+          :fill="pendingZoneArea.color"
+          fill-opacity="0.2"
+          :stroke="pendingZoneArea.color"
+          stroke-width="3"
+        />
+        <polyline
+          v-if="polygonDraft.length > 0"
+          :points="areaPoints(polygonDraft)"
+          fill="none"
+          stroke="#f97316"
+          stroke-dasharray="8 6"
+          stroke-width="2"
+        />
+        <circle
+          v-for="(point, index) in polygonDraft"
+          :key="`poly-${index}`"
+          :cx="point.x"
+          :cy="point.y"
+          r="5"
+          fill="#f97316"
+        />
+      </g>
+      <g v-if="project.viewSettings.showLoopLines" class="loop-layer">
+        <line
+          v-for="line in loopLines"
+          :key="line.id"
+          :x1="line.x1"
+          :y1="line.y1"
+          :x2="line.x2"
+          :y2="line.y2"
+          :stroke="line.color"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+        <line
+          v-for="line in dragPreviewLoopLines"
+          :key="line.id"
+          :x1="line.x1"
+          :y1="line.y1"
+          :x2="line.x2"
+          :y2="line.y2"
+          :stroke="line.color"
+          class="drag-preview-line"
+          stroke-width="3.5"
+          stroke-linecap="round"
+        />
+      </g>
+      <foreignObject
+        v-if="pendingZoneArea && pendingZoneAreaActionPoint"
+        :x="pendingZoneAreaActionPoint.x"
+        :y="pendingZoneAreaActionPoint.y"
+        width="116"
+        height="38"
+        @click.stop
+        @mousedown.stop
+      >
+        <div class="zone-confirm-actions" xmlns="http://www.w3.org/1999/xhtml">
+          <button type="button" class="zone-confirm-btn confirm" @click="confirmPendingZoneArea">
+            {{ t('fire.planner.confirmZoneArea') }}
+          </button>
+          <button type="button" class="zone-confirm-btn cancel" @click="cancelPendingZoneArea()">
+            {{ t('fire.planner.cancelZoneArea') }}
+          </button>
+        </div>
+      </foreignObject>
+      <g class="device-layer">
+        <g
+          v-for="device in currentDevices"
+          :key="device.id"
+          class="device-node"
+          :class="deviceClass(device)"
+          :data-device-status="deviceStatus(device).state"
+          :transform="`translate(${devicePoint(device).x} ${devicePoint(device).y})`"
+          @mousedown="startDeviceDrag(device, $event)"
+          @click="handleDeviceClick(device, $event)"
+          @contextmenu="showDeviceContextMenu(device, $event)"
+        >
+          <title v-if="deviceStatus(device).title">
+            {{ device.address ?? device.id }} - {{ deviceStatus(device).title }}
+          </title>
+          <circle :r="deviceRingRadius" class="device-ring" />
+          <image
+            :href="deviceIcon(device)"
+            :x="deviceIconOffset"
+            :y="deviceIconOffset"
+            :width="deviceIconSize"
+            :height="deviceIconSize"
+            :opacity="deviceStatus(device).iconOpacity"
+          />
+          <g
+            v-if="deviceStatus(device).badgeLabel"
+            class="device-status-badge"
+            :transform="`translate(${deviceStatusBadgeX} ${deviceStatusBadgeY})`"
+          >
+            <circle :r="deviceStatusBadgeRadius" :fill="deviceStatus(device).color" />
+            <text class="device-status-badge-label" y="0.35em" text-anchor="middle">
+              {{ deviceStatus(device).badgeLabel }}
+            </text>
+          </g>
+          <text class="device-address-label" :y="deviceLabelOffset" text-anchor="middle">
+            {{ device.address ?? device.id }}
+          </text>
+        </g>
+      </g>
+    </svg>
+    <div v-if="!currentFloor" class="empty-floor" @click.stop>
+      <p>{{ t('fire.planner.noFloor') }}</p>
+      <div>
+        <el-button type="primary" @click="addBuilding">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="svg-icon btn-inline-svg"
+            style="margin-right: 6px; width: 14px; height: 14px"
+          >
+            <rect x="4" y="2" width="8" height="20" rx="1" />
+            <rect x="12" y="8" width="8" height="14" rx="1" />
+            <line x1="6" y1="6" x2="6.01" y2="6" />
+            <line x1="10" y1="6" x2="10.01" y2="6" />
+            <line x1="6" y1="10" x2="6.01" y2="10" />
+            <line x1="10" y1="10" x2="10.01" y2="10" />
+            <line x1="6" y1="14" x2="6.01" y2="14" />
+            <line x1="10" y1="14" x2="10.01" y2="14" />
+            <line x1="6" y1="18" x2="6.01" y2="18" />
+            <line x1="10" y1="18" x2="10.01" y2="18" />
+            <line x1="14" y1="12" x2="14.01" y2="12" />
+            <line x1="18" y1="12" x2="18.01" y2="12" />
+            <line x1="14" y1="16" x2="14.01" y2="16" />
+            <line x1="18" y1="16" x2="18.01" y2="16" />
+          </svg>
+          {{ t('fire.planner.addBuilding') }}
+        </el-button>
+        <el-button @click="importDrawingForCurrentFloor">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="svg-icon btn-inline-svg"
+            style="margin-right: 6px; width: 14px; height: 14px"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          {{ t('fire.planner.importDrawing') }}
+        </el-button>
+      </div>
+    </div>
+  </div>
+  <DeviceContextMenu
+    :visible="contextMenu.visible"
+    :x="contextMenu.x"
+    :y="contextMenu.y"
+    :device="contextDevice"
+    :simulation-mode="false"
+    :input-active="false"
+    :fault-active="false"
+    @close="closeContextMenu"
+    @remove-from-drawing="store.removeDeviceFromDrawing($event)"
+  />
+</section>

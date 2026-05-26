@@ -66,6 +66,18 @@ const inspectorData = computed(() => {
   return buildCpdInspectorModel(panel, allDevices.value)
 })
 
+const selectedZoneDirectDevices = computed(() => {
+  const data = inspectorData.value
+  if (!data) return []
+  return data.directDevices.filter(
+    (device) => device.rawDevice.zoneNumber === selectedZoneNumber.value
+  )
+})
+
+const selectedZoneDirectGroupIds = computed(() => {
+  return [...new Set(selectedZoneDirectDevices.value.flatMap((device) => device.directGroupIds))]
+})
+
 // Auto-selections based on model changes
 watch(
   inspectorData,
@@ -79,8 +91,9 @@ watch(
 
       // Select first group of that zone
       const zone = newData.zones.find((z) => z.zoneNumber === selectedZoneNumber.value)
-      if (zone && zone.groups.length > 0) {
-        selectedGroupId.value = zone.groups[0]
+      const linkedGroupIds = [...(zone?.groups ?? []), ...selectedZoneDirectGroupIds.value]
+      if (linkedGroupIds.length > 0) {
+        selectedGroupId.value = linkedGroupIds[0]
       } else {
         selectedGroupId.value = null
       }
@@ -97,9 +110,10 @@ watch(selectedZoneNumber, (newZoneNum) => {
   const data = inspectorData.value
   if (!data) return
   const zone = data.zones.find((z) => z.zoneNumber === newZoneNum)
-  if (zone && zone.groups.length > 0) {
-    if (!selectedGroupId.value || !zone.groups.includes(selectedGroupId.value)) {
-      selectedGroupId.value = zone.groups[0]
+  const linkedGroupIds = [...(zone?.groups ?? []), ...selectedZoneDirectGroupIds.value]
+  if (linkedGroupIds.length > 0) {
+    if (!selectedGroupId.value || !linkedGroupIds.includes(selectedGroupId.value)) {
+      selectedGroupId.value = linkedGroupIds[0]
     }
   } else {
     selectedGroupId.value = null
@@ -205,7 +219,52 @@ function drawLines(): void {
     })
   }
 
-  // 2. Draw Group -> Device paths
+  // 2. Draw Direct Device -> Group paths
+  selectedZoneDirectDevices.value.forEach((dev) => {
+    dev.directGroupIds.forEach((groupId) => {
+      const fromPortId = `direct-device-${dev.id}-out`
+      const toPortId = `group-${groupId}-in`
+
+      const fromCoords = getPortCoords(fromPortId)
+      const toCoords = getPortCoords(toPortId)
+
+      if (!fromCoords || !toCoords) return
+
+      const x1 = fromCoords.x
+      const y1 = fromCoords.y
+      const x2 = toCoords.x
+      const y2 = toCoords.y
+
+      const dx = x2 - x1
+      const cx1 = x1 + dx * 0.45
+      const cy1 = y1
+      const cx2 = x2 - dx * 0.45
+      const cy2 = y2
+
+      const group = data.groups.find((g) => g.id === groupId)
+      const groupType = group?.type || 'sg'
+      const isGroupSelected = groupId === selectedGroupId.value
+      const isHovered =
+        hoveredCardId.value === `direct-device-${dev.id}` ||
+        hoveredCardId.value === `group-${groupId}`
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`)
+
+      let className = `svg-path direct-path active-${groupType}`
+      if (isGroupSelected) {
+        className += ' active-path'
+      }
+      if (isHovered) {
+        className += ' hovered-path'
+      }
+
+      path.setAttribute('class', className)
+      svg.appendChild(path)
+    })
+  })
+
+  // 3. Draw Group -> Device paths
   if (selectedGroupId.value) {
     const group = data.groups.find((g) => g.id === selectedGroupId.value)
     if (group) {
@@ -292,8 +351,14 @@ function handleToggleAllGroups(): void {
   if (!showAllGroups.value) {
     const data = inspectorData.value
     const zone = data?.zones.find((z) => z.zoneNumber === selectedZoneNumber.value)
-    if (zone && (!selectedGroupId.value || !zone.groups.includes(selectedGroupId.value))) {
-      selectedGroupId.value = zone.groups[0] || null
+    const directGroupIds = selectedZoneDirectGroupIds.value
+    if (
+      zone &&
+      (!selectedGroupId.value ||
+        (!zone.groups.includes(selectedGroupId.value) &&
+          !directGroupIds.includes(selectedGroupId.value)))
+    ) {
+      selectedGroupId.value = zone.groups[0] || directGroupIds[0] || null
     }
   }
 }
@@ -302,8 +367,8 @@ function handleHoverGroup(groupId: string | null): void {
   hoveredCardId.value = groupId ? `group-${groupId}` : null
 }
 
-function handleHoverDevice(deviceId: string | null): void {
-  hoveredCardId.value = deviceId ? `device-${deviceId}` : null
+function handleHoverDevice(cardId: string | null): void {
+  hoveredCardId.value = cardId
 }
 
 function handleSelectDevice(device: CpdInspectorDevice): void {
@@ -374,18 +439,29 @@ onUnmounted(() => {
         @expand-change="drawLines"
       />
 
-      <!-- COLUMN 2: GROUPS -->
+      <!-- COLUMN 2: DIRECT DEVICE ASSIGNMENTS -->
+      <CpdInspectorDeviceColumn
+        :devices="inspectorData.directDevices"
+        :selected-group-id="selectedGroupId"
+        :selected-zone-number="selectedZoneNumber"
+        mode="direct"
+        @select-device="handleSelectDevice"
+        @hover-device="handleHoverDevice"
+      />
+
+      <!-- COLUMN 3: GROUPS -->
       <CpdInspectorGroupColumn
         :groups="inspectorData.groups"
         :selected-group-id="selectedGroupId"
         :selected-zone-number="selectedZoneNumber"
         :show-all-groups="showAllGroups"
+        :direct-group-ids="selectedZoneDirectGroupIds"
         @select-group="handleSelectGroup"
         @toggle-all-groups="handleToggleAllGroups"
         @hover-group="handleHoverGroup"
       />
 
-      <!-- COLUMN 3: OUTPUT DEVICES -->
+      <!-- COLUMN 4: OUTPUT DEVICES -->
       <CpdInspectorDeviceColumn
         :devices="inspectorData.devices"
         :selected-group-id="selectedGroupId"
@@ -486,9 +562,9 @@ onUnmounted(() => {
 /* Diagram Container */
 .diagram-container {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 110px;
-  padding: 20px 48px 24px;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 56px;
+  padding: 20px 34px 24px;
   position: relative;
   min-height: 0;
   height: 100%;

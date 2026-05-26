@@ -100,39 +100,6 @@ const rawMappingData = [
     desc: 'Reporting detail parameter'
   }
 ]
-
-const specialProperties = computed(() => {
-  if (!props.device) return []
-  const dev = props.device.rawDevice
-  const list: { key: string; label: string; value: string | boolean }[] = []
-
-  const add = (key: string, val: string | boolean | undefined): void => {
-    if (
-      val === undefined ||
-      val === false ||
-      val === '0' ||
-      (typeof val === 'string' && val.trim().toLowerCase() === 'normal')
-    )
-      return
-    list.push({ key, label: t(`fire.property.${key}`), value: val })
-  }
-
-  add('disabled', dev.disabled)
-  add('overrideDelays', dev.overrideDelays)
-  add('inhibitSounders', dev.inhibitSounders)
-  add('inhibitIO', dev.inhibitIO)
-  add('inhibitRelays', dev.inhibitRelays)
-  add('evacuateIO', dev.evacuateIO)
-  add('ioOverrideDelay', dev.ioOverrideDelay)
-  add('immediateEvacuate', dev.immediateEvacuate)
-  add('setEvacuateTimer', dev.setEvacuateTimer)
-  add('selectedDisablement', dev.selectedDisablement)
-  add('smokeSensitivity', dev.smokeSensitivity)
-  add('heatGrade', dev.heatGrade)
-  add('reportingDetail', dev.reportingDetail)
-
-  return list
-})
 </script>
 
 <template>
@@ -205,8 +172,6 @@ const specialProperties = computed(() => {
           </div>
         </div>
       </div>
-
-
 
       <!-- Raw mapping details -->
       <el-collapse>

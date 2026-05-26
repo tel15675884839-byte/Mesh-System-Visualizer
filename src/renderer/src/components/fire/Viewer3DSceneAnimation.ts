@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { SounderOutputPattern } from '../../domain/fire/simulationOutputMapping'
 import {
+  getSelectedDeviceBracketAnimationFrame,
   getViewer3DDeviceAnimationFrame,
   type Viewer3DDeviceOutputState
 } from '../../domain/fire/viewer3DSimulationVisual'
@@ -11,7 +12,6 @@ interface AnimatedDeviceObject {
   sprite: THREE.Sprite
   spriteMaterial: THREE.SpriteMaterial
   ringMaterial: THREE.MeshBasicMaterial | null
-  glowSprite: THREE.Sprite | null
   baseSize: number
   baseColor: THREE.ColorRepresentation
   baseOpacity: number
@@ -43,6 +43,7 @@ interface Viewer3DSceneAnimationDependencies {
   getRenderer: () => THREE.WebGLRenderer | null
   getScene: () => THREE.Scene | null
   getCamera: () => THREE.PerspectiveCamera | null
+  getSelectedBracketsMesh: () => THREE.LineSegments | null
 }
 
 export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimationDependencies): {
@@ -60,7 +61,8 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     getControls,
     getRenderer,
     getScene,
-    getCamera
+    getCamera,
+    getSelectedBracketsMesh
   } = dependencies
 
   function updateDeviceAnimations(elapsedMs: number): void {
@@ -80,14 +82,8 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
       object.spriteMaterial.opacity = object.baseOpacity * frame.opacity
 
       if (object.ringMaterial) {
-        object.ringMaterial.color.set(frame.color ?? object.baseColor)
+        object.ringMaterial.color.set(frame.accentColor ?? frame.color ?? object.baseColor)
         object.ringMaterial.opacity = object.baseOpacity * frame.ringOpacity
-      }
-
-      if (object.glowSprite) {
-        object.glowSprite.scale.setScalar(frame.scale * 1.8)
-        const mat = object.glowSprite.material as THREE.SpriteMaterial
-        mat.opacity = 0.55 + Math.sin(elapsedMs * 0.003) * 0.15
       }
 
       if (object.isSounder && object.outputState === 'active') {
@@ -130,6 +126,16 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     })
   }
 
+  function updateSelectedBracketAnimation(elapsedMs: number): void {
+    const mesh = getSelectedBracketsMesh()
+    if (!mesh) return
+
+    const frame = getSelectedDeviceBracketAnimationFrame(elapsedMs)
+    mesh.scale.setScalar(frame.scale)
+    const material = mesh.material as THREE.LineBasicMaterial
+    material.opacity = frame.opacity
+  }
+
   function renderFrame(): void {
     animationFrame = 0
     const now = performance.now()
@@ -138,10 +144,17 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
 
     const controlsChanged = getControls()?.update() ?? false
     const animatedDeviceCount = animatedDeviceObjects.length
+    const highlightAnimationCount =
+      radarRipples.length + radarZones.length + (getSelectedBracketsMesh() ? 1 : 0)
 
     if (animatedDeviceCount > 0) {
       updateDeviceAnimations(now)
+    }
+    if (highlightAnimationCount > 0) {
       updateRadarHighlightAnimations(now, deltaMs)
+      updateSelectedBracketAnimation(now)
+    }
+    if (sounderRipples.length > 0) {
       updateSounderRippleAnimations(deltaMs)
     }
 
@@ -150,7 +163,13 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     const camera = getCamera()
     if (renderer && scene && camera) renderer.render(scene, camera)
 
-    if (shouldContinueViewer3DRender({ controlsChanged, animatedDeviceCount })) {
+    if (
+      shouldContinueViewer3DRender({
+        controlsChanged,
+        animatedDeviceCount,
+        highlightAnimationCount
+      })
+    ) {
       requestRender()
     } else {
       lastTime = 0

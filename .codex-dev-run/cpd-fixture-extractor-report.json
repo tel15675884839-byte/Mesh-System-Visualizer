@@ -1,0 +1,69 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "fileName": "6002-basic-zone-linkage.cpd",
+      "extracted": "6002-basic-zone-linkage.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 0
+    },
+    {
+      "fileName": "6002-global-sounder-delay.cpd",
+      "extracted": "6002-global-sounder-delay.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 0
+    },
+    {
+      "fileName": "6002-zone-no-delayed-sounders.cpd",
+      "extracted": "6002-zone-no-delayed-sounders.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 0
+    },
+    {
+      "fileName": "6002-manual-callpoint-override-delay.cpd",
+      "extracted": "6002-manual-callpoint-override-delay.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 0
+    },
+    {
+      "fileName": "6002-disabled-and-inhibited.cpd",
+      "extracted": "6002-disabled-and-inhibited.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 1
+    },
+    {
+      "fileName": "6002-io-stage-linkage.cpd",
+      "extracted": "6002-io-stage-linkage.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 2
+    },
+    {
+      "fileName": "6002-delay-edge-fields.cpd",
+      "extracted": "6002-delay-edge-fields.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 2
+    },
+    {
+      "fileName": "6002-realistic-building-composite.cpd",
+      "extracted": "6002-realistic-building-composite.json",
+      "devices": 20,
+      "zones": 128,
+      "sounderGroups": 4,
+      "ioGroups": 3
+    }
+  ]
+}

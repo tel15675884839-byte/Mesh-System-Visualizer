@@ -1,0 +1,96 @@
+{
+  "ok": true,
+  "checks": {
+    "canvas-rendered": true,
+    "disabled-status-preserves-sprite-color": true,
+    "inhibited-status-preserves-sprite-color": true,
+    "cpd-delayed-zone-renders-delayed-3d-sounder": true,
+    "cpd-delay-edge-zone1-has-no-immediate-active-3d-outputs": true,
+    "mounted-delay-edge-store-has-no-immediate-active-outputs": true,
+    "mounted-delay-edge-renders-delayed-sounder-output": true,
+    "mounted-delay-edge-renders-delayed-io-output": true,
+    "mounted-delay-edge-shows-countdown-before-active": true,
+    "mounted-delay-edge-audio-muted-before-countdown-expires": true,
+    "mounted-delay-edge-starts-audio-and-active-light-after-countdown": true,
+    "cpd-non-delayed-zone-renders-active-3d-sounder": true,
+    "viewer3d-event-log-records-activation": true,
+    "viewer3d-event-log-records-delay-expiry": true,
+    "viewer3d-event-log-shows-condition-summary": true,
+    "viewer3d-event-log-panel-rendered": true
+  },
+  "errors": [],
+  "statuses": [
+    {
+      "id": "device-disabled",
+      "address": 21,
+      "state": "disabled",
+      "markerColor": "#f59e0b",
+      "spriteColor": "#ffffff"
+    },
+    {
+      "id": "device-inhibited",
+      "address": 17,
+      "state": "inhibited",
+      "markerColor": "#7c3aed",
+      "spriteColor": "#ffffff"
+    },
+    {
+      "id": "device-normal",
+      "address": 114,
+      "state": "normal",
+      "markerColor": "#ffffff",
+      "spriteColor": "#ffffff"
+    }
+  ],
+  "cpdSounder3D": {
+    "delayedState": {
+      "state": "delayActive",
+      "sounderPattern": "continuous",
+      "remainingDelaySeconds": 60
+    },
+    "delayedColor": "#0ea5e9",
+    "delayEdgeAddress4SounderState": {
+      "state": "delayActive",
+      "sounderPattern": "continuous",
+      "remainingDelaySeconds": 60
+    },
+    "delayEdgeAddress4IoState": {
+      "state": "delayActive",
+      "remainingDelaySeconds": 45
+    },
+    "delayEdgeAddress4ActiveOutputCount": 0,
+    "nonDelayedState": {
+      "state": "active",
+      "sounderPattern": "continuous"
+    },
+    "nonDelayedColor": "#ef4444"
+  },
+  "mountedDelayEdge3D": {
+    "beforeDelaySounderState": {
+      "state": "delayActive",
+      "sounderPattern": "continuous",
+      "remainingDelaySeconds": 60
+    },
+    "beforeDelayIoState": {
+      "state": "delayActive",
+      "remainingDelaySeconds": 45
+    },
+    "beforeDelayCountdownSeconds": 60,
+    "beforeDelayActiveOutputCount": 0,
+    "beforeDelayShouldPlayAudio": false,
+    "afterDelaySounderState": {
+      "state": "active",
+      "sounderPattern": "continuous"
+    },
+    "afterDelayColor": "#ef4444",
+    "afterDelayShouldPlayAudio": true,
+    "afterDelayActiveOutputCount": 3
+  },
+  "eventLog": {
+    "count": 4,
+    "hasActivation": true,
+    "hasDelayExpiry": true,
+    "hasConditionSummary": true,
+    "panelRendered": true
+  }
+}

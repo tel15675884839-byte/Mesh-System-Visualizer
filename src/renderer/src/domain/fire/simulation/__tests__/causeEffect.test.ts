@@ -32,6 +32,23 @@ describe('cause and effect resolution', () => {
     )
   })
 
+  it('activates direct initiating-device Sounder Group and I/O Group assignments separately from membership', () => {
+    const input = device({ id: 'input-1', zoneNumber: 1, sounderGroupId: 8, ioGroupId: 9 })
+
+    const outputs = outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input])
+
+    expect(outputIds(outputs)).toEqual([
+      'fire-brigade:panel-1',
+      'io-group:panel-1:3',
+      'io-group:panel-1:5',
+      'io-group:panel-1:6',
+      'io-group:panel-1:7',
+      'io-group:panel-1:9',
+      'sounder-group:panel-1:1',
+      'sounder-group:panel-1:8'
+    ])
+  })
+
   it('activates programmed stage 2 Zone outputs when a double-knock Zone has two alarms', () => {
     const first = device({ id: 'input-1', zoneNumber: 2 })
     const second = device({ id: 'input-2', address: 2, zoneNumber: 2 })
@@ -128,8 +145,8 @@ describe('cause and effect resolution', () => {
     expect(outputs).toContainEqual(
       expect.objectContaining({
         outputId: 'device:sounder-disabled',
-        state: 'disabled',
-        reason: 'disabled-output'
+        state: 'active',
+        reason: 'evacuate'
       })
     )
     expect(outputs.systemState).toBe('evacuate')
@@ -181,6 +198,32 @@ describe('cause and effect resolution', () => {
         outputId: 'sounder-group:panel-1:1',
         state: 'inhibited',
         reason: 'inhibit-sounders'
+      })
+    )
+  })
+
+  it('applies zonal sounder inhibit without blocking direct device sounder assignments', () => {
+    const input = device({
+      id: 'input-1',
+      zoneNumber: 1,
+      sounderGroupId: 8,
+      inhibitSounders: true,
+      raw: { InhibitSounders: 'ZONAL' }
+    })
+
+    const outputs = outputsFor([{ deviceId: 'input-1', activatedAt: 0 }], [input])
+
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'sounder-group:panel-1:1',
+        state: 'inhibited',
+        reason: 'inhibit-sounders'
+      })
+    )
+    expect(outputs).toContainEqual(
+      expect.objectContaining({
+        outputId: 'sounder-group:panel-1:8',
+        state: 'active'
       })
     )
   })

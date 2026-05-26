@@ -1,0 +1,1643 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CPD 预览交互式设计 - Numens Fire Alarm Simulator</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef2f7;
+        --panel: #ffffff;
+        --panel-soft: #f8fafc;
+        --line: #d8dee8;
+        --line-soft: #e6ebf2;
+        --text: #172033;
+        --muted: #64748b;
+        --faint: #94a3b8;
+        --primary: #1f6feb;
+        --primary-soft: #e8f1ff;
+        --green: #0f8a5f;
+        --green-soft: #e8f7f0;
+        --amber: #b26a00;
+        --amber-soft: #fff4d8;
+        --violet: #6d45b8;
+        --violet-soft: #f0eafd;
+        --blue: #1769aa;
+        --blue-soft: #e8f3fb;
+        --danger: #b42318;
+        --danger-soft: #fff0ee;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Microsoft YaHei', sans-serif;
+        font-size: 13px;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 56px minmax(0, 1fr);
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .brand {
+        display: grid;
+        min-width: 0;
+        gap: 2px;
+      }
+
+      .brand strong {
+        font-size: 16px;
+        line-height: 20px;
+      }
+
+      .brand span {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 16px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--text);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .button:hover {
+        background: var(--panel-soft);
+        border-color: var(--muted);
+      }
+
+      .button.primary {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .button.primary:hover {
+        background: #1a5ebd;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      /* Navigation Sidebar */
+      .preview-nav {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+        border-right: 1px solid var(--line);
+        background: #f8fafc;
+      }
+
+      .preview-title {
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .preview-title strong {
+        display: block;
+        font-size: 14px;
+        line-height: 20px;
+      }
+
+      .preview-title span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 16px;
+      }
+
+      .nav-items {
+        padding: 10px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 6px;
+        color: var(--text);
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .nav-item:hover {
+        background: #f1f5f9;
+      }
+
+      .nav-item.active {
+        background: var(--primary-soft);
+        color: #1555b8;
+        font-weight: 600;
+      }
+
+      .nav-item .badge {
+        margin-left: auto;
+      }
+
+      /* Content Area */
+      .preview-content {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .content-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .content-header h1 {
+        margin: 0;
+        font-size: 18px;
+        line-height: 24px;
+      }
+
+      .content-header p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .read-only {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 26px;
+        padding: 0 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .content-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 14px 16px 18px;
+      }
+
+      /* Overview Screen specifically */
+      .overview-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .metric {
+        min-width: 0;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      }
+
+      .metric.highlight-amber {
+        border-left: 4px solid #d97706;
+      }
+
+      .metric.highlight-blue {
+        border-left: 4px solid #2563eb;
+      }
+
+      .metric span {
+        display: block;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 24px;
+        line-height: 28px;
+        font-weight: 700;
+      }
+
+      /* Sections & Grid Layout */
+      .section-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+        gap: 14px;
+        min-height: 520px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 48px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .panel-header h2 {
+        margin: 0;
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+      }
+
+      .panel-header p {
+        margin: 1px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .filter {
+        height: 30px;
+        min-width: 104px;
+        padding: 0 9px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--text);
+        outline: none;
+        cursor: pointer;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        flex: 1;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line-soft);
+        text-align: left;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f8fafc;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      tbody tr {
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      tbody tr:hover {
+        background: #f8fafc;
+      }
+
+      tr.selected-row td {
+        background: var(--primary-soft) !important;
+      }
+
+      td strong {
+        display: block;
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      td small {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      /* Chips/Badges */
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 22px;
+        padding: 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 16px;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+
+      .chip.blue {
+        border-color: #b9d6ec;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .chip.green {
+        border-color: #bfe7d4;
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .chip.amber {
+        border-color: #f4d07a;
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .chip.violet {
+        border-color: #d9c9f5;
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .chip.danger {
+        border-color: #fac5bd;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      /* Right Detail Panel */
+      .detail {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .detail-body {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px;
+        overflow-y: auto;
+      }
+
+      .detail-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .detail-stat {
+        padding: 8px 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 6px;
+        background: var(--panel-soft);
+      }
+
+      .detail-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .detail-stat strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .relation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .relation {
+        display: grid;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 6px;
+        background: var(--panel);
+      }
+
+      .relation-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      .device-mini-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .device-mini {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 8px;
+        border: 1px solid var(--line-soft);
+        border-radius: 4px;
+        background: var(--panel-soft);
+        font-size: 12px;
+      }
+
+      .device-mini span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .mono {
+        font-family: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+      }
+
+      /* Card styling for Overview Info */
+      .card-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .card-info-item {
+        background: var(--panel-soft);
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line-soft);
+      }
+
+      .card-info-item h3 {
+        margin: 0 0 6px 0;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .card-info-item p {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .card-info-item p span {
+        font-size: 12px;
+        font-weight: normal;
+        color: var(--muted);
+        margin-left: 4px;
+      }
+
+      .view-section {
+        display: none;
+      }
+
+      .view-section.active-section {
+        display: grid;
+      }
+
+      .no-data {
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      @media (max-width: 1180px) {
+        .section-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <div class="brand">
+          <strong>Numens Fire Alarm Simulator (CPD 预览效果)</strong>
+          <span>正在查看参考配置：6002-delay-edge-fields.cpd</span>
+        </div>
+        <nav class="actions" aria-label="Project actions">
+          <button class="button primary">从 CPD 导入</button>
+          <button class="button">打开项目</button>
+          <button class="button">保存项目</button>
+        </nav>
+      </header>
+
+      <section class="workspace">
+        <!-- Sidebar Navigation -->
+        <aside class="preview-nav" aria-label="CPD preview sections">
+          <div class="preview-title">
+            <strong>CPD 检查器</strong>
+            <span>只读配置总览与联动查看</span>
+          </div>
+          <div class="nav-items">
+            <div class="nav-item active" onclick="switchTab('overview', this)">
+              总览 (Overview)
+              <span class="badge chip">CPD</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('zones', this)">
+              分区 (Zones)
+              <span class="badge chip blue">3</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('sounder-groups', this)">
+              声光组 (Sounder Groups)
+              <span class="badge chip blue">4</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <section class="preview-content">
+          <!-- CONTENT HEADER -->
+          <header class="content-header">
+            <div>
+              <h1 id="content-title">总览</h1>
+              <p id="content-desc">显示 .cpd 配置文件解析出的硬件与逻辑定义总揽。</p>
+            </div>
+            <span class="read-only">CPD 导入参考数据</span>
+          </header>
+
+          <div class="content-scroll">
+            <!-- 1. OVERVIEW VIEW SECTION -->
+            <div id="section-overview" class="view-section active-section overview-container">
+              <section class="metrics" aria-label="CPD summary">
+                <div class="metric">
+                  <span>控制器 (Panels)</span>
+                  <strong>1</strong>
+                </div>
+                <div class="metric">
+                  <span>回路 (Loops)</span>
+                  <strong>2</strong>
+                </div>
+                <div class="metric">
+                  <span>设备总数 (Devices)</span>
+                  <strong>20</strong>
+                </div>
+                <div class="metric">
+                  <span>已配置分区 (Zones)</span>
+                  <strong
+                    >3
+                    <span style="font-size: 11px; font-weight: normal; color: var(--muted)"
+                      >/ 共128</span
+                    ></strong
+                  >
+                </div>
+                <div class="metric highlight-blue">
+                  <span>声光组 (Sounder Groups)</span>
+                  <strong>4</strong>
+                </div>
+                <div class="metric">
+                  <span>I/O 组 (I/O Groups)</span>
+                  <strong>2</strong>
+                </div>
+                <div class="metric highlight-amber">
+                  <span>延时分区 (Delayed Zones)</span>
+                  <strong>3</strong>
+                </div>
+                <div class="metric">
+                  <span>禁用设备 (Disabled)</span>
+                  <strong>0</strong>
+                </div>
+              </section>
+
+              <div class="section-grid">
+                <article class="panel">
+                  <header class="panel-header">
+                    <h2>控制器全局参数 (Panel General Config)</h2>
+                  </header>
+                  <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px">
+                    <div class="card-info-grid">
+                      <div class="card-info-item">
+                        <h3>控制器型号</h3>
+                        <p>ControlPanel6002_N</p>
+                      </div>
+                      <div class="card-info-item">
+                        <h3>声光模式 (Sounder Mode)</h3>
+                        <p>Programmed <span>(联动模式)</span></p>
+                      </div>
+                      <div class="card-info-item">
+                        <h3>声光延时时间 (Sounder Delay)</h3>
+                        <p style="color: #d97706">01:00 <span>(60秒)</span></p>
+                      </div>
+                      <div class="card-info-item">
+                        <h3>I/O 延时时间 (I/O Delay)</h3>
+                        <p style="color: #6d45b8">00:45 <span>(45秒)</span></p>
+                      </div>
+                      <div class="card-info-item">
+                        <h3>故障 I/O 组 (Fault I/O Group)</h3>
+                        <p>0 <span>(未启用)</span></p>
+                      </div>
+                      <div class="card-info-item">
+                        <h3>消防队继电器延时</h3>
+                        <p>00:00 <span>(无延时)</span></p>
+                      </div>
+                    </div>
+                    <div
+                      style="
+                        background: #f1f5f9;
+                        padding: 12px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        color: var(--muted);
+                      "
+                    >
+                      <strong>说明：</strong
+                      >当分区的“声光延时联动”开启时，该分区激活后对应的声光组将延时
+                      <strong>60秒</strong> 动作；当对应设备的 I/O 延时开启时，动作将延时
+                      <strong>45秒</strong>。
+                    </div>
+                  </div>
+                </article>
+
+                <aside class="panel">
+                  <header class="panel-header">
+                    <h2>文件属性</h2>
+                  </header>
+                  <div
+                    style="
+                      padding: 14px;
+                      display: flex;
+                      flex-direction: column;
+                      gap: 10px;
+                      font-size: 12px;
+                    "
+                  >
+                    <div>
+                      <span class="muted">文件名:</span>
+                      <strong class="mono" style="display: inline"
+                        >6002-delay-edge-fields.cpd</strong
+                      >
+                    </div>
+                    <div>
+                      <span class="muted">CPD 版本:</span>
+                      <strong class="mono" style="display: inline">3.6.0</strong>
+                    </div>
+                    <div>
+                      <span class="muted">解析器版本:</span>
+                      <strong class="mono" style="display: inline">1.0.0 (CpdExtractor.ps1)</strong>
+                    </div>
+                    <div>
+                      <span class="muted">导出时间:</span>
+                      <span class="mono">2026-05-25 09:54:25</span>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0" />
+                    <div><strong>回路构成：</strong></div>
+                    <div class="chip-row">
+                      <span class="chip blue">Loop 1 (20个设备)</span>
+                      <span class="chip">Loop 2 (0个设备)</span>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <!-- 2. ZONES VIEW SECTION -->
+            <div id="section-zones" class="view-section section-grid">
+              <article class="panel">
+                <header class="panel-header">
+                  <div>
+                    <h2>分区配置 (Zone Configuration)</h2>
+                    <p>点击分区行，可在右侧查看该分区的具体绑定设备与联动关系。</p>
+                  </div>
+                  <div class="filters">
+                    <select
+                      class="filter"
+                      aria-label="Delay filter"
+                      onchange="filterZones(this.value)"
+                    >
+                      <option value="all">所有分区</option>
+                      <option value="delayed">仅有延时</option>
+                      <option value="nodelay">无延时</option>
+                    </select>
+                  </div>
+                </header>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>分区号</th>
+                        <th>分区文本名称 (Text)</th>
+                        <th>设备总数</th>
+                        <th>声光组联动 (Alarm 1 / 2)</th>
+                        <th>延时状态</th>
+                        <th>I/O 组联动 (Alarm 1 / 2)</th>
+                        <th>触发模式</th>
+                      </tr>
+                    </thead>
+                    <tbody id="zones-table-body">
+                      <!-- Row 1 -->
+                      <tr class="selected-row" onclick="selectZoneRow(1, this)">
+                        <td><strong>001</strong><small>Panel 1</small></td>
+                        <td>1st Floor</td>
+                        <td>6</td>
+                        <td>
+                          <div class="chip-row">
+                            <span class="chip blue">SG 1</span>
+                            <span class="chip blue">SG 10</span>
+                          </div>
+                        </td>
+                        <td><span class="chip amber">60秒延时</span></td>
+                        <td>
+                          <div class="chip-row">
+                            <span class="chip violet">IO 1</span>
+                            <span class="chip violet">IO 2</span>
+                          </div>
+                        </td>
+                        <td><span class="chip">Single (单报警)</span></td>
+                      </tr>
+                      <!-- Row 2 -->
+                      <tr onclick="selectZoneRow(2, this)">
+                        <td><strong>002</strong><small>Panel 1</small></td>
+                        <td>2nd Floor</td>
+                        <td>5</td>
+                        <td>
+                          <div class="chip-row">
+                            <span class="chip blue">SG 2</span>
+                            <span class="chip blue">SG 10</span>
+                          </div>
+                        </td>
+                        <td><span class="chip amber">60秒延时</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="chip">Single (单报警)</span></td>
+                      </tr>
+                      <!-- Row 3 -->
+                      <tr onclick="selectZoneRow(3, this)">
+                        <td><strong>003</strong><small>Panel 1</small></td>
+                        <td>3rd Floor</td>
+                        <td>4</td>
+                        <td>
+                          <div class="chip-row">
+                            <span class="chip blue">SG 3</span>
+                            <span class="chip blue">SG 10</span>
+                          </div>
+                        </td>
+                        <td><span class="chip amber">60秒延时</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="chip">Single (单报警)</span></td>
+                      </tr>
+                      <!-- Rest of zones (just a couple of empty ones for design demonstration) -->
+                      <tr onclick="selectZoneRow(4, this)">
+                        <td><strong>004</strong><small>Panel 1</small></td>
+                        <td><span class="muted">(无文本)</span></td>
+                        <td>0</td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="chip">Single (单报警)</span></td>
+                      </tr>
+                      <tr onclick="selectZoneRow(5, this)">
+                        <td><strong>005</strong><small>Panel 1</small></td>
+                        <td><span class="muted">(无文本)</span></td>
+                        <td>0</td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="muted">-</span></td>
+                        <td><span class="chip">Single (单报警)</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <!-- Zones Detail Panel -->
+              <aside class="panel detail" id="zone-detail-panel">
+                <!-- Dynamic Header -->
+                <header class="panel-header" style="background: #fafafa">
+                  <div>
+                    <h2 id="zd-title">Zone 001 详情</h2>
+                    <p id="zd-desc">1st Floor</p>
+                  </div>
+                  <span class="chip amber" id="zd-delay-badge">延时开启</span>
+                </header>
+
+                <div class="detail-body">
+                  <div class="detail-summary">
+                    <div class="detail-stat">
+                      <span>绑定设备数量</span>
+                      <strong id="zd-dev-count">6</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>声光延时时间</span>
+                      <strong id="zd-delay-time">60 秒</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>联动声光组</span>
+                      <strong id="zd-sg">SG 1, SG 10</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>联动 I/O 组</span>
+                      <strong id="zd-io">IO 1, IO 2</strong>
+                    </div>
+                  </div>
+
+                  <section>
+                    <div class="panel-header" style="padding: 4px 0 8px; border: 0; min-height: 0">
+                      <h2>输出联动规则 (Outputs Linkage)</h2>
+                    </div>
+                    <div class="relation-list" id="zd-relations">
+                      <div class="relation">
+                        <div class="relation-title">
+                          <span>第一阶段报警输出 (Alarm 1)</span>
+                          <span class="chip blue">SG 1</span>
+                        </div>
+                        <div class="chip-row">
+                          <span class="chip amber">参与声光延时</span>
+                          <span class="chip">Stage 1</span>
+                        </div>
+                      </div>
+                      <div class="relation">
+                        <div class="relation-title">
+                          <span>第二阶段报警输出 (Alarm 2)</span>
+                          <span class="chip blue">SG 10</span>
+                        </div>
+                        <div class="chip-row">
+                          <span class="chip">Stage 2</span>
+                        </div>
+                      </div>
+                      <div class="relation">
+                        <div class="relation-title">
+                          <span>I/O 组联动 1 (Alarm 1)</span>
+                          <span class="chip violet">IO 1</span>
+                        </div>
+                      </div>
+                      <div class="relation">
+                        <div class="relation-title">
+                          <span>I/O 组联动 2 (Alarm 2)</span>
+                          <span class="chip violet">IO 2</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div class="panel-header" style="padding: 4px 0 8px; border: 0; min-height: 0">
+                      <h2>分区内绑定设备 (Zone Devices)</h2>
+                    </div>
+                    <div class="device-mini-list" id="zd-devices">
+                      <div class="device-mini">
+                        <span><strong>L1-1</strong> 光电感烟探测器 (1F Lobby Smoke)</span>
+                        <span class="chip green">输入</span>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-2</strong> 感温探测器 (1F Plant Heat)</span>
+                        <span class="chip green">输入</span>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-3</strong> 光电感烟探测器 (1F Corridor Smoke)</span>
+                        <span class="chip green">输入</span>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-4</strong> 手动报警按钮 (1F Corridor MCP)</span>
+                        <div class="chip-row">
+                          <span class="chip green">输入</span>
+                          <span class="chip amber">延时覆盖</span>
+                        </div>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-7</strong> 输入输出模块 (1F Shutter Half-Down)</span>
+                        <span class="chip violet">I/O 模块</span>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-8</strong> 输入输出模块 (1F Shutter Full-Down)</span>
+                        <span class="chip violet">I/O 模块</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </aside>
+            </div>
+
+            <!-- 3. SOUNDER GROUPS VIEW SECTION -->
+            <div id="section-sounder-groups" class="view-section section-grid">
+              <article class="panel">
+                <header class="panel-header">
+                  <div>
+                    <h2>声光输出组配置 (Sounder Groups)</h2>
+                    <p>反向查看每个声光组：被哪些分区调用、包含哪些声光设备以及延时策略。</p>
+                  </div>
+                  <div class="filters">
+                    <select
+                      class="filter"
+                      aria-label="Delay filter"
+                      onchange="filterGroups(this.value)"
+                    >
+                      <option value="all">所有组</option>
+                      <option value="linked">有调用分区</option>
+                      <option value="empty">无调用分区</option>
+                    </select>
+                  </div>
+                </header>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>组号 (Group ID)</th>
+                        <th>组名称 / 描述</th>
+                        <th>调用分区数</th>
+                        <th>调用分区列表 (Triggering Zones)</th>
+                        <th>绑定声光设备数</th>
+                        <th>参与延时联动</th>
+                      </tr>
+                    </thead>
+                    <tbody id="groups-table-body">
+                      <!-- SG 1 -->
+                      <tr class="selected-row" onclick="selectGroupRow(1, this)">
+                        <td><strong>SG 1</strong><small>Panel 1</small></td>
+                        <td>Sounder Group 1</td>
+                        <td>1</td>
+                        <td><span class="chip">Zone 1</span></td>
+                        <td>2</td>
+                        <td><span class="chip amber">延时 (60秒)</span></td>
+                      </tr>
+                      <!-- SG 2 -->
+                      <tr onclick="selectGroupRow(2, this)">
+                        <td><strong>SG 2</strong><small>Panel 1</small></td>
+                        <td>Sounder Group 2</td>
+                        <td>1</td>
+                        <td><span class="chip">Zone 2</span></td>
+                        <td>2</td>
+                        <td><span class="chip amber">延时 (60秒)</span></td>
+                      </tr>
+                      <!-- SG 3 -->
+                      <tr onclick="selectGroupRow(3, this)">
+                        <td><strong>SG 3</strong><small>Panel 1</small></td>
+                        <td>Sounder Group 3</td>
+                        <td>1</td>
+                        <td><span class="chip">Zone 3</span></td>
+                        <td>1</td>
+                        <td><span class="chip amber">延时 (60秒)</span></td>
+                      </tr>
+                      <!-- SG 10 -->
+                      <tr onclick="selectGroupRow(10, this)">
+                        <td><strong>SG 10</strong><small>Panel 1</small></td>
+                        <td>Sounder Group 10</td>
+                        <td>3</td>
+                        <td>
+                          <div class="chip-row">
+                            <span class="chip">Zone 1</span>
+                            <span class="chip">Zone 2</span>
+                            <span class="chip">Zone 3</span>
+                          </div>
+                        </td>
+                        <td>0</td>
+                        <td><span class="chip amber">延时 (60秒)</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <!-- Sounder Group Detail Panel -->
+              <aside class="panel detail" id="group-detail-panel">
+                <header class="panel-header" style="background: #fafafa">
+                  <div>
+                    <h2 id="gd-title">SG 1 详情</h2>
+                    <p id="gd-desc">Sounder Group 1</p>
+                  </div>
+                  <span class="chip amber" id="gd-delay-badge">参与延时</span>
+                </header>
+
+                <div class="detail-body">
+                  <div class="detail-summary">
+                    <div class="detail-stat">
+                      <span>包含声光数</span>
+                      <strong id="gd-dev-count">2</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>调用分区数</span>
+                      <strong id="gd-zone-count">1</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>控制器号</span>
+                      <strong>Panel 1</strong>
+                    </div>
+                    <div class="detail-stat">
+                      <span>关联延时</span>
+                      <strong id="gd-delay-duration">60 秒</strong>
+                    </div>
+                  </div>
+
+                  <section>
+                    <div class="panel-header" style="padding: 4px 0 8px; border: 0; min-height: 0">
+                      <h2>联动激活此组的分区 (Triggered By Zones)</h2>
+                    </div>
+                    <div class="relation-list" id="gd-zones">
+                      <div class="relation">
+                        <div class="relation-title">
+                          <span>Zone 1 (1st Floor)</span>
+                          <span class="chip blue">Alarm 1 联动</span>
+                        </div>
+                        <div class="chip-row">
+                          <span class="chip amber">Zone声光延时激活</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div class="panel-header" style="padding: 4px 0 8px; border: 0; min-height: 0">
+                      <h2>组内绑定的声光/输出设备 (Group Devices)</h2>
+                    </div>
+                    <div class="device-mini-list" id="gd-devices">
+                      <div class="device-mini">
+                        <span><strong>L1-94</strong> 声光报警器 (1F Corridor Sounder)</span>
+                        <span class="chip blue">声光</span>
+                      </div>
+                      <div class="device-mini">
+                        <span><strong>L1-95</strong> 声光报警器 (1F Lobby Sounder)</span>
+                        <span class="chip blue">声光</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- Interactive Data Script -->
+    <script>
+      // 1. DATA DEFINITIONS FROM 6002-delay-edge-fields.cpd
+      const zonesData = {
+        1: {
+          number: '001',
+          name: '1st Floor',
+          deviceCount: 6,
+          sounderGroups: ['SG 1', 'SG 10'],
+          delayed: true,
+          delayTime: '60 秒',
+          ioGroups: ['IO 1', 'IO 2'],
+          mode: 'Single (单报警)',
+          alarm1Sg: 'SG 1',
+          alarm2Sg: 'SG 10',
+          alarm1Io: 'IO 1',
+          alarm2Io: 'IO 2',
+          devices: [
+            {
+              id: 'L1-1',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '1F Lobby Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-2',
+              type: 'Heat_Det',
+              name: '感温探测器',
+              desc: '1F Plant Heat',
+              role: '输入'
+            },
+            {
+              id: 'L1-3',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '1F Corridor Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-4',
+              type: 'Manual_Call_Point',
+              name: '手动报警按钮',
+              desc: '1F Corridor MCP',
+              role: '输入',
+              override: '延时覆盖'
+            },
+            {
+              id: 'L1-7',
+              type: 'Input_Output',
+              name: '输入输出模块',
+              desc: '1F Shutter Half-Down',
+              role: 'I/O 模块'
+            },
+            {
+              id: 'L1-8',
+              type: 'Input_Output',
+              name: '输入输出模块',
+              desc: '1F Shutter Full-Down',
+              role: 'I/O 模块'
+            }
+          ]
+        },
+        2: {
+          number: '002',
+          name: '2nd Floor',
+          deviceCount: 5,
+          sounderGroups: ['SG 2', 'SG 10'],
+          delayed: true,
+          delayTime: '60 秒',
+          ioGroups: [],
+          mode: 'Single (单报警)',
+          alarm1Sg: 'SG 2',
+          alarm2Sg: 'SG 10',
+          alarm1Io: null,
+          alarm2Io: null,
+          devices: [
+            {
+              id: 'L1-11',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '2F Meeting Room Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-12',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '2F R&D Area Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-13',
+              type: 'Heat_Det',
+              name: '感温探测器',
+              desc: '2F Kitchen Heat',
+              role: '输入'
+            },
+            {
+              id: 'L1-14',
+              type: 'Manual_Call_Point',
+              name: '手动报警按钮',
+              desc: '2F Exit MCP',
+              role: '输入',
+              override: '延时覆盖'
+            },
+            {
+              id: 'L1-17',
+              type: 'Input_Output',
+              name: '输入输出模块',
+              desc: '2F Sprinkler Relay',
+              role: 'I/O 模块'
+            }
+          ]
+        },
+        3: {
+          number: '003',
+          name: '3rd Floor',
+          deviceCount: 4,
+          sounderGroups: ['SG 3', 'SG 10'],
+          delayed: true,
+          delayTime: '60 秒',
+          ioGroups: [],
+          mode: 'Single (单报警)',
+          alarm1Sg: 'SG 3',
+          alarm2Sg: 'SG 10',
+          alarm1Io: null,
+          alarm2Io: null,
+          devices: [
+            {
+              id: 'L1-21',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '3F Archive Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-22',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '3F Manager Office Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-23',
+              type: 'Optical_Det',
+              name: '光电感烟探测器',
+              desc: '3F Corridor Smoke',
+              role: '输入'
+            },
+            {
+              id: 'L1-24',
+              type: 'Manual_Call_Point',
+              name: '手动报警按钮',
+              desc: '3F Corridor MCP',
+              role: '输入',
+              override: '延时覆盖'
+            }
+          ]
+        },
+        4: {
+          number: '004',
+          name: '(无文本)',
+          deviceCount: 0,
+          sounderGroups: [],
+          delayed: false,
+          delayTime: '-',
+          ioGroups: [],
+          mode: 'Single (单报警)',
+          alarm1Sg: null,
+          alarm2Sg: null,
+          alarm1Io: null,
+          alarm2Io: null,
+          devices: []
+        },
+        5: {
+          number: '005',
+          name: '(无文本)',
+          deviceCount: 0,
+          sounderGroups: [],
+          delayed: false,
+          delayTime: '-',
+          ioGroups: [],
+          mode: 'Single (单报警)',
+          alarm1Sg: null,
+          alarm2Sg: null,
+          alarm1Io: null,
+          alarm2Io: null,
+          devices: []
+        }
+      }
+
+      const groupsData = {
+        1: {
+          id: 'SG 1',
+          name: 'Sounder Group 1',
+          zoneCount: 1,
+          devCount: 2,
+          delay: '延时 (60秒)',
+          zones: [{ num: 1, name: '1st Floor', type: 'Alarm 1 联动', delay: 'Zone声光延时激活' }],
+          devices: [
+            { id: 'L1-94', name: '声光报警器', desc: '1F Corridor Sounder' },
+            { id: 'L1-95', name: '声光报警器', desc: '1F Lobby Sounder' }
+          ]
+        },
+        2: {
+          id: 'SG 2',
+          name: 'Sounder Group 2',
+          zoneCount: 1,
+          devCount: 2,
+          delay: '延时 (60秒)',
+          zones: [{ num: 2, name: '2nd Floor', type: 'Alarm 1 联动', delay: 'Zone声光延时激活' }],
+          devices: [
+            { id: 'L1-104', name: '声光报警器', desc: '2F Corridor Sounder 1' },
+            { id: 'L1-105', name: '声光报警器', desc: '2F Corridor Sounder 2' }
+          ]
+        },
+        3: {
+          id: 'SG 3',
+          name: 'Sounder Group 3',
+          zoneCount: 1,
+          devCount: 1,
+          delay: '延时 (60秒)',
+          zones: [{ num: 3, name: '3rd Floor', type: 'Alarm 1 联动', delay: 'Zone声光延时激活' }],
+          devices: [{ id: 'L1-114', name: '声光报警器', desc: '3F Corridor Sounder' }]
+        },
+        10: {
+          id: 'SG 10',
+          name: 'Sounder Group 10',
+          zoneCount: 3,
+          devCount: 0,
+          delay: '延时 (60秒)',
+          zones: [
+            { num: 1, name: '1st Floor', type: 'Alarm 2 联动', delay: 'Zone声光延时激活' },
+            { num: 2, name: '2nd Floor', type: 'Alarm 2 联动', delay: 'Zone声光延时激活' },
+            { num: 3, name: '3rd Floor', type: 'Alarm 2 联动', delay: 'Zone声光延时激活' }
+          ],
+          devices: []
+        }
+      }
+
+      // 2. SWITCH TAB LOGIC
+      function switchTab(tabId, el) {
+        // Toggle Nav Items Active State
+        document.querySelectorAll('.nav-item').forEach((item) => {
+          item.classList.remove('active')
+        })
+        el.classList.add('active')
+
+        // Toggle Content Sections Active State
+        document.querySelectorAll('.view-section').forEach((sec) => {
+          sec.classList.remove('active-section')
+        })
+
+        // Set Title & Description
+        const titleEl = document.getElementById('content-title')
+        const descEl = document.getElementById('content-desc')
+
+        if (tabId === 'overview') {
+          document.getElementById('section-overview').classList.add('active-section')
+          titleEl.innerText = '总览 (Overview)'
+          descEl.innerText = '显示 .cpd 配置文件解析出的硬件与逻辑定义总揽。'
+        } else if (tabId === 'zones') {
+          document.getElementById('section-zones').classList.add('active-section')
+          titleEl.innerText = '分区 (Zones)'
+          descEl.innerText =
+            '显示整个 CPD 文件的 Zone 分区关联、绑定输入设备、声光和 I/O 组延时联动关系。'
+          // Default to Zone 1 detail
+          updateZoneDetail(1)
+        } else if (tabId === 'sounder-groups') {
+          document.getElementById('section-sounder-groups').classList.add('active-section')
+          titleEl.innerText = '声光组 (Sounder Groups)'
+          descEl.innerText =
+            '反向查看各声光组被哪些分区调用、包含哪些声光设备，以便核对声光延时和阶段覆盖。'
+          // Default to SG 1 detail
+          updateGroupDetail(1)
+        }
+      }
+
+      // 3. ZONES DETAIL INTERACTION
+      function selectZoneRow(zoneNum, rowEl) {
+        // Remove selection from all rows
+        document.querySelectorAll('#zones-table-body tr').forEach((tr) => {
+          tr.classList.remove('selected-row')
+        })
+        rowEl.classList.add('selected-row')
+        updateZoneDetail(zoneNum)
+      }
+
+      function updateZoneDetail(zoneNum) {
+        const zone = zonesData[zoneNum]
+        if (!zone) return
+
+        document.getElementById('zd-title').innerText = `Zone ${zone.number} 详情`
+        document.getElementById('zd-desc').innerText = zone.name || '(无文本描述)'
+
+        // Delay badge
+        const delayBadge = document.getElementById('zd-delay-badge')
+        if (zone.delayed) {
+          delayBadge.innerText = '延时开启'
+          delayBadge.className = 'chip amber'
+        } else {
+          delayBadge.innerText = '无延时'
+          delayBadge.className = 'chip'
+        }
+
+        // Stats
+        document.getElementById('zd-dev-count').innerText = zone.deviceCount
+        document.getElementById('zd-delay-time').innerText = zone.delayTime
+        document.getElementById('zd-sg').innerText = zone.sounderGroups.join(', ') || '无'
+        document.getElementById('zd-io').innerText = zone.ioGroups.join(', ') || '无'
+
+        // Outputs Linkage List
+        const relationContainer = document.getElementById('zd-relations')
+        relationContainer.innerHTML = ''
+
+        if (zone.alarm1Sg) {
+          relationContainer.innerHTML += `
+            <div class="relation">
+              <div class="relation-title">
+                <span>第一阶段报警输出 (Alarm 1)</span>
+                <span class="chip blue">${zone.alarm1Sg}</span>
+              </div>
+              <div class="chip-row">
+                ${zone.delayed ? '<span class="chip amber">参与声光延时</span>' : '<span class="chip">直接响应</span>'}
+                <span class="chip">Stage 1</span>
+              </div>
+            </div>`
+        }
+
+        if (zone.alarm2Sg) {
+          relationContainer.innerHTML += `
+            <div class="relation">
+              <div class="relation-title">
+                <span>第二阶段报警输出 (Alarm 2)</span>
+                <span class="chip blue">${zone.alarm2Sg}</span>
+              </div>
+              <div class="chip-row">
+                <span class="chip">Stage 2</span>
+              </div>
+            </div>`
+        }
+
+        if (zone.alarm1Io) {
+          relationContainer.innerHTML += `
+            <div class="relation">
+              <div class="relation-title">
+                <span>I/O 组联动 1 (Alarm 1)</span>
+                <span class="chip violet">${zone.alarm1Io}</span>
+              </div>
+            </div>`
+        }
+
+        if (zone.alarm2Io) {
+          relationContainer.innerHTML += `
+            <div class="relation">
+              <div class="relation-title">
+                <span>I/O 组联动 2 (Alarm 2)</span>
+                <span class="chip violet">${zone.alarm2Io}</span>
+              </div>
+            </div>`
+        }
+
+        if (!zone.alarm1Sg && !zone.alarm2Sg && !zone.alarm1Io && !zone.alarm2Io) {
+          relationContainer.innerHTML = '<div class="no-data">无输出联动绑定</div>'
+        }
+
+        // Zone Devices List
+        const devContainer = document.getElementById('zd-devices')
+        devContainer.innerHTML = ''
+
+        zone.devices.forEach((dev) => {
+          let roleClass = 'green'
+          if (dev.role.includes('I/O')) roleClass = 'violet'
+          if (dev.role.includes('输出') || dev.role.includes('声光')) roleClass = 'blue'
+
+          devContainer.innerHTML += `
+            <div class="device-mini">
+              <span><strong>${dev.id}</strong> ${dev.name} (${dev.desc})</span>
+              <div class="chip-row">
+                <span class="chip ${roleClass}">${dev.role}</span>
+                ${dev.override ? `<span class="chip amber">${dev.override}</span>` : ''}
+              </div>
+            </div>`
+        })
+
+        if (zone.devices.length === 0) {
+          devContainer.innerHTML = '<div class="no-data">该分区内没有绑定输入或输出设备</div>'
+        }
+      }
+
+      // 4. SOUNDER GROUP DETAIL INTERACTION
+      function selectGroupRow(groupId, rowEl) {
+        document.querySelectorAll('#groups-table-body tr').forEach((tr) => {
+          tr.classList.remove('selected-row')
+        })
+        rowEl.classList.add('selected-row')
+        updateGroupDetail(groupId)
+      }
+
+      function updateGroupDetail(groupId) {
+        const group = groupsData[groupId]
+        if (!group) return
+
+        document.getElementById('gd-title').innerText = `${group.id} 详情`
+        document.getElementById('gd-desc').innerText = group.name
+
+        // Stats
+        document.getElementById('gd-dev-count').innerText = group.devCount
+        document.getElementById('gd-zone-count').innerText = group.zoneCount
+        document.getElementById('gd-delay-duration').innerText =
+          group.devCount > 0 ? '60 秒' : '未定义（空组）'
+
+        // Triggered by Zones List
+        const zoneContainer = document.getElementById('gd-zones')
+        zoneContainer.innerHTML = ''
+
+        group.zones.forEach((z) => {
+          zoneContainer.innerHTML += `
+            <div class="relation">
+              <div class="relation-title">
+                <span>Zone ${z.num} (${zonesData[z.num]?.name || ''})</span>
+                <span class="chip blue">${z.type}</span>
+              </div>
+              <div class="chip-row">
+                <span class="chip amber">${z.delay}</span>
+              </div>
+            </div>`
+        })
+
+        if (group.zones.length === 0) {
+          zoneContainer.innerHTML = '<div class="no-data">未被任何 Zone 联动激活</div>'
+        }
+
+        // Group Devices List
+        const devContainer = document.getElementById('gd-devices')
+        devContainer.innerHTML = ''
+
+        group.devices.forEach((dev) => {
+          devContainer.innerHTML += `
+            <div class="device-mini">
+              <span><strong>${dev.id}</strong> ${dev.name} (${dev.desc})</span>
+              <span class="chip blue">声光</span>
+            </div>`
+        })
+
+        if (group.devices.length === 0) {
+          devContainer.innerHTML = '<div class="no-data">组内无绑定声光物理设备</div>'
+        }
+      }
+
+      // 5. SIMPLE FRONTEND FILTERING DEMO
+      function filterZones(val) {
+        const rows = document.querySelectorAll('#zones-table-body tr')
+        rows.forEach((row) => {
+          const delayCell = row.cells[4].innerText
+          if (val === 'all') {
+            row.style.display = ''
+          } else if (val === 'delayed') {
+            row.style.display = delayCell.includes('延时') ? '' : 'none'
+          } else if (val === 'nodelay') {
+            row.style.display = !delayCell.includes('延时') ? '' : 'none'
+          }
+        })
+      }
+
+      function filterGroups(val) {
+        const rows = document.querySelectorAll('#groups-table-body tr')
+        rows.forEach((row) => {
+          const zoneCell = row.cells[2].innerText
+          if (val === 'all') {
+            row.style.display = ''
+          } else if (val === 'linked') {
+            row.style.display = parseInt(zoneCell) > 0 ? '' : 'none'
+          } else if (val === 'empty') {
+            row.style.display = parseInt(zoneCell) === 0 ? '' : 'none'
+          }
+        })
+      }
+    </script>
+  </body>
+</html>

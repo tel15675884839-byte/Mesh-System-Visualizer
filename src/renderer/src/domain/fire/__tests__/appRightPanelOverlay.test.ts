@@ -98,10 +98,10 @@ describe('phase-one workspace layout', () => {
     expect(viewerTemplateSource).not.toContain('@locate-in-tree')
   })
 
-  it('renders delayed sounders as countdown-only before output animation', () => {
+  it('renders delayed outputs as countdown-only before output animation', () => {
     expect(viewerSceneSource).toContain('renderDelayCountdownLabel')
-    expect(viewerSceneSource).toContain('const isDelayedSounder')
-    expect(viewerSceneSource).toContain('outputState !== null && !isDelayedSounder')
+    expect(viewerSceneSource).toContain('const isDelayedOutput')
+    expect(viewerSceneSource).toContain("const shouldAnimate = outputState?.state === 'active'")
   })
 
   it('keeps the 3D simulation countdown ticking without the full panel', () => {
@@ -113,5 +113,14 @@ describe('phase-one workspace layout', () => {
     )
     expect(viewerScriptSource).toContain('window.setInterval')
     expect(viewerScriptSource).toContain('window.clearInterval')
+  })
+
+  it('shows a compact 3D event log sourced from simulation state', () => {
+    expect(viewerScriptSource).toContain('recent3DEvents')
+    expect(viewerScriptSource).toContain('format3DEventTime')
+    expect(viewerTemplateSource).toContain('viewer-event-log-panel')
+    expect(viewerTemplateSource).toContain('event.type')
+    expect(viewerTemplateSource).toContain('event.condition')
+    expect(viewerStyleSource).toContain('.viewer-event-log-panel')
   })
 })

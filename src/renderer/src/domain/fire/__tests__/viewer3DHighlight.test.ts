@@ -23,13 +23,14 @@ describe('viewer 3D highlight', () => {
       { id: 'io-4', label: 'Panel 1 / I/O Group 4' }
     ])
     expect(getViewer3DHighlightOptions(project, 'type')).toEqual([
+      { id: 'input_output', label: 'I/O Module' },
       { id: 'manual_call_point', label: 'Manual Call Point' },
       { id: 'optical_det', label: 'Optical Detector' },
       { id: 'sounder', label: 'Sounder' }
     ])
   })
 
-  it('matches devices by selected loop, zone, direct group, or group member address', () => {
+  it('matches group highlights by true members, not direct initiating-device assignments', () => {
     const project = makeProject()
     const [deviceOne, deviceTwo, memberSounder, directIo] = project.devices as FireDevice[]
 
@@ -37,9 +38,9 @@ describe('viewer 3D highlight', () => {
     expect(isDeviceHighlighted(project, { kind: 'zone', targetId: 'zone-1' }, deviceOne)).toBe(true)
     expect(
       isDeviceHighlighted(project, { kind: 'sounderGroup', targetId: 'sounder-3' }, deviceOne)
-    ).toBe(true)
+    ).toBe(false)
     expect(isDeviceHighlighted(project, { kind: 'ioGroup', targetId: 'io-4' }, deviceTwo)).toBe(
-      true
+      false
     )
     expect(
       isDeviceHighlighted(project, { kind: 'sounderGroup', targetId: 'sounder-3' }, memberSounder)
@@ -59,10 +60,9 @@ describe('viewer 3D highlight', () => {
     const selection = { kind: 'sounderGroup' as const, targetId: 'sounder-3' }
 
     expect(getViewer3DDeviceHighlightAppearance(project, selection, deviceOne)).toMatchObject({
-      highlighted: true,
-      faded: false,
-      opacity: 1,
-      color: '#f59e0b'
+      highlighted: false,
+      faded: true,
+      opacity: 0.18
     })
     expect(getViewer3DDeviceHighlightAppearance(project, selection, memberSounder)).toMatchObject({
       highlighted: true,
@@ -152,7 +152,7 @@ function makeProject(): FireProject & { devices: FireDevice[] } {
             networkId: 'network-1',
             panelId: 'panel-1',
             groupId: 4,
-            members: [{ loopId: 1, physicalAddress: 2, raw: {} }],
+            members: [{ loopId: 1, physicalAddress: 4, raw: {} }],
             raw: {}
           }
         ],
@@ -188,7 +188,7 @@ function makeProject(): FireProject & { devices: FireDevice[] } {
       makeDevice('device-1', 1, 1, 3, undefined, 'manual_call_point', 'Manual Call Point'),
       makeDevice('device-2', 2, 2),
       makeDevice('device-3', 3, 3, undefined, undefined, 'sounder', 'Sounder'),
-      makeDevice('device-4', 4, 4, undefined, 4)
+      makeDevice('device-4', 4, 4, undefined, 4, 'input_output', 'I/O Module')
     ]
   }
 }

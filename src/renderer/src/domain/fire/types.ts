@@ -4,6 +4,7 @@ export type GroupMode = 'loop' | 'zone' | 'type' | 'sounderGroup' | 'ioGroup'
 export type DeviceStatusFilter = 'all' | 'unplaced' | 'placed' | 'issues'
 export type ZoneAlarmMode = 'single' | 'double'
 export type VisualShapeKind = 'rectangle' | 'polygon'
+export type OutputInhibitMode = 'NONE' | 'COMMON' | 'ZONAL' | 'ALL'
 
 export interface Vector2 {
   x: number

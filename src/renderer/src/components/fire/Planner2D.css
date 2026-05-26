@@ -1,0 +1,434 @@
+@import './Planner2DSidebar.css';
+
+.planner-2d {
+  position: relative;
+  height: 100%;
+  background: #eef2f7;
+  color: #172033;
+}
+
+/* 悬浮磨砂玻璃工具坞 */
+.planner-toolbar {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  user-select: none;
+  pointer-events: auto;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+.section-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.btn-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  align-self: center;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* 按钮样式微调 */
+.toolbar-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  padding: 0;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #000000;
+  transform: scale(1.06);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.toolbar-btn.active:not(:disabled) {
+  background: #0071e3;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.35);
+}
+
+.toolbar-btn:disabled {
+  color: rgba(0, 0, 0, 0.22);
+  cursor: not-allowed;
+}
+
+.toolbar-btn.danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.toolbar-btn.danger.active:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}
+
+.svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sub-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 2px;
+}
+
+/* Select下拉框深度定制 */
+.zone-select-dock,
+.loop-select-dock {
+  width: 105px;
+  margin-right: 2px;
+}
+
+.zone-select-dock :deep(.el-select__wrapper),
+.loop-select-dock :deep(.el-select__wrapper) {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 0 8px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+}
+
+.zone-select-dock :deep(.el-select__placeholder),
+.loop-select-dock :deep(.el-select__placeholder) {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #515154 !important;
+}
+
+.zone-select-dock :deep(.el-select__selected-item),
+.loop-select-dock :deep(.el-select__selected-item) {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #000000 !important;
+}
+
+/* 徽标 */
+.point-count-badge {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.loop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 99px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.link-icon {
+  width: 10px;
+  height: 10px;
+}
+
+/* 视图缩放样式 */
+.view-controls-section {
+  width: 175px;
+}
+
+.view-icon-svg {
+  color: #475569;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.view-slider-dock {
+  width: 60px !important;
+  margin-right: 6px;
+}
+
+.view-slider-dock :deep(.el-slider__runway) {
+  height: 4px !important;
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.view-slider-dock :deep(.el-slider__bar) {
+  height: 4px !important;
+  background-color: #0071e3 !important;
+}
+
+.view-slider-dock :deep(.el-slider__button) {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid #0071e3 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+}
+
+.control-value-dock,
+.zoom-value-dock {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d1d1f;
+  min-width: 24px;
+  text-align: right;
+}
+
+.zoom-value-dock {
+  color: #86868b;
+  min-width: 32px;
+}
+
+.canvas-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #e8eef6;
+}
+
+.canvas-shell.has-map {
+  overflow: hidden;
+  padding: 0;
+}
+
+.planner-canvas {
+  display: block;
+}
+
+.planner-canvas:not(.has-map) {
+  width: min(100%, 1400px);
+  min-width: 720px;
+  aspect-ratio: 3 / 2;
+  margin: 0 auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.planner-canvas.has-map {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.planner-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.canvas-bg {
+  fill: #f8fafc;
+}
+
+.floor-map {
+  pointer-events: none;
+}
+
+.zone-layer polygon,
+.loop-layer line {
+  pointer-events: none;
+}
+
+.zone-layer .zone-area {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.zone-layer .zone-area.selected {
+  filter: drop-shadow(0 0 5px rgba(15, 23, 42, 0.28));
+}
+
+.zone-layer .pending-zone-area {
+  filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.3));
+}
+
+.zone-confirm-actions {
+  width: 112px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+
+.zone-confirm-btn {
+  flex: 1;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.zone-confirm-btn.confirm {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.zone-confirm-btn.cancel {
+  background: #e5e7eb;
+  color: #334155;
+}
+
+.drag-preview-line {
+  filter: drop-shadow(0 0 4px rgba(15, 23, 42, 0.18));
+}
+
+.device-node {
+  cursor: grab;
+}
+
+.device-node:active {
+  cursor: grabbing;
+}
+
+.device-ring {
+  fill: rgba(37, 99, 235, 0.05);
+  opacity: 0;
+  pointer-events: none;
+  stroke: rgba(37, 99, 235, 0.3);
+  stroke-width: 1.5;
+}
+
+.device-node.selected image {
+  filter: brightness(1.08) drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-node.disabled image {
+  filter: saturate(0.55) contrast(0.9);
+}
+
+.device-node.inhibited image {
+  filter: saturate(0.75) contrast(0.95);
+}
+
+.device-node.selected.disabled image {
+  filter: saturate(0.55) contrast(0.9) brightness(1.08) drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-node.selected.inhibited image {
+  filter: saturate(0.75) contrast(0.95) brightness(1.08)
+    drop-shadow(0 0 5px rgba(37, 99, 235, 0.45));
+}
+
+.device-status-badge {
+  pointer-events: none;
+}
+
+.device-status-badge circle {
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.device-node text.device-status-badge-label {
+  fill: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  paint-order: normal;
+  stroke: none;
+}
+
+.device-node text {
+  fill: #172033;
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3px;
+}
+
+.device-node.disabled .device-address-label {
+  fill: #92400e;
+}
+
+.device-node.inhibited .device-address-label {
+  fill: #4c1d95;
+}
+
+.empty-floor {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  place-items: center;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.empty-floor p {
+  margin: 0;
+}
+
+.empty-floor div {
+  display: flex;
+  gap: 8px;
+}
+
+/* Left Sidebar Wrapper & Panels */

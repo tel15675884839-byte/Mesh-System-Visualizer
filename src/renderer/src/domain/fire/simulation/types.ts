@@ -38,5 +38,7 @@ export interface SimulationEvent {
   timestamp: number
   type: string
   message: string
+  condition?: string
   relatedDeviceId?: string
+  relatedOutputId?: string
 }

@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { adaptCpdExport, type CpdAdapterResult } from '../cpdAdapter'
 import { getDeviceSimulationOutput } from '../simulationOutputMapping'
 import type { FireDevice, FireProject } from '../types'
-import { getViewer3DDeviceAnimationFrame } from '../viewer3DSimulationVisual'
+import {
+  getSelectedDeviceBracketAnimationFrame,
+  getSelectedDeviceBracketPoints,
+  getViewer3DDeviceAnimationFrame
+} from '../viewer3DSimulationVisual'
 import { resolveCauseAndEffect } from '../simulation/causeEffect'
 import { tickDelayedOutputs } from '../simulation/delays'
 import type { OutputActivation } from '../simulation/types'
@@ -81,8 +85,10 @@ describe('viewer 3D simulation visuals', () => {
       isSounder: true
     })
 
-    expect(first.color).toBe('#ef4444')
-    expect(second.color).toBe('#facc15')
+    expect(first.color).toBeNull()
+    expect(second.color).toBeNull()
+    expect(first.accentColor).toBe('#ef4444')
+    expect(second.accentColor).toBe('#facc15')
     expect(first.scale).toBeGreaterThan(10)
     expect(second.scale).toBeGreaterThan(10)
   })
@@ -101,8 +107,10 @@ describe('viewer 3D simulation visuals', () => {
       isSounder: false
     })
 
-    expect(first.color).toBe('#0ea5e9')
-    expect(second.color).toBe('#0ea5e9')
+    expect(first.color).toBeNull()
+    expect(second.color).toBeNull()
+    expect(first.accentColor).toBe('#0ea5e9')
+    expect(second.accentColor).toBe('#0ea5e9')
     expect(first.opacity).not.toBe(second.opacity)
   })
 
@@ -123,7 +131,8 @@ describe('viewer 3D simulation visuals', () => {
     })
 
     expect(first).toEqual(second)
-    expect(first.color).toBe('#ef4444')
+    expect(first.color).toBeNull()
+    expect(first.accentColor).toBe('#ef4444')
   })
 
   it('maps generated CPD delayed and non-delayed Zone sounder states into 3D visuals', () => {
@@ -159,9 +168,11 @@ describe('viewer 3D simulation visuals', () => {
 
     expect(delayedOutput).toMatchObject({ state: 'delayActive' })
     expect(delayedOutput?.remainingDelaySeconds).toBeGreaterThan(0)
-    expect(delayedFrame.color).toBe('#0ea5e9')
+    expect(delayedFrame.color).toBeNull()
+    expect(delayedFrame.accentColor).toBe('#0ea5e9')
     expect(activeOutput).toMatchObject({ state: 'active', sounderPattern: 'continuous' })
-    expect(activeFrame.color).toBe('#ef4444')
+    expect(activeFrame.color).toBeNull()
+    expect(activeFrame.accentColor).toBe('#ef4444')
   })
 
   it('switches the delay-edge Zone 1 sounder from countdown state to active 3D alarm state', () => {
@@ -190,15 +201,17 @@ describe('viewer 3D simulation visuals', () => {
       state: 'delayActive',
       remainingDelaySeconds: 60
     })
-    expect(delayedFrame.color).toBe('#0ea5e9')
+    expect(delayedFrame.color).toBeNull()
+    expect(delayedFrame.accentColor).toBe('#0ea5e9')
     expect(activeOutput).toMatchObject({
       state: 'active',
       sounderPattern: 'continuous'
     })
-    expect(activeFrame.color).toBe('#ef4444')
+    expect(activeFrame.color).toBeNull()
+    expect(activeFrame.accentColor).toBe('#ef4444')
   })
 
-  it('checks detector input active breathing scale and red color', () => {
+  it('keeps detector input activation visually still', () => {
     const framePeak = getViewer3DDeviceAnimationFrame({
       baseSize: 10,
       elapsedMs: 100 * Math.PI,
@@ -217,15 +230,17 @@ describe('viewer 3D simulation visuals', () => {
     })
 
     expect(framePeak.color).toBeNull()
-    expect(framePeak.scale).toBeCloseTo(12, 5)
-    expect(framePeak.ringOpacity).toBeCloseTo(0.89, 5)
+    expect(framePeak.accentColor).toBeNull()
+    expect(framePeak.scale).toBe(10)
+    expect(framePeak.ringOpacity).toBe(0)
 
     expect(frameTrough.color).toBeNull()
-    expect(frameTrough.scale).toBeCloseTo(10, 5)
-    expect(frameTrough.ringOpacity).toBeCloseTo(0.55, 5)
+    expect(frameTrough.accentColor).toBeNull()
+    expect(frameTrough.scale).toBe(10)
+    expect(frameTrough.ringOpacity).toBe(0)
   })
 
-  it('checks IO module input active (red) and output active (blue) states', () => {
+  it('animates IO module output state without animating IO input activation', () => {
     const frameInputActive = getViewer3DDeviceAnimationFrame({
       baseSize: 10,
       elapsedMs: 0,
@@ -251,23 +266,50 @@ describe('viewer 3D simulation visuals', () => {
       isIO: true
     })
 
-    expect(frameInputActive.color).toBe('#dc2626')
-    expect(frameOutputActive.color).toBe('#2563eb')
+    expect(frameInputActive.color).toBeNull()
+    expect(frameOutputActive.color).toBeNull()
+    expect(frameInputActive.accentColor).toBeNull()
+    expect(frameOutputActive.accentColor).toBe('#2563eb')
     expect(frameInactive.color).toBeNull()
+    expect(frameInactive.accentColor).toBeNull()
 
-    expect(frameInputActive.scale).toBeCloseTo(11, 5)
-    expect(frameInputActive.ringOpacity).toBeCloseTo(0.72, 5)
+    expect(frameInputActive.scale).toBe(10)
+    expect(frameInputActive.ringOpacity).toBe(0)
+    expect(frameOutputActive.scale).toBeCloseTo(11, 5)
+    expect(frameOutputActive.ringOpacity).toBeCloseTo(0.72, 5)
 
     const framePeak = getViewer3DDeviceAnimationFrame({
       baseSize: 10,
       elapsedMs: 100 * Math.PI,
-      outputState: null,
+      outputState: 'active',
       isSounder: false,
-      inputActive: true,
+      inputActive: false,
       isIO: true
     })
     expect(framePeak.scale).toBeCloseTo(12, 5)
     expect(framePeak.ringOpacity).toBeCloseTo(0.89, 5)
   })
-})
 
+  it('builds four selected-device L brackets in the XZ plane', () => {
+    const points = getSelectedDeviceBracketPoints(10)
+
+    expect(points).toHaveLength(16)
+    expect(points.every((point) => point.y === 0)).toBe(true)
+    expect(points).toContainEqual({ x: 5.6, y: 0, z: 8.2 })
+    expect(points).toContainEqual({ x: 8.2, y: 0, z: 8.2 })
+    expect(points).toContainEqual({ x: -8.2, y: 0, z: -8.2 })
+    expect(points).toContainEqual({ x: -8.2, y: 0, z: -5.6 })
+  })
+
+  it('breathes selected-device brackets without changing the device sprite', () => {
+    const base = getSelectedDeviceBracketAnimationFrame(0)
+    const peak = getSelectedDeviceBracketAnimationFrame(Math.PI / 2 / 0.004)
+    const trough = getSelectedDeviceBracketAnimationFrame((Math.PI * 1.5) / 0.004)
+
+    expect(base).toEqual({ scale: 1, opacity: 0.8 })
+    expect(peak.scale).toBeCloseTo(1.08, 5)
+    expect(peak.opacity).toBeCloseTo(0.95, 5)
+    expect(trough.scale).toBeCloseTo(0.92, 5)
+    expect(trough.opacity).toBeCloseTo(0.65, 5)
+  })
+})

@@ -68,6 +68,16 @@ const outputCapableTypes = new Set([
   'wireless_sounder'
 ])
 
+const ioGroupMemberTypes = new Set(['input_output', 'wireless_input_output'])
+
+export interface DeviceRoleLike {
+  type?: string | null
+  isInputCapable?: boolean
+  isSounder?: boolean
+  sounderGroupId?: number
+  ioGroupId?: number
+}
+
 export function normalizeDeviceType(type: string | undefined | null): string {
   return String(type ?? '')
     .trim()
@@ -109,4 +119,40 @@ export function isWirelessDeviceType(type: string | undefined | null): boolean {
 export function isSounderType(type: string | undefined | null): boolean {
   const normalized = normalizeDeviceType(type)
   return normalized === 'sounder' || normalized === 'wireless_sounder'
+}
+
+export function isIOGroupMemberType(type: string | undefined | null): boolean {
+  return ioGroupMemberTypes.has(normalizeDeviceType(type))
+}
+
+export function isZoneMemberDevice(device: DeviceRoleLike): boolean {
+  return getDeviceInputCapable(device) && !getDeviceSounder(device)
+}
+
+export function isSounderGroupMemberDevice(device: DeviceRoleLike): boolean {
+  return getDeviceSounder(device)
+}
+
+export function isIOGroupMemberDevice(device: DeviceRoleLike): boolean {
+  return isIOGroupMemberType(device.type)
+}
+
+export function hasDirectSounderGroupAssignment(device: DeviceRoleLike): boolean {
+  return isZoneMemberDevice(device) && isPositiveGroupId(device.sounderGroupId)
+}
+
+export function hasDirectIOGroupAssignment(device: DeviceRoleLike): boolean {
+  return getDeviceInputCapable(device) && isPositiveGroupId(device.ioGroupId)
+}
+
+function getDeviceInputCapable(device: DeviceRoleLike): boolean {
+  return Boolean(device.isInputCapable) || isInputCapableType(device.type)
+}
+
+function getDeviceSounder(device: DeviceRoleLike): boolean {
+  return Boolean(device.isSounder) || isSounderType(device.type)
+}
+
+function isPositiveGroupId(value: number | undefined): boolean {
+  return value !== undefined && Number.isFinite(value) && value > 0
 }

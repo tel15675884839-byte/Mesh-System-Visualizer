@@ -198,6 +198,30 @@ describe('fire device tree', () => {
         .map((node) => node.deviceId)
     ).toEqual(['device-4'])
   })
+
+  it('does not treat initiating-device direct output assignments as tree group membership', () => {
+    const project = fixtureProject()
+    project.devices!.push(
+      makeDevice('direct-mcp-sg', 1, 31, 'manual_call_point', 'Direct MCP SG', {
+        zoneNumber: 1,
+        sounderGroupId: 7
+      }),
+      makeDevice('direct-mcp-io', 1, 32, 'manual_call_point', 'Direct MCP IO', {
+        zoneNumber: 1,
+        ioGroupId: 9
+      })
+    )
+
+    const sounderTree = buildFireDeviceTree({
+      project,
+      groupMode: 'sounderGroup',
+      statusFilter: 'all'
+    })
+    const ioTree = buildFireDeviceTree({ project, groupMode: 'ioGroup', statusFilter: 'all' })
+
+    expect(deviceIds(sounderTree)).toEqual(['device-3'])
+    expect(deviceIds(ioTree)).toEqual(['device-4'])
+  })
 })
 
 function groupLabels(tree: ReturnType<typeof buildFireDeviceTree>): string[] {

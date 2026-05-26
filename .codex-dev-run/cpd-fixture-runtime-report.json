@@ -1,0 +1,45 @@
+{
+  "imported": true,
+  "fixture": "6002-realistic-building-composite.cpd",
+  "recognized": {
+    "devices": 20,
+    "zones": [
+      1,
+      2,
+      3
+    ],
+    "sounderGroups": [
+      1,
+      2,
+      3,
+      10
+    ],
+    "ioGroups": [
+      1,
+      2,
+      3
+    ]
+  },
+  "preview": {
+    "zoneInputOnly": "passed",
+    "sounderGroupSoundersOnly": "passed",
+    "ioGroupIOModulesOnly": "passed",
+    "ioModuleDualZoneAndGroupSemantics": "passed",
+    "directDeviceAssignmentsSeparate": "passed",
+    "l1004CpdSetEvacuateTimerFalse": "passed"
+  },
+  "simulation": {
+    "detectorDelay": "passed",
+    "delayEdgeZone1ManualCallPointDelay": "passed",
+    "delayEdgeNoImmediateZone1Outputs": "passed",
+    "zoneNoDelayedSounders": "passed",
+    "manualOverride": "passed",
+    "zoneStage2": "passed",
+    "ioStage": "passed",
+    "disabledInput": "passed",
+    "inhibitedRelay": "passed",
+    "directDeviceAssignments": "passed",
+    "eventLogDelayExpiry": "passed",
+    "eventLogResetSummary": "passed"
+  }
+}

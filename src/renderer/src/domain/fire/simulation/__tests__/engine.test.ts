@@ -156,7 +156,18 @@ describe('simulation engine reducer', () => {
       at: 20
     })
 
-    expect(reset).toEqual(createInitialSimulationState())
+    expect(reset).toMatchObject({
+      ...createInitialSimulationState(),
+      eventLog: expect.any(Array)
+    })
+    expect(reset.eventLog).toContainEqual(
+      expect.objectContaining({
+        timestamp: 20,
+        type: 'system-reset',
+        message: 'System reset requested',
+        condition: 'normal / silent / inputs 0 / faults 0 / outputs 0'
+      })
+    )
   })
 
   it('silences the current sound when the buzzer is silenced', () => {
@@ -418,6 +429,42 @@ describe('simulation engine reducer', () => {
         outputId: 'sounder-group:panel-1:1',
         state: 'active',
         remainingDelaySeconds: 0
+      })
+    )
+  })
+
+  it('logs delay expiry when a delayed output becomes active', () => {
+    const net = network({ sounderDelaySeconds: 10 })
+    net.panels[0].zones[0].delayedSounders = true
+    const active = reduceSimulation(
+      createInitialSimulationState(),
+      { ...engineInput(undefined, net), sounderDelaysEnabled: true },
+      {
+        type: 'activate-input',
+        deviceId: 'input-1',
+        at: 10
+      }
+    )
+
+    const partial = reduceSimulation(active, engineInput(undefined, net), {
+      type: 'tick',
+      at: 15,
+      elapsedSeconds: 5
+    })
+    const expired = reduceSimulation(partial, engineInput(undefined, net), {
+      type: 'tick',
+      at: 20,
+      elapsedSeconds: 5
+    })
+
+    expect(partial.eventLog.map((event) => event.type)).not.toContain('delay-expired')
+    expect(expired.eventLog).toContainEqual(
+      expect.objectContaining({
+        timestamp: 20,
+        type: 'delay-expired',
+        relatedOutputId: 'sounder-group:panel-1:1',
+        message: 'Delay expired for sounder-group:panel-1:1',
+        condition: 'fireAlarm / fire / inputs 1 / faults 0 / outputs 3'
       })
     )
   })

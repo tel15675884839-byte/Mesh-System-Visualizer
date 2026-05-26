@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireBuilding, FireFloor } from '../../domain/fire/types'
 import type { SimulationAction } from '../../domain/fire/simulation/engine'
+import type { SimulationEvent } from '../../domain/fire/simulation/types'
 import { getEffectiveFloorHeight3D } from '../../domain/fire/viewer3DGeometry'
 import {
   getViewer3DHighlightOptions,
@@ -83,6 +84,48 @@ export default defineComponent({
     function getShortFloorName(name: string): string {
       const match = name.match(/\d+/)
       return match ? 'F' + match[0] : name.slice(0, 3)
+    }
+
+    function formatDeviceAddress(deviceId: string): string {
+      const device = deviceById.value.get(deviceId)
+      if (!device || device.loopId === undefined || device.address === undefined) {
+        return deviceId
+      }
+
+      return `L${device.loopId}-${String(device.address).padStart(3, '0')}`
+    }
+
+    function getDeviceLabel(deviceId: string): string {
+      const device = deviceById.value.get(deviceId)
+      if (!device) return deviceId
+      return `${formatDeviceAddress(deviceId)} ${device.description || device.friendlyTypeName}`
+    }
+
+    function getOutputLabel(outputId: string): string {
+      if (outputId.startsWith('device:')) {
+        return getDeviceLabel(outputId.slice('device:'.length))
+      }
+
+      return outputId
+    }
+
+    function get3DEventTarget(event: SimulationEvent): string {
+      if (event.relatedDeviceId) {
+        return getDeviceLabel(event.relatedDeviceId)
+      }
+      if (event.relatedOutputId) {
+        return getOutputLabel(event.relatedOutputId)
+      }
+
+      return ''
+    }
+
+    function format3DEventTime(timestamp: number): string {
+      return new Date(timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
     }
 
     function setHighlightKind(kind: Viewer3DHighlightKind): void {
@@ -193,6 +236,7 @@ export default defineComponent({
           isSounderOutputId(output.outputId)
       )
     )
+    const recent3DEvents = computed(() => simulationState.value.eventLog.slice(-10).reverse())
     const shouldPlay3DSimulationAudio = computed(() =>
       shouldPlaySimulationAlarmAudio({
         simulationMode: simulationMode.value,
@@ -333,6 +377,7 @@ export default defineComponent({
       sounderDelaysEnabled,
       hasDelayedSounderOutputs,
       soundersActive,
+      recent3DEvents,
       contextDevice,
       hasActiveInput,
       hasActiveFault,
@@ -345,6 +390,8 @@ export default defineComponent({
       getFloorOpacity,
       setFloorOpacity,
       getShortFloorName,
+      get3DEventTarget,
+      format3DEventTime,
       setHighlightKind,
       dispatchSimulation,
       dispatchSimulationAction,

@@ -76,7 +76,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-const planner2DRef = ref<any>(null)
+const planner2DRef = ref<{ locateDevice?: (deviceId: string) => void } | null>(null)
 
 function handleFocusDevice(deviceId: string): void {
   store.selectDevice(deviceId)
@@ -180,7 +180,11 @@ function handleFocusDevice(deviceId: string): void {
         </div>
 
         <CpdInspector v-if="viewMode === 'cpd'" @locate-device="store.selectDevice($event)" />
-        <Planner2D v-else-if="viewMode === '2d'" ref="planner2DRef" @locate-device="store.selectDevice($event)" />
+        <Planner2D
+          v-else-if="viewMode === '2d'"
+          ref="planner2DRef"
+          @locate-device="store.selectDevice($event)"
+        />
         <Viewer3D v-else @locate-device="store.selectDevice($event)" />
       </section>
     </section>
