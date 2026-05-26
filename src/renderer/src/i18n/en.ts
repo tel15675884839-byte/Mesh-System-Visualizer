@@ -18,6 +18,23 @@ export default {
       saveFailed: 'Save failed',
       openFailed: 'Open failed'
     },
+    cpdInspector: {
+      viewCpd: 'Project Preview',
+      zones: 'Zones',
+      outputGroups: 'Output Groups',
+      outputDevices: 'Output Devices',
+      devices: 'Devices',
+      special: 'Special',
+      configured: 'Configured',
+      all128: 'All 1-128',
+      delayed: 'Delayed',
+      hasDevices: 'Has Devices',
+      hasOutputs: 'Has Outputs',
+      specialDevices: 'Special Devices',
+      modeUnavailable: 'Mode unavailable',
+      noOutputDevices: 'No output devices in this group',
+      noSpecialProperties: 'No non-default simulation properties'
+    },
     common: {
       apply: 'Apply',
       cancel: 'Cancel',
@@ -48,12 +65,30 @@ export default {
       floor: 'Floor',
       addBuilding: 'Add Building',
       addFloor: 'Add Floor',
+      deleteBuilding: 'Delete Building',
+      deleteFloor: 'Delete Floor',
       importDrawing: 'Import Drawing',
+      clearDrawing: 'Clear Drawing',
+      zoneArea: 'Zone Area',
+      deleteZoneArea: 'Delete Zone Area',
+      replaceZoneArea: 'Replace Zone Area',
+      confirmZoneArea: 'Confirm',
+      cancelZoneArea: 'Cancel',
+      zoneAreaSaved: 'Zone area saved.',
+      zoneAreaCanceled: 'Zone area canceled.',
       iconScale: 'Icon size',
-      noFloor: 'No floor selected'
+      noFloor: 'No floor selected',
+      invalidPolygon:
+        'Zone polygon is invalid. Use at least three points, avoid overlaps, and draw a larger area.',
+      confirmDeleteTitle: 'Confirm Delete',
+      confirmDeleteBuilding:
+        'Delete this building? Devices on its floors will be unplaced and Zone areas on those floors will be removed.',
+      confirmDeleteFloor:
+        'Delete this floor? Devices on it will be unplaced and Zone areas on this floor will be removed.'
     },
     viewer3d: {
       floorSpacing: 'Floor spacing',
+      drawingControl: 'Drawing control',
       mapOpacity: 'Drawing opacity',
       floorOverride: 'Floor override',
       useGlobal: 'Use global',
