@@ -32,7 +32,7 @@
 
 .viewer-simulation-actions {
   position: absolute;
-  top: 12px;
+  top: 72px; /* Positioned below highlight toolbar to prevent overlap on narrow screens */
   right: 12px;
   z-index: 90;
   display: flex;
@@ -53,8 +53,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 66px; /* 50% larger than 44px */
+  height: 66px;
   padding: 0;
   border: none;
   background: transparent;
@@ -72,7 +72,7 @@
 
 .simulation-action .tooltip-text {
   position: absolute;
-  top: 52px;
+  top: 74px; /* Adjusted for 66px button height */
   left: 50%;
   transform: translateX(-50%) translateY(-10px);
   background: rgba(15, 23, 42, 0.95);
@@ -110,20 +110,20 @@
 }
 
 .simulation-action-icon {
-  width: 44px;
-  height: 44px;
+  width: 66px; /* 50% larger than 44px */
+  height: 66px;
   object-fit: contain;
   flex: 0 0 auto;
 }
 
 .active-dot {
   position: absolute;
-  left: 1px;
-  bottom: 1px;
-  width: 8px;
-  height: 8px;
+  left: 2px;
+  bottom: 2px;
+  width: 12px; /* Proportional scale */
+  height: 12px;
   border-radius: 50%;
-  border: 1px solid #ffffff;
+  border: 2px solid #ffffff;
   z-index: 2;
 }
 
