@@ -197,4 +197,77 @@ describe('viewer 3D simulation visuals', () => {
     })
     expect(activeFrame.color).toBe('#ef4444')
   })
+
+  it('checks detector input active breathing scale and red color', () => {
+    const framePeak = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 100 * Math.PI,
+      outputState: null,
+      isSounder: false,
+      inputActive: true,
+      isIO: false
+    })
+    const frameTrough = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 300 * Math.PI,
+      outputState: null,
+      isSounder: false,
+      inputActive: true,
+      isIO: false
+    })
+
+    expect(framePeak.color).toBe('#dc2626')
+    expect(framePeak.scale).toBeCloseTo(12, 5)
+    expect(framePeak.ringOpacity).toBeCloseTo(0.89, 5)
+
+    expect(frameTrough.color).toBe('#dc2626')
+    expect(frameTrough.scale).toBeCloseTo(10, 5)
+    expect(frameTrough.ringOpacity).toBeCloseTo(0.55, 5)
+  })
+
+  it('checks IO module input active (red) and output active (blue) states', () => {
+    const frameInputActive = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: null,
+      isSounder: false,
+      inputActive: true,
+      isIO: true
+    })
+    const frameOutputActive = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: 'active',
+      isSounder: false,
+      inputActive: false,
+      isIO: true
+    })
+    const frameInactive = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 0,
+      outputState: null,
+      isSounder: false,
+      inputActive: false,
+      isIO: true
+    })
+
+    expect(frameInputActive.color).toBe('#dc2626')
+    expect(frameOutputActive.color).toBe('#2563eb')
+    expect(frameInactive.color).toBeNull()
+
+    expect(frameInputActive.scale).toBeCloseTo(11, 5)
+    expect(frameInputActive.ringOpacity).toBeCloseTo(0.72, 5)
+
+    const framePeak = getViewer3DDeviceAnimationFrame({
+      baseSize: 10,
+      elapsedMs: 100 * Math.PI,
+      outputState: null,
+      isSounder: false,
+      inputActive: true,
+      isIO: true
+    })
+    expect(framePeak.scale).toBeCloseTo(12, 5)
+    expect(framePeak.ringOpacity).toBeCloseTo(0.89, 5)
+  })
 })
+

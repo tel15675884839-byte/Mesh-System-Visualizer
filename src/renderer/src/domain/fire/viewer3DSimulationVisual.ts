@@ -8,6 +8,8 @@ export interface Viewer3DDeviceAnimationInput {
   outputState: Viewer3DDeviceOutputState
   isSounder: boolean
   sounderPattern?: SounderOutputPattern
+  inputActive?: boolean
+  isIO?: boolean
 }
 
 export interface Viewer3DDeviceAnimationFrame {
@@ -22,8 +24,34 @@ export function getViewer3DDeviceAnimationFrame({
   elapsedMs,
   outputState,
   isSounder,
-  sounderPattern
+  sounderPattern,
+  inputActive,
+  isIO
 }: Viewer3DDeviceAnimationInput): Viewer3DDeviceAnimationFrame {
+  if (isIO) {
+    const scale = baseSize * (1.1 + 0.1 * Math.sin(elapsedMs * 0.005))
+    const color = inputActive ? '#dc2626' : (outputState === 'active' ? '#2563eb' : null)
+    const ringOpacity = 0.72 + 0.17 * Math.sin(elapsedMs * 0.005)
+    return {
+      color,
+      opacity: 1,
+      scale,
+      ringOpacity
+    }
+  }
+
+  if (inputActive && !isIO) {
+    const scale = baseSize * (1.1 + 0.1 * Math.sin(elapsedMs * 0.005))
+    const color = '#dc2626'
+    const ringOpacity = 0.72 + 0.17 * Math.sin(elapsedMs * 0.005)
+    return {
+      color,
+      opacity: 1,
+      scale,
+      ringOpacity
+    }
+  }
+
   if (outputState === 'active' && isSounder) {
     if (sounderPattern === 'continuous') {
       return {
@@ -61,3 +89,4 @@ export function getViewer3DDeviceAnimationFrame({
     ringOpacity: 0.85
   }
 }
+
