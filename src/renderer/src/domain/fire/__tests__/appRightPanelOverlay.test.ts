@@ -66,8 +66,8 @@ describe('phase-one workspace layout', () => {
   it('keeps 3D highlight and simulation controls in one light control-panel style', () => {
     expect(viewerStyleSource).toContain('background: rgba(248, 250, 252, 0.94)')
     expect(viewerStyleSource).toContain('border-radius: 8px')
-    expect(viewerStyleSource).toContain('width: 36px')
-    expect(viewerStyleSource).toContain('height: 36px')
+    expect(viewerStyleSource).toContain('width: 66px')
+    expect(viewerStyleSource).toContain('height: 66px')
     expect(viewerStyleSource).not.toContain('background: rgba(15, 23, 42, 0.85)')
   })
 
