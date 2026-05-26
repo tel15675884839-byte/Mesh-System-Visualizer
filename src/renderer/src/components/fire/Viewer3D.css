@@ -32,7 +32,7 @@
 
 .viewer-simulation-actions {
   position: absolute;
-  top: 72px; /* Positioned below highlight toolbar to prevent overlap on narrow screens */
+  top: 12px; /* Placed at the top by default */
   right: 12px;
   z-index: 90;
   display: flex;
@@ -46,6 +46,12 @@
   box-shadow: none;
   backdrop-filter: none;
   box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .viewer-simulation-actions {
+    top: 72px; /* Pushed down below the highlight toolbar only on medium/narrow viewports to prevent overlap */
+  }
 }
 
 .simulation-action {
