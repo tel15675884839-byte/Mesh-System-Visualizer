@@ -58,16 +58,16 @@ function createDevice(id: string, floorId?: string, placementOrder?: number): Fi
 }
 
 describe('loop wiring', () => {
-  it('uses manual order when non-empty', () => {
+  it('uses configured order even when legacy manual order is present', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c'],
       manualDeviceOrder: ['device-c', 'device-a']
     })
 
-    expect(getEffectiveLoopOrder(loop)).toEqual(['device-c', 'device-a'])
+    expect(getEffectiveLoopOrder(loop)).toEqual(['device-a', 'device-b', 'device-c'])
   })
 
-  it('uses placed device order when manual order is empty', () => {
+  it('uses configured order instead of placement order', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c'],
       manualDeviceOrder: []
@@ -78,10 +78,10 @@ describe('loop wiring', () => {
       createDevice('device-c', 'floor-1', 30)
     ]
 
-    expect(getEffectiveLoopOrder(loop, devices)).toEqual(['device-b', 'device-a', 'device-c'])
+    expect(getEffectiveLoopOrder(loop, devices)).toEqual(['device-a', 'device-b', 'device-c'])
   })
 
-  it('builds 2D segments only for adjacent same-floor pairs in placed order', () => {
+  it('builds 2D segments only for adjacent same-floor pairs in configured order', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c', 'device-d']
     })
@@ -93,12 +93,12 @@ describe('loop wiring', () => {
     ]
 
     expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
-      segments: [{ fromDeviceId: 'device-d', toDeviceId: 'device-a' }],
+      segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-b' }],
       skippedSegments: []
     })
   })
 
-  it('does not connect placed devices by configured order when placement order differs', () => {
+  it('does not shortcut over unplaced devices in configured order', () => {
     const loop = createLoop({
       configuredDeviceOrder: ['device-a', 'device-b', 'device-c', 'device-d']
     })
@@ -110,8 +110,12 @@ describe('loop wiring', () => {
     ]
 
     expect(buildCurrentFloorLoopSegments(loop, devices, 'floor-1')).toEqual({
-      segments: [{ fromDeviceId: 'device-a', toDeviceId: 'device-d' }],
-      skippedSegments: []
+      segments: [],
+      skippedSegments: [
+        { fromDeviceId: 'device-a', toDeviceId: 'device-b' },
+        { fromDeviceId: 'device-b', toDeviceId: 'device-c' },
+        { fromDeviceId: 'device-c', toDeviceId: 'device-d' }
+      ]
     })
   })
 
@@ -201,12 +205,7 @@ describe('loop wiring', () => {
 
     const result = buildLoopSegments(loop, devices)
 
-    expect(result.segments).toEqual([])
-    expect(result.skippedSegments).toEqual([
-      { fromDeviceId: 'device-a', toDeviceId: 'device-b' },
-      { fromDeviceId: 'device-b', toDeviceId: 'device-missing' },
-      { fromDeviceId: 'device-missing', toDeviceId: 'device-c' }
-    ])
-    expect(result.skippedSegments).toHaveLength(3)
+    expect(result.segments).toEqual([{ fromDeviceId: 'device-a', toDeviceId: 'device-c' }])
+    expect(result.skippedSegments).toEqual([])
   })
 })

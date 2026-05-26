@@ -100,7 +100,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     pickableDeviceObjects,
     hasActiveInput
   })
-  const { animate, cancelAnimation } = createViewer3DSceneAnimation({
+  const { animate, cancelAnimation, requestRender } = createViewer3DSceneAnimation({
     animatedDeviceObjects,
     radarRipples,
     radarZones,
@@ -109,6 +109,8 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     getScene: () => scene,
     getCamera: () => camera
   })
+  const textureLoader = new THREE.TextureLoader()
+  const textureCache = new Map<string, THREE.Texture>()
 
   interface AnimatedDeviceObject {
     sprite: THREE.Sprite
@@ -144,6 +146,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.target.set(45, 20, 35)
+    controls.addEventListener('change', requestRender)
 
     resizeObserver = new ResizeObserver(resizeRenderer)
     resizeObserver.observe(container)
@@ -208,6 +211,8 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
         }
       }
     }
+
+    requestRender()
   }
 
   function renderBuilding(building: FireBuilding, buildingIndex: number): void {
@@ -240,7 +245,9 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
 
       const assetHref = getFireAssetHref(asset)
       if (assetHref) {
-        material.map = new THREE.TextureLoader().load(assetHref)
+        material.map = getCachedTexture(assetHref, (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace
+        })
         material.map.colorSpace = THREE.SRGBColorSpace
         material.color = new THREE.Color('#ffffff')
         material.transparent = floorOpacity < 1
@@ -270,11 +277,12 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
   }
 
   function renderDevice(device: FireDevice, point: THREE.Vector3): void {
-    const texture = new THREE.TextureLoader().load(`/icons/${getDeviceIconByType(device.type)}`)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.generateMipmaps = false
-    texture.minFilter = THREE.LinearFilter
-    texture.magFilter = THREE.LinearFilter
+    const texture = getCachedTexture(`/icons/${getDeviceIconByType(device.type)}`, (next) => {
+      next.colorSpace = THREE.SRGBColorSpace
+      next.generateMipmaps = false
+      next.minFilter = THREE.LinearFilter
+      next.magFilter = THREE.LinearFilter
+    })
     const highlightAppearance = getViewer3DDeviceHighlightAppearance(
       project.value,
       highlightSelection.value,
@@ -536,6 +544,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     camera.updateProjectionMatrix()
     controls.target.copy(target)
     controls.update()
+    requestRender()
   }
 
   function resizeRenderer(): void {
@@ -547,11 +556,13 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     renderer.setSize(width, height, false)
     camera.aspect = width / height
     camera.updateProjectionMatrix()
+    requestRender()
   }
 
   function cleanupScene(): void {
     cancelAnimation()
     resizeObserver?.disconnect()
+    controls?.removeEventListener('change', requestRender)
     controls?.dispose()
     renderer?.domElement.removeEventListener('pointerdown', handleRendererPointerDown)
     renderer?.domElement.removeEventListener('click', handleRendererClick)
@@ -559,6 +570,31 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     renderer?.domElement.removeEventListener('contextmenu', handleRendererContextMenu)
     renderer?.dispose()
     clearViewer3DScene(scene, radarRipples, radarZones)
+    disposeTextureCache()
+  }
+
+  function getCachedTexture(
+    href: string,
+    configure: (texture: THREE.Texture) => void
+  ): THREE.Texture {
+    const cached = textureCache.get(href)
+    if (cached) {
+      return cached
+    }
+
+    const texture = textureLoader.load(href, requestRender, undefined, requestRender)
+    texture.userData.preserveOnSceneClear = true
+    configure(texture)
+    textureCache.set(href, texture)
+    return texture
+  }
+
+  function disposeTextureCache(): void {
+    for (const texture of textureCache.values()) {
+      texture.userData.preserveOnSceneClear = false
+      texture.dispose()
+    }
+    textureCache.clear()
   }
   return {
     initScene,

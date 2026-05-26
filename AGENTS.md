@@ -58,6 +58,14 @@ The manager should:
 - The original `.cpd` file must not be stored inside `.fireproj`.
 - Simulation must follow CPD/CIE behavior, including Fire Alarm, Evacuate, Fault, Fire Brigade, Sounder, I/O, delays, disabled states, inhibited states, `BUZZER SILENCE`, and `SYSTEM RESET`.
 
+## Code Organization
+
+- Keep code files maintainable. As a working rule, avoid letting any source code file exceed 500 lines.
+- When a feature or core component approaches 500 lines, split it by responsibility before adding more behavior.
+- Prefer small focused modules for templates, styles, store actions, domain helpers, scene logic, interaction handlers, calculations, and test fixtures.
+- Do not reduce line count by weakening behavior, deleting verification, or hiding unrelated logic in hard-to-follow abstractions.
+- For large 2D/3D components, keep the `.vue` file as a thin entry point and move template, script, styles, and specialized actions into nearby files.
+
 ## CPD Extractor
 
 Use the provided extractor package:

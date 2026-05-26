@@ -5,6 +5,7 @@ import {
   getViewer3DDeviceAnimationFrame,
   type Viewer3DDeviceOutputState
 } from '../../domain/fire/viewer3DSimulationVisual'
+import { shouldContinueViewer3DRender } from '../../domain/fire/viewer3DRenderPolicy'
 
 interface AnimatedDeviceObject {
   sprite: THREE.Sprite
@@ -43,6 +44,7 @@ interface Viewer3DSceneAnimationDependencies {
 export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimationDependencies): {
   animate: () => void
   cancelAnimation: () => void
+  requestRender: () => void
 } {
   let animationFrame = 0
   let lastTime = 0
@@ -95,21 +97,39 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     })
   }
 
-  function animate(): void {
-    animationFrame = requestAnimationFrame(animate)
-    getControls()?.update()
-
+  function renderFrame(): void {
+    animationFrame = 0
     const now = performance.now()
     const deltaMs = lastTime === 0 ? 0 : now - lastTime
     lastTime = now
 
-    updateDeviceAnimations(now)
-    updateRadarHighlightAnimations(now, deltaMs)
+    const controlsChanged = getControls()?.update() ?? false
+    const animatedDeviceCount = animatedDeviceObjects.length
+
+    if (animatedDeviceCount > 0) {
+      updateDeviceAnimations(now)
+      updateRadarHighlightAnimations(now, deltaMs)
+    }
 
     const renderer = getRenderer()
     const scene = getScene()
     const camera = getCamera()
     if (renderer && scene && camera) renderer.render(scene, camera)
+
+    if (shouldContinueViewer3DRender({ controlsChanged, animatedDeviceCount })) {
+      requestRender()
+    } else {
+      lastTime = 0
+    }
+  }
+
+  function requestRender(): void {
+    if (animationFrame !== 0) return
+    animationFrame = requestAnimationFrame(renderFrame)
+  }
+
+  function animate(): void {
+    requestRender()
   }
 
   function cancelAnimation(): void {
@@ -118,5 +138,5 @@ export function createViewer3DSceneAnimation(dependencies: Viewer3DSceneAnimatio
     lastTime = 0
   }
 
-  return { animate, cancelAnimation }
+  return { animate, cancelAnimation, requestRender }
 }

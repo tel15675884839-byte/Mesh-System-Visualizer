@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { FireDevice, FireLoop, FireNetwork, FireProject, FireZone } from '../types'
 import {
   DEFAULT_FLOOR_HEIGHT_3D,
   MAX_FLOOR_HEIGHT_3D,
   MIN_FLOOR_HEIGHT_3D
 } from '../viewer3DGeometry'
 import { useFireProjectStore } from '../../../stores/fireProjectStore'
+
+import { makeDevice, makeNetwork, makeProject } from './fireProjectStore.fixture'
 
 describe('fire project store', () => {
   beforeEach(() => {
@@ -52,6 +53,32 @@ describe('fire project store', () => {
     ])
   })
 
+  it('merges missing device-assigned zones into partially configured old projects', () => {
+    const store = useFireProjectStore()
+    const project = makeProject()
+    project.networks[0].panels[0].zones = [
+      {
+        ...project.networks[0].panels[0].zones[0],
+        zoneNumber: 99,
+        text: 'Existing Zone'
+      }
+    ]
+    project.devices = [
+      makeDevice('device-1', 'network-1', 'panel-1', 1),
+      makeDevice('device-2', 'network-1', 'panel-1', 99)
+    ]
+
+    store.loadFireProject(project)
+
+    const zones = store.project.networks[0].panels[0].zones
+    expect(zones.map((zone) => zone.zoneNumber)).toEqual([1, 99])
+    expect(zones.find((zone) => zone.zoneNumber === 1)).toMatchObject({
+      text: 'Zone 1',
+      raw: { synthesizedFromDeviceZones: true }
+    })
+    expect(zones.find((zone) => zone.zoneNumber === 99)?.text).toBe('Existing Zone')
+  })
+
   it('restores missing panel sounder and I/O groups from device group assignments', () => {
     const store = useFireProjectStore()
     const project = makeProject()
@@ -69,6 +96,53 @@ describe('fire project store', () => {
     )
     expect(store.project.networks[0].panels[0].ioGroups.map((group) => group.groupId)).toEqual([
       2, 4
+    ])
+  })
+
+  it('merges missing device-assigned groups into partially configured old projects', () => {
+    const store = useFireProjectStore()
+    const project = makeProject()
+    project.networks[0].panels[0].sounderGroups = [
+      {
+        id: 'panel-1-sounder-group-99',
+        networkId: 'network-1',
+        panelId: 'panel-1',
+        groupId: 99,
+        title: 'Existing sounder group',
+        addressableMembers: [],
+        nonAddressableMembers: [],
+        raw: {}
+      }
+    ]
+    project.networks[0].panels[0].ioGroups = [
+      {
+        id: 'panel-1-io-group-88',
+        networkId: 'network-1',
+        panelId: 'panel-1',
+        groupId: 88,
+        members: [],
+        raw: {}
+      }
+    ]
+    project.devices = [
+      makeDevice('device-1', 'network-1', 'panel-1', 1, 1, 2),
+      makeDevice('device-2', 'network-1', 'panel-1', 1, 99, 88)
+    ]
+
+    store.loadFireProject(project)
+
+    const panel = store.project.networks[0].panels[0]
+    expect(panel.sounderGroups.map((group) => group.groupId)).toEqual([1, 99])
+    expect(panel.sounderGroups.find((group) => group.groupId === 1)).toMatchObject({
+      title: 'Sounder Group 1',
+      addressableMembers: [expect.objectContaining({ physicalAddress: 1 })]
+    })
+    expect(panel.sounderGroups.find((group) => group.groupId === 99)?.title).toBe(
+      'Existing sounder group'
+    )
+    expect(panel.ioGroups.map((group) => group.groupId)).toEqual([2, 88])
+    expect(panel.ioGroups.find((group) => group.groupId === 2)?.members).toEqual([
+      expect.objectContaining({ physicalAddress: 1 })
     ])
   })
 
@@ -248,133 +322,3 @@ describe('fire project store', () => {
     ).toEqual([3, 2, undefined])
   })
 })
-
-function makeProject(): FireProject & { devices: FireDevice[] } {
-  const network = makeNetwork('network-1')
-
-  return {
-    schemaVersion: 1,
-    projectId: 'project-1',
-    name: 'Test Project',
-    createdAt: 1,
-    updatedAt: 1,
-    language: 'en',
-    networks: [network],
-    buildings: [],
-    assets: [],
-    viewSettings: {
-      deviceIconScale2D: 1,
-      deviceIconScale3D: 1,
-      floorSpacing3D: DEFAULT_FLOOR_HEIGHT_3D,
-      mapOpacity: 1,
-      labelColor: '#111827',
-      showLoopLines: true,
-      showGroupHelperLines: true
-    },
-    simulationSettings: {
-      timeScale: 1,
-      soundEnabled: true
-    },
-    devices: [
-      makeDevice('device-1', network.id, 'panel-1'),
-      makeDevice('device-2', network.id, 'panel-1'),
-      makeDevice('device-3', network.id, 'panel-1')
-    ]
-  }
-}
-
-function makeNetwork(id: string): FireNetwork {
-  const loop: FireLoop = {
-    id: 'loop-1',
-    networkId: id,
-    panelId: 'panel-1',
-    loopId: 1,
-    name: 'Loop 1',
-    configuredDeviceOrder: ['device-1', 'device-2', 'device-3'],
-    manualDeviceOrder: [],
-    color: '#2563eb'
-  }
-  const zone: FireZone = {
-    id: 'zone-1',
-    networkId: id,
-    panelId: 'panel-1',
-    zoneNumber: 1,
-    text: 'Zone 1',
-    enabled: true,
-    delayedSounders: false,
-    alarmMode: 'single',
-    visualAreas: [],
-    raw: {}
-  }
-
-  return {
-    id,
-    name: 'Network 1',
-    sourceFileName: 'test.cpd',
-    sourceImportedAt: 1,
-    sounderMode: 'Programmed',
-    panels: [
-      {
-        id: 'panel-1',
-        networkId: id,
-        panelNumber: 1,
-        panelName: 'Panel 1',
-        general: {
-          panelNumber: 1,
-          sounderMode: 'Programmed',
-          evacuateDelaySeconds: 0,
-          sounderDelaySeconds: 0,
-          inputOutputDelaySeconds: 0,
-          fireBrigadeDelaySeconds: 0,
-          onManualCallPoints: false,
-          onTwoDevices: false,
-          delayOffAtNight: false,
-          raw: {}
-        },
-        loops: [loop],
-        zones: [zone],
-        sounderGroups: [],
-        ioGroups: [],
-        sounders: { raw: {} }
-      }
-    ]
-  }
-}
-
-function makeDevice(
-  id: string,
-  networkId: string,
-  panelId: string,
-  zoneNumber?: number,
-  sounderGroupId?: number,
-  ioGroupId?: number
-): FireDevice {
-  return {
-    id,
-    networkId,
-    panelId,
-    panelNumber: 1,
-    loopId: 1,
-    address: Number(id.replace('device-', '')),
-    type: 'manual_call_point',
-    friendlyTypeName: 'Manual Call Point',
-    zoneNumber,
-    sounderGroupId,
-    ioGroupId,
-    isInputCapable: true,
-    isOutputCapable: false,
-    isSounder: false,
-    isWirelessType: false,
-    disabled: false,
-    inhibitSounders: false,
-    inhibitIO: false,
-    inhibitRelays: false,
-    evacuateIO: false,
-    ioOverrideDelay: false,
-    immediateEvacuate: false,
-    setEvacuateTimer: false,
-    overrideDelays: false,
-    placement: { status: 'unplaced' },
-    raw: {}
-  }
-}

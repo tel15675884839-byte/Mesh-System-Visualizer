@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import {
-  Aim,
   Bell,
   Delete,
   MuteNotification,
   Refresh,
   SwitchButton,
-  View,
   WarningFilled
 } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -24,9 +22,7 @@ defineProps<{
 
 const emit = defineEmits<{
   close: []
-  openProperties: [deviceId: string]
   removeFromDrawing: [deviceId: string]
-  locateInTree: [deviceId: string]
   startAlarm: [deviceId: string]
   restoreInput: [deviceId: string]
   triggerFault: [deviceId: string]
@@ -50,17 +46,9 @@ function run(action: (deviceId: string) => void, device: FireDevice | null): voi
     @click.stop
     @contextmenu.prevent
   >
-    <button type="button" @click="run((id) => emit('openProperties', id), device)">
-      <el-icon><View /></el-icon>
-      <span>{{ t('fire.contextMenu.openProperties') }}</span>
-    </button>
     <button type="button" @click="run((id) => emit('removeFromDrawing', id), device)">
       <el-icon><Delete /></el-icon>
       <span>{{ t('fire.contextMenu.removeFromDrawing') }}</span>
-    </button>
-    <button type="button" @click="run((id) => emit('locateInTree', id), device)">
-      <el-icon><Aim /></el-icon>
-      <span>{{ t('fire.contextMenu.locateInTree') }}</span>
     </button>
 
     <div v-if="simulationMode" class="menu-separator" />

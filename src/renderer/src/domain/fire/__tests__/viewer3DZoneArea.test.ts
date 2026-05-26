@@ -86,6 +86,60 @@ describe('viewer 3D Zone area resolution', () => {
       })
     ).toEqual([])
   })
+
+  it('mixes saved areas with temporary bounds for floors that have no saved area', () => {
+    const zone = makeZone({
+      visualAreas: [
+        {
+          id: 'area-floor-a1',
+          networkId: 'network-1',
+          panelId: 'panel-1',
+          zoneNumber: 7,
+          buildingId: 'building-a',
+          floorId: 'floor-a1',
+          kind: 'rectangle',
+          points: [
+            { x: 10, y: 20 },
+            { x: 30, y: 20 },
+            { x: 30, y: 40 },
+            { x: 10, y: 40 }
+          ],
+          color: '#ef4444',
+          opacity: 0.25
+        }
+      ]
+    })
+
+    const areas = resolveViewer3DZoneAreas({
+      zone,
+      devices: [
+        makeDevice('device-saved-floor', 7, 'building-a', 'floor-a1', 100, 200),
+        makeDevice('device-other-floor', 7, 'building-a', 'floor-a2', 300, 400)
+      ],
+      includeTemporary: true,
+      padding: 20
+    })
+
+    expect(areas).toEqual([
+      expect.objectContaining({
+        id: 'area-floor-a1',
+        temporary: false,
+        buildingId: 'building-a',
+        floorId: 'floor-a1'
+      }),
+      expect.objectContaining({
+        temporary: true,
+        buildingId: 'building-a',
+        floorId: 'floor-a2',
+        points: [
+          { x: 280, y: 380 },
+          { x: 320, y: 380 },
+          { x: 320, y: 420 },
+          { x: 280, y: 420 }
+        ]
+      })
+    ])
+  })
 })
 
 function makeZone(overrides: Partial<FireZone>): FireZone {

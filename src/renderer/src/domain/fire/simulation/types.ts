@@ -30,6 +30,7 @@ export interface SimulationState {
   eventLog: SimulationEvent[]
   manualEvacuateActive?: boolean
   evacuatedAt?: number
+  soundersSilenced?: boolean
 }
 
 export interface SimulationEvent {

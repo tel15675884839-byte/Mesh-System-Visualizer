@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import type { FireDevice, FireFloor } from '../types'
+import type { FireDevice, FireFloor, ZoneVisualArea } from '../types'
 import {
   getViewer3DMapOpacity,
+  shouldRenderViewer3DZoneArea,
   shouldRenderViewer3DDevice,
   shouldRenderViewer3DFloor,
   type Viewer3DScopeSelection
@@ -70,6 +71,30 @@ describe('viewer 3D view state', () => {
       })
     ).toBe(false)
   })
+
+  it('filters zone areas by selected building or floor scope', () => {
+    const buildingScope: Viewer3DScopeSelection = { kind: 'building', targetId: 'building-a' }
+    const floorScope: Viewer3DScopeSelection = { kind: 'floor', targetId: 'floor-a1' }
+
+    expect(
+      shouldRenderViewer3DZoneArea({
+        area: makeZoneArea('building-a', 'floor-a1'),
+        scope: buildingScope
+      })
+    ).toBe(true)
+    expect(
+      shouldRenderViewer3DZoneArea({
+        area: makeZoneArea('building-b', 'floor-b1'),
+        scope: buildingScope
+      })
+    ).toBe(false)
+    expect(
+      shouldRenderViewer3DZoneArea({
+        area: makeZoneArea('building-a', 'floor-a2'),
+        scope: floorScope
+      })
+    ).toBe(false)
+  })
 })
 
 function makeFloor(id: string, buildingId: string): FireFloor {
@@ -111,5 +136,25 @@ function makeDevice(id: string, buildingId: string, floorId: string): FireDevice
       position: { x: 0, y: 0, z: 0 }
     },
     raw: {}
+  }
+}
+
+function makeZoneArea(buildingId: string, floorId: string): ZoneVisualArea {
+  return {
+    id: `${buildingId}-${floorId}-area`,
+    networkId: 'network-1',
+    panelId: 'panel-1',
+    zoneNumber: 1,
+    buildingId,
+    floorId,
+    kind: 'rectangle' as const,
+    points: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 }
+    ],
+    color: '#ef4444',
+    opacity: 0.2
   }
 }

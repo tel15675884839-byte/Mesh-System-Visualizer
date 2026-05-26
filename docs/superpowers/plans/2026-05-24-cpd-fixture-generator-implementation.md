@@ -28,6 +28,7 @@
 ## Task 1: Baseline Field Map And Verification
 
 **Files:**
+
 - Modify: `goal-5/tasks.md`
 - Create: `.codex-dev-run/cpd-fixture-field-map.md`
 
@@ -86,6 +87,7 @@ Write `.codex-dev-run/cpd-fixture-field-map.md` with exact fields consumed by ge
 ## Task 2: Generator Scaffold
 
 **Files:**
+
 - Create: `tools/CpdFixtureGenerator/CpdFixtureGenerator.cs`
 - Create: `tools/CpdFixtureGenerator/build.ps1`
 - Create: `tools/CpdFixtureGenerator/generate.ps1`
@@ -127,6 +129,7 @@ Expected: prints all fixture names and exits 0.
 ## Task 3: Generate Core Linkage Fixture
 
 **Files:**
+
 - Modify: `tools/CpdFixtureGenerator/CpdFixtureGenerator.cs`
 - Modify: `tools/CpdFixtureGenerator/README.md`
 - Create/Modify: `fixtures/cpd/manifest.json`
@@ -154,6 +157,7 @@ Expected: `6002-basic-zone-linkage.cpd` exists and extracted JSON contains Zone 
 ## Task 4: Delay, Override, Disabled, Inhibited, I/O, And Composite Fixtures
 
 **Files:**
+
 - Modify: `tools/CpdFixtureGenerator/CpdFixtureGenerator.cs`
 - Modify: `fixtures/cpd/manifest.json`
 - Create: `fixtures/cpd/6002-global-sounder-delay.cpd`
@@ -190,6 +194,7 @@ Expected: extractor runs for every generated `.cpd`; JSON checks pass; optional 
 ## Task 5: Import Tests
 
 **Files:**
+
 - Create: `src/renderer/src/domain/fire/__tests__/cpdFixtureImport.test.ts`
 
 - [ ] **Step 1: Write failing adapter tests**
@@ -219,6 +224,7 @@ Expected after generator/extraction exists: tests pass. If they fail due adapter
 ## Task 6: Simulation Tests
 
 **Files:**
+
 - Create: `src/renderer/src/domain/fire/simulation/__tests__/cpdFixtureSimulation.test.ts`
 
 - [ ] **Step 1: Write simulation tests from adapted fixtures**
@@ -248,6 +254,7 @@ Expected: tests pass, or minimal simulation/import fixes are applied and rerun.
 ## Task 7: Runtime/App Verification Harness
 
 **Files:**
+
 - Create: `scripts/runtime-cpd-fixture-check.mjs`
 - Modify: `goal-5/tasks.md`
 
@@ -289,6 +296,7 @@ Expected: report marks every required runtime behavior as passed and is written 
 ## Task 8: Final Verification And Task Updates
 
 **Files:**
+
 - Modify: `goal-5/tasks.md`
 
 - [ ] **Step 1: Run full verification**
@@ -317,4 +325,3 @@ git status --short
 ```
 
 Expected: only intentional generator, fixture, test, script, docs, and task files are changed or added.
-

@@ -13,6 +13,7 @@ import { useI18n } from 'vue-i18n'
 import { useFireProjectStore } from '../../stores/fireProjectStore'
 import type { FireDevice } from '../../domain/fire/types'
 import type { OutputActivation } from '../../domain/fire/simulation/types'
+import { getDeviceSimulationOutput } from '../../domain/fire/simulationOutputMapping'
 
 const store = useFireProjectStore()
 const { t } = useI18n()
@@ -70,23 +71,20 @@ const shouldPlaySimulationAudio = computed(() => {
     return true
   }
 
-  return simulationState.value.outputs.some((output) => {
-    if (output.state !== 'active') return false
-    if (
-      output.outputId.startsWith('sounder-group:') ||
-      output.outputId.startsWith('non-addressable-sounder:') ||
-      output.outputId.startsWith('evacuate:')
-    ) {
-      return true
-    }
-
-    if (output.outputId.startsWith('device:')) {
-      const deviceId = output.outputId.slice('device:'.length)
-      return deviceById.value.get(deviceId)?.isSounder === true
-    }
-
-    return false
+  const hasActiveAddressableSounder = networkDevices.value.some((device) => {
+    if (!device.isSounder) return false
+    return (
+      getDeviceSimulationOutput(project.value, simulationState.value.outputs, device)?.state ===
+      'active'
+    )
   })
+  if (hasActiveAddressableSounder) {
+    return true
+  }
+
+  return simulationState.value.outputs.some(
+    (output) => output.state === 'active' && output.outputId.startsWith('non-addressable-sounder:')
+  )
 })
 
 const timeScaleOptions = [

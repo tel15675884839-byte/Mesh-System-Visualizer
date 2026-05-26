@@ -133,20 +133,30 @@ describe('simulation engine reducer', () => {
     expect(restored.activeInputAlarms).toEqual([])
   })
 
-  it('returns to alarm after system reset when the source remains active', () => {
+  it('resets directly to the initial state', () => {
     const active = reduceSimulation(createInitialSimulationState(), engineInput(), {
       type: 'activate-input',
       deviceId: 'input-1',
       at: 10
     })
 
-    const reset = reduceSimulation(active, engineInput(), {
+    const faulted = reduceSimulation(active, engineInput(), {
+      type: 'trigger-fault',
+      deviceId: 'input-1',
+      at: 15
+    })
+
+    const silenced = reduceSimulation(faulted, engineInput(), {
+      type: 'buzzer-silence',
+      at: 18
+    })
+
+    const reset = reduceSimulation(silenced, engineInput(), {
       type: 'system-reset',
       at: 20
     })
 
-    expect(reset.systemState).toBe('fireAlarm')
-    expect(reset.activeInputAlarms).toHaveLength(1)
+    expect(reset).toEqual(createInitialSimulationState())
   })
 
   it('silences the current sound when the buzzer is silenced', () => {
@@ -269,6 +279,121 @@ describe('simulation engine reducer', () => {
     )
   })
 
+  it('bypasses sounder delays when the 3D delay toggle is off', () => {
+    const net = network({ sounderDelaySeconds: 60 })
+    net.panels[0].zones[0].delayedSounders = true
+
+    const active = reduceSimulation(
+      createInitialSimulationState(),
+      { ...engineInput(undefined, net), sounderDelaysEnabled: false },
+      {
+        type: 'activate-input',
+        deviceId: 'input-1',
+        at: 10
+      }
+    )
+
+    expect(outputById(active, 'sounder-group:panel-1:1')).toMatchObject({
+      state: 'active',
+      remainingDelaySeconds: 0
+    })
+  })
+
+  it('applies sounder delays when the 3D delay toggle is on', () => {
+    const net = network({ sounderDelaySeconds: 60 })
+    net.panels[0].zones[0].delayedSounders = true
+
+    const active = reduceSimulation(
+      createInitialSimulationState(),
+      { ...engineInput(undefined, net), sounderDelaysEnabled: true },
+      {
+        type: 'activate-input',
+        deviceId: 'input-1',
+        at: 10
+      }
+    )
+
+    expect(outputById(active, 'sounder-group:panel-1:1')).toMatchObject({
+      state: 'delayActive',
+      remainingDelaySeconds: 60
+    })
+  })
+
+  it('silences sounders without restoring active detector alarms', () => {
+    const net = network({ sounderDelaySeconds: 0 })
+    const active = reduceSimulation(createInitialSimulationState(), engineInput(undefined, net), {
+      type: 'activate-input',
+      deviceId: 'input-1',
+      at: 10
+    })
+
+    const silenced = reduceSimulation(active, engineInput(undefined, net), {
+      type: 'sounder-silence',
+      at: 20
+    })
+
+    expect(silenced.systemState).toBe('fireAlarm')
+    expect(silenced.soundState).toBe('silent')
+    expect(silenced.activeInputAlarms).toEqual([{ deviceId: 'input-1', activatedAt: 10 }])
+    expect(silenced.outputs.some((output) => output.outputId.startsWith('sounder-group:'))).toBe(
+      false
+    )
+  })
+
+  it('clears manual evacuate when sounders are silenced but keeps detector alarms', () => {
+    const alarmed = reduceSimulation(createInitialSimulationState(), engineInput(), {
+      type: 'activate-input',
+      deviceId: 'input-1',
+      at: 10
+    })
+    const evacuated = reduceSimulation(alarmed, engineInput(), { type: 'evacuate', at: 12 })
+
+    const silenced = reduceSimulation(evacuated, engineInput(), {
+      type: 'sounder-silence',
+      at: 20
+    })
+
+    expect(silenced.systemState).toBe('fireAlarm')
+    expect(silenced.manualEvacuateActive).toBe(false)
+    expect(silenced.activeInputAlarms).toEqual([{ deviceId: 'input-1', activatedAt: 10 }])
+  })
+
+  it('skips only delayed sounder outputs for 3D demonstrations', () => {
+    const net = network({
+      sounderDelaySeconds: 60,
+      inputOutputDelaySeconds: 45,
+      fireBrigadeDelaySeconds: 30
+    })
+    net.panels[0].zones[0].delayedSounders = true
+    const delayed = reduceSimulation(
+      createInitialSimulationState(),
+      { ...engineInput(undefined, net), sounderDelaysEnabled: true },
+      {
+        type: 'activate-input',
+        deviceId: 'input-1',
+        at: 10
+      }
+    )
+
+    const skipped = reduceSimulation(delayed, engineInput(undefined, net), {
+      type: 'skip-sounder-delays',
+      at: 20
+    })
+
+    expect(outputById(skipped, 'sounder-group:panel-1:1')).toMatchObject({
+      state: 'active',
+      remainingDelaySeconds: 0
+    })
+    expect(outputById(skipped, 'io-group:panel-1:3')).toMatchObject({
+      state: 'delayActive',
+      remainingDelaySeconds: 45
+    })
+    expect(outputById(skipped, 'fire-brigade:panel-1')).toMatchObject({
+      state: 'delayActive',
+      remainingDelaySeconds: 30
+    })
+  })
+
   it('preserves skipped delay as active across later non-tick actions while the cause remains', () => {
     const net = network({ sounderDelaySeconds: 90 })
     const active = reduceSimulation(createInitialSimulationState(), engineInput(undefined, net), {
@@ -297,3 +422,10 @@ describe('simulation engine reducer', () => {
     )
   })
 })
+
+function outputById(
+  state: ReturnType<typeof createInitialSimulationState>,
+  outputId: string
+): ReturnType<typeof createInitialSimulationState>['outputs'][number] | undefined {
+  return state.outputs.find((output) => output.outputId === outputId)
+}

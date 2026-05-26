@@ -23,7 +23,7 @@ export function createViewer3DSceneInteraction(
   handleRendererContextMenu: (event: MouseEvent) => void
   closeContextMenu: () => void
 } {
-  const { store, simulationMode, deviceById, contextMenu } = context
+  const { store, simulationMode, deviceById, contextMenu, dispatchSimulationAction } = context
   const { getRenderer, getCamera, pickableDeviceObjects, hasActiveInput } = dependencies
   let pointerDownPosition: { x: number; y: number } | null = null
 
@@ -53,7 +53,7 @@ export function createViewer3DSceneInteraction(
 
     event.preventDefault()
     store.selectDevice(device.id)
-    store.dispatchSimulationAction({
+    dispatchSimulationAction({
       type: hasActiveInput(device.id) ? 'restore-input' : 'activate-input',
       deviceId: device.id,
       at: Date.now()

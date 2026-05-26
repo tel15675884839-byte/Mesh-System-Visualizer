@@ -102,19 +102,7 @@ const getBadgeLabel = (badge: string): string => {
       <el-input v-model="searchQuery" size="small" placeholder="Search Zones..." clearable />
     </div>
 
-    <!-- Filter Buttons -->
-    <div class="filters-bar">
-      <el-radio-group v-model="filterMode" size="small" class="filter-group">
-        <el-radio-button label="configured">{{
-          t('fire.cpdInspector.configured')
-        }}</el-radio-button>
-        <el-radio-button label="all">{{ t('fire.cpdInspector.all128') }}</el-radio-button>
-        <el-radio-button label="delayed">{{ t('fire.cpdInspector.delayed') }}</el-radio-button>
-        <el-radio-button label="devices">{{ t('fire.cpdInspector.devices') }}</el-radio-button>
-        <el-radio-button label="outputs">{{ t('fire.cpdInspector.hasOutputs') }}</el-radio-button>
-        <el-radio-button label="special">{{ t('fire.cpdInspector.special') }}</el-radio-button>
-      </el-radio-group>
-    </div>
+
 
     <!-- Scrollable zones list -->
     <div id="list-zones" class="card-list">
@@ -140,14 +128,6 @@ const getBadgeLabel = (badge: string): string => {
             <span class="zone-title-text"
               >Zone {{ zone.zoneNumber.toString().padStart(3, '0') }}</span
             >
-            <el-tag
-              v-if="zone.text || zone.devicesCount > 0 || zone.groups.length > 0"
-              size="small"
-              type="success"
-              class="active-tag"
-            >
-              Active
-            </el-tag>
           </div>
           <div v-if="zone.text" class="card-desc">{{ zone.text }}</div>
 
@@ -158,7 +138,7 @@ const getBadgeLabel = (badge: string): string => {
             class="card-tags"
           >
             <span v-if="zone.delayedSounders" class="badge delay">
-              Delay: {{ zone.groups.length > 0 ? 'Yes' : 'No' }}
+              Delay
             </span>
             <span class="badge">{{ zone.devicesCount }} {{ t('fire.cpdInspector.devices') }}</span>
           </div>

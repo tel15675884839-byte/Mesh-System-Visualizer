@@ -5,7 +5,30 @@ import 'element-plus/dist/index.css'
 import { createI18n } from 'vue-i18n'
 import Planner2D from './components/fire/Planner2D.vue'
 import { useFireProjectStore, type FireProjectDocument } from './stores/fireProjectStore'
+import { createRectangleArea } from './domain/fire/zoneGeometry'
 import en from './i18n/en'
+
+interface PlannerLifecycleCheckResult {
+  ok: boolean
+  checks: Record<string, boolean>
+  errors: string[]
+}
+
+interface PlannerCheckSummary {
+  buildings: number
+  floors: number
+  devices: number
+  zoneAreas: number
+}
+
+declare global {
+  interface Window {
+    __plannerCheck?: {
+      runLifecycleCheck: () => PlannerLifecycleCheckResult
+      getSummary: () => PlannerCheckSummary
+    }
+  }
+}
 
 const project: FireProjectDocument = {
   schemaVersion: 1,
@@ -111,17 +134,31 @@ const project: FireProjectDocument = {
     panelNumber: 1,
     loopId: 1,
     address: index + 1,
-    type: 'manual_call_point',
-    friendlyTypeName: 'Manual Call Point',
+    type:
+      suffix === 'a'
+        ? 'optical_det'
+        : suffix === 'b'
+          ? 'input_output'
+          : suffix === 'd'
+            ? 'sounder'
+            : 'manual_call_point',
+    friendlyTypeName:
+      suffix === 'a'
+        ? 'Optical Detector'
+        : suffix === 'b'
+          ? 'Input/Output'
+          : suffix === 'd'
+            ? 'Sounder'
+            : 'Manual Call Point',
     description: `Device ${suffix.toUpperCase()}`,
     zoneNumber: 1,
-    isInputCapable: true,
-    isOutputCapable: false,
-    isSounder: false,
+    isInputCapable: suffix !== 'd',
+    isOutputCapable: suffix === 'b' || suffix === 'd',
+    isSounder: suffix === 'd',
     isWirelessType: false,
-    disabled: false,
+    disabled: suffix === 'a',
     inhibitSounders: false,
-    inhibitIO: false,
+    inhibitIO: suffix === 'b',
     inhibitRelays: false,
     evacuateIO: false,
     ioOverrideDelay: false,
@@ -151,3 +188,167 @@ app.mount('#app')
 
 const store = useFireProjectStore(pinia)
 store.loadFireProject(project)
+
+function runLifecycleCheck(): PlannerLifecycleCheckResult {
+  const checks: Record<string, boolean> = {}
+  const errors: string[] = []
+
+  const record = (name: string, passed: boolean): void => {
+    checks[name] = passed
+    if (!passed) {
+      errors.push(name)
+    }
+  }
+
+  const initialBuildingIds = store.project.buildings.map((building) => building.id)
+  const buildingId = store.addBuilding('Harness Building')
+  record(
+    'add-building',
+    store.project.buildings.some((building) => building.id === buildingId)
+  )
+  store.removeBuilding(buildingId)
+  record(
+    'delete-building',
+    store.project.buildings.map((building) => building.id).join(',') ===
+      initialBuildingIds.join(',')
+  )
+
+  const target = store.ensureDefaultPlanningFloor()
+  const floorId = store.addFloor(target.buildingId, 'Harness Floor')
+  record(
+    'add-floor',
+    Boolean(
+      floorId &&
+      store.project.buildings
+        .find((building) => building.id === target.buildingId)
+        ?.floors.some((floor) => floor.id === floorId)
+    )
+  )
+  if (floorId) {
+    store.removeFloor(target.buildingId, floorId)
+  }
+  record(
+    'delete-floor',
+    Boolean(
+      floorId &&
+      !store.project.buildings
+        .find((building) => building.id === target.buildingId)
+        ?.floors.some((floor) => floor.id === floorId)
+    )
+  )
+
+  store.assignFloorMapAsset({
+    asset: {
+      id: 'harness-map',
+      kind: 'map',
+      name: 'Harness Map',
+      packagePath: 'assets/maps/harness-map.png',
+      runtimePath: 'data:image/png;base64,',
+      mimeType: 'image/png'
+    },
+    buildingId: target.buildingId,
+    floorId: target.floorId,
+    mapWidth: 640,
+    mapHeight: 480
+  })
+  const targetBuilding = store.project.buildings.find(
+    (building) => building.id === target.buildingId
+  )
+  const targetFloor = targetBuilding?.floors.find((floor) => floor.id === target.floorId)
+  record(
+    'assign-drawing',
+    targetFloor?.mapAssetId === 'harness-map' &&
+      targetFloor?.mapWidth === 640 &&
+      targetFloor?.mapHeight === 480
+  )
+  store.clearFloorMapAsset(target.buildingId, target.floorId)
+  const clearedTargetFloor = store.project.buildings
+    .find((building) => building.id === target.buildingId)
+    ?.floors.find((floor) => floor.id === target.floorId)
+  record(
+    'clear-drawing',
+    clearedTargetFloor?.mapAssetId === undefined &&
+      clearedTargetFloor?.mapWidth === 1200 &&
+      clearedTargetFloor?.mapHeight === 800
+  )
+
+  const zone = store.project.networks[0]?.panels[0]?.zones[0]
+  if (zone) {
+    const area = createRectangleArea({
+      id: 'harness-zone-area',
+      networkId: zone.networkId,
+      panelId: zone.panelId,
+      zoneNumber: zone.zoneNumber,
+      buildingId: target.buildingId,
+      floorId: target.floorId,
+      start: { x: 40, y: 40 },
+      end: { x: 180, y: 150 },
+      color: '#ef4444',
+      opacity: 0.2
+    })
+    store.addZoneArea(area)
+    record('draw-zone-area', getZoneAreaCount() === 1)
+    store.removeZoneArea(area.id)
+    record('delete-zone-area', getZoneAreaCount() === 0)
+  } else {
+    record('draw-zone-area', false)
+    record('delete-zone-area', false)
+  }
+
+  return {
+    ok: errors.length === 0,
+    checks,
+    errors
+  }
+}
+
+function getZoneAreaCount(): number {
+  return store.project.networks.reduce(
+    (networkTotal, network) =>
+      networkTotal +
+      network.panels.reduce(
+        (panelTotal, panel) =>
+          panelTotal +
+          panel.zones.reduce((zoneTotal, zone) => zoneTotal + zone.visualAreas.length, 0),
+        0
+      ),
+    0
+  )
+}
+
+function getSummary(): PlannerCheckSummary {
+  return {
+    buildings: store.project.buildings.length,
+    floors: store.project.buildings.reduce((total, building) => total + building.floors.length, 0),
+    devices: store.project.devices.length,
+    zoneAreas: getZoneAreaCount()
+  }
+}
+
+function writeHarnessReport(result: PlannerLifecycleCheckResult): void {
+  let report = document.getElementById('planner-check-report') as HTMLPreElement | null
+  if (!report) {
+    report = document.createElement('pre')
+    report.id = 'planner-check-report'
+    report.hidden = true
+    document.body.appendChild(report)
+  }
+  report.dataset.ok = String(result.ok)
+  report.textContent = JSON.stringify(
+    {
+      result,
+      summary: getSummary()
+    },
+    null,
+    2
+  )
+}
+
+window.__plannerCheck = {
+  runLifecycleCheck,
+  getSummary
+}
+
+queueMicrotask(() => {
+  writeHarnessReport(runLifecycleCheck())
+})

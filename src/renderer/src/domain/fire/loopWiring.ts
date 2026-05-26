@@ -11,8 +11,8 @@ export interface LoopSegmentsResult {
 }
 
 export function getEffectiveLoopOrder(loop: FireLoop, devices: FireDevice[] = []): string[] {
-  if (loop.manualDeviceOrder.length > 0) {
-    return loop.manualDeviceOrder
+  if (loop.configuredDeviceOrder.length > 0) {
+    return loop.configuredDeviceOrder
   }
 
   return devices

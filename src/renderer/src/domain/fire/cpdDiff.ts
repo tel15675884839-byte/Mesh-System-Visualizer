@@ -70,6 +70,9 @@ export function applyCpdDiff(
   const existingDevices = existingProject.devices ?? []
   const existingByKey = new Map(existingDevices.map((device) => [deviceMatchKey(device), device]))
   const incomingMatchedKeys = new Set(incoming.devices.map(deviceMatchKey))
+  const incomingToAppliedDeviceId = new Map(
+    diff.matched.map((match) => [match.incomingDeviceId, match.existingDeviceId])
+  )
   const removedIds = new Set(diff.removed)
   const devices = [
     ...incoming.devices.map((incomingDevice) => {
@@ -100,20 +103,23 @@ export function applyCpdDiff(
     ...clone(existing),
     name: incoming.projectName || existing.name,
     updatedAt: Date.now(),
-    networks: [mergeNetworkPlanningState(existing.networks, incoming.network)],
+    networks: [mergeNetworkPlanningState(existing, incoming.network, incomingToAppliedDeviceId)],
     devices,
     issues: incoming.issues
   } as FireProject
 }
 
 function mergeNetworkPlanningState(
-  existingNetworks: FireNetwork[],
-  incomingNetwork: FireNetwork
+  existing: FireProject,
+  incomingNetwork: FireNetwork,
+  incomingToAppliedDeviceId: Map<string, string>
 ): FireNetwork {
+  const validFloorKeys = getValidPlanningFloorKeys(existing.buildings)
+
   return {
     ...incomingNetwork,
     panels: incomingNetwork.panels.map((incomingPanel) => {
-      const existingPanel = existingNetworks
+      const existingPanel = existing.networks
         .flatMap((network) => network.panels)
         .find((panel) => panel.panelNumber === incomingPanel.panelNumber)
 
@@ -123,28 +129,57 @@ function mergeNetworkPlanningState(
 
       return {
         ...incomingPanel,
-        loops: incomingPanel.loops.map((loop) => mergeLoopPlanningState(existingPanel.loops, loop)),
-        zones: incomingPanel.zones.map((zone) => mergeZonePlanningState(existingPanel.zones, zone))
+        loops: incomingPanel.loops.map((loop) =>
+          mergeLoopPlanningState(existingPanel.loops, loop, incomingToAppliedDeviceId)
+        ),
+        zones: incomingPanel.zones.map((zone) =>
+          mergeZonePlanningState(existingPanel.zones, zone, validFloorKeys)
+        )
       }
     })
   }
 }
 
-function mergeLoopPlanningState(existingLoops: FireLoop[], incomingLoop: FireLoop): FireLoop {
+function mergeLoopPlanningState(
+  existingLoops: FireLoop[],
+  incomingLoop: FireLoop,
+  incomingToAppliedDeviceId: Map<string, string>
+): FireLoop {
   const existingLoop = existingLoops.find((loop) => loop.loopId === incomingLoop.loopId)
 
   if (!existingLoop) {
-    return incomingLoop
+    return {
+      ...incomingLoop,
+      configuredDeviceOrder: remapDeviceOrder(
+        incomingLoop.configuredDeviceOrder,
+        incomingToAppliedDeviceId
+      )
+    }
   }
 
   return {
     ...incomingLoop,
+    configuredDeviceOrder: remapDeviceOrder(
+      incomingLoop.configuredDeviceOrder,
+      incomingToAppliedDeviceId
+    ),
     manualDeviceOrder: existingLoop.manualDeviceOrder,
     color: existingLoop.color || incomingLoop.color
   }
 }
 
-function mergeZonePlanningState(existingZones: FireZone[], incomingZone: FireZone): FireZone {
+function remapDeviceOrder(
+  deviceIds: string[],
+  incomingToAppliedDeviceId: Map<string, string>
+): string[] {
+  return deviceIds.map((deviceId) => incomingToAppliedDeviceId.get(deviceId) ?? deviceId)
+}
+
+function mergeZonePlanningState(
+  existingZones: FireZone[],
+  incomingZone: FireZone,
+  validFloorKeys: Set<string>
+): FireZone {
   const existingZone = existingZones.find((zone) => zone.zoneNumber === incomingZone.zoneNumber)
 
   if (!existingZone) {
@@ -153,8 +188,22 @@ function mergeZonePlanningState(existingZones: FireZone[], incomingZone: FireZon
 
   return {
     ...incomingZone,
-    visualAreas: existingZone.visualAreas
+    visualAreas: existingZone.visualAreas.filter((area) =>
+      validFloorKeys.has(planningFloorKey(area.buildingId, area.floorId))
+    )
   }
+}
+
+function getValidPlanningFloorKeys(buildings: FireProject['buildings']): Set<string> {
+  return new Set(
+    buildings.flatMap((building) =>
+      building.floors.map((floor) => planningFloorKey(building.id, floor.id))
+    )
+  )
+}
+
+function planningFloorKey(buildingId: string, floorId: string): string {
+  return `${buildingId}:${floorId}`
 }
 
 function deviceMatchKey(device: FireDevice): string {

@@ -25,19 +25,21 @@ export function resolveViewer3DZoneAreas({
   temporaryColor = DEFAULT_TEMPORARY_COLOR,
   temporaryOpacity = DEFAULT_TEMPORARY_OPACITY
 }: Viewer3DZoneAreaResolutionArgs): Viewer3DResolvedZoneArea[] {
-  if (zone.visualAreas.length > 0) {
-    return zone.visualAreas.map((area) => ({
-      ...area,
-      temporary: false
-    }))
-  }
+  const savedAreas: Viewer3DResolvedZoneArea[] = zone.visualAreas.map((area) => ({
+    ...area,
+    temporary: false
+  }))
 
   if (!includeTemporary) {
-    return []
+    return savedAreas
   }
 
-  return Array.from(groupPlacedZoneDevicesByFloor(zone.zoneNumber, devices).entries()).map(
-    ([key, floorDevices]) => {
+  const savedAreaFloorKeys = new Set(zone.visualAreas.map(areaFloorKey))
+  const temporaryAreas: Viewer3DResolvedZoneArea[] = Array.from(
+    groupPlacedZoneDevicesByFloor(zone.zoneNumber, devices).entries()
+  )
+    .filter(([key]) => !savedAreaFloorKeys.has(key))
+    .map(([key, floorDevices]) => {
       const [buildingId, floorId] = key.split(':')
       const bounds = getDeviceBounds(floorDevices, padding)
 
@@ -48,14 +50,19 @@ export function resolveViewer3DZoneAreas({
         zoneNumber: zone.zoneNumber,
         buildingId,
         floorId,
-        kind: 'rectangle',
+        kind: 'rectangle' as const,
         points: boundsToRectangle(bounds),
         color: temporaryColor,
         opacity: temporaryOpacity,
         temporary: true
       }
-    }
-  )
+    })
+
+  return [...savedAreas, ...temporaryAreas]
+}
+
+function areaFloorKey(area: Pick<ZoneVisualArea, 'buildingId' | 'floorId'>): string {
+  return `${area.buildingId}:${area.floorId}`
 }
 
 function groupPlacedZoneDevicesByFloor(

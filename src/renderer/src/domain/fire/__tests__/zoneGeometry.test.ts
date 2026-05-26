@@ -4,7 +4,8 @@ import {
   buildBoundingAreaForDevices,
   createPolygonArea,
   createRectangleArea,
-  pointInPolygon
+  pointInPolygon,
+  validateZonePolygon
 } from '../zoneGeometry'
 
 function createPlacedDevice(id: string, x: number, y: number): FireDevice {
@@ -124,5 +125,60 @@ describe('zone geometry', () => {
 
     expect(pointInPolygon({ x: 50, y: 60 }, zoneBVisualArea)).toBe(true)
     expect(pointInPolygon({ x: 120, y: 60 }, zoneBVisualArea)).toBe(false)
+  })
+
+  it('rejects polygons with fewer than three unique points', () => {
+    expect(
+      validateZonePolygon([
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 0 }
+      ])
+    ).toEqual({ valid: false, reason: 'too-few-points' })
+  })
+
+  it('rejects polygons with adjacent duplicate points', () => {
+    expect(
+      validateZonePolygon([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 }
+      ])
+    ).toEqual({ valid: false, reason: 'duplicate-adjacent-points' })
+  })
+
+  it('rejects polygons that are too small to be usable', () => {
+    expect(
+      validateZonePolygon([
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 }
+      ])
+    ).toEqual({ valid: false, reason: 'area-too-small' })
+  })
+
+  it('rejects self-intersecting polygons', () => {
+    expect(
+      validateZonePolygon([
+        { x: 0, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+        { x: 100, y: 0 }
+      ])
+    ).toEqual({ valid: false, reason: 'self-intersection' })
+  })
+
+  it('accepts a usable simple polygon', () => {
+    expect(
+      validateZonePolygon([
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 90, y: 80 },
+        { x: 0, y: 100 }
+      ])
+    ).toEqual({ valid: true })
   })
 })

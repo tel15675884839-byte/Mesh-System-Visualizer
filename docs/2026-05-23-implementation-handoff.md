@@ -96,6 +96,40 @@ Runtime UI review:
 
 The active fire code was also searched for old product concepts. No old Mesh, RSSI, Leader, Router, or HTML topology product workflow remains exposed in the active Fire Simulator code. The only remaining `Mesh` matches in active fire files are Three.js class names such as `THREE.Mesh` in the 3D viewer.
 
+## Goal 4 Zone And 2D Lifecycle Fixes Completed
+
+The 2026-05-24 Goal 4 pass fixed the new Zone drawing and 2D Building/Floor lifecycle work end to end:
+
+- Store actions now support undoable `removeBuilding`, `removeFloor`, `clearFloorMapAsset`, and `replaceZoneArea`.
+- Deleting a Building/Floor unplaces affected devices and non-addressable sounder points, removes affected Zone visual areas, clears affected selected devices, and keeps a valid default planning target when the last target is deleted.
+- Clearing a drawing removes only the floor `mapAssetId` and resets the canvas dimensions while preserving devices, Zone areas, and managed assets.
+- Planner2D now exposes compact controls for delete Building, delete Floor, clear drawing, select/delete Zone area, and replace selected Zone area.
+- Zone polygon persistence is guarded against too few points, duplicate adjacent points, tiny areas, and self-intersection.
+- Viewer3D now filters saved and temporary Zone areas by the same Building/Floor scope rules as floors/devices, and Zone focus bounds only include visible/current-scope areas.
+- 3D Zone resolution now combines saved areas with temporary device-bounds areas per Building/Floor, without duplicating floors that already have saved areas.
+- Save/open normalization and CPD re-import preservation now drop orphan Building/Floor visual references instead of resurrecting deleted targets.
+
+Goal 4 verification commands run successfully:
+
+```powershell
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+Observed Goal 4 final test result:
+
+- 25 test files passed.
+- 153 tests passed.
+
+Runtime and focused checks:
+
+- `http://127.0.0.1:5174/planner-check.html` reported `ok: true` for add/delete Building, add/delete Floor, assign/clear Drawing, draw/delete Zone area.
+- Browser console errors/warnings were empty during the Planner2D harness run.
+- The 1280px Planner2D toolbar reported no initial horizontal overflow after hiding Zone-area edit controls until a Zone area is selected.
+- `viewer3DZoneArea.test.ts` and `viewer3DViewState.test.ts` passed again after full validation, covering saved/temporary Zone area resolution and Building/Floor scope/focus behavior.
+
 ## Known Risks And Gaps
 
 - No sample `.cpd` or `.fireproj` file was present in the repository during final verification, so the long manual import/export workflow was not executed end-to-end with real customer data.
@@ -103,15 +137,18 @@ The active fire code was also searched for old product concepts. No old Mesh, RS
 - The old top-level Mesh UI files still exist in the repository but are retired from the active `App.vue` workflow. ESLint now excludes these retired top-level legacy renderer files so lint reflects the active Fire Alarm app.
 - The worktree contains unrelated or pre-existing modified/untracked files. They were intentionally preserved and not reverted.
 - Runtime review used a local planner harness for fast UI validation. The full Electron native file-dialog workflow still needs real operator/customer sample files for an end-to-end manual run.
+- There is not yet a dedicated browser-mounted 3D runtime harness; Goal 4 3D Zone behavior is covered by focused domain tests plus the production build.
 
 ## Current Dirty Worktree Notes
 
-At the time of this handoff, `git status --short` still reported unrelated or previously existing changes including:
+At the time of the original 2026-05-23 handoff, `git status --short` still reported unrelated or previously existing changes including:
 
 - Modified `README.md`, `electron-builder.yml`, `out/main/index.js`, and `out/preload/index.js`.
 - Deleted old public icon files such as `Leader.svg`, `Router.svg`, `heat-mult.svg`, `io-module.svg`, `mcp.svg`, and `smoke.svg`.
 - Modified retired legacy renderer components and utilities under `src/renderer/src/components/`, `src/renderer/src/stores/loggerStore.ts`, and `src/renderer/src/utils/`.
 - Untracked `AGENTS.md`, `docs/`, `out/renderer/`, new public fire device icons, and `src/renderer/src/assets/logo.svg`.
+
+After Goal 4, the worktree also contains the intentional Goal 4 files under `goal-4/`, `scripts/planner-check.vite.config.mjs`, active Fire renderer/store/domain/i18n source files, and this handoff document. The build command also updated generated `out/renderer` artifacts and `.eslintcache`; these were left in place. Other status entries such as `.codex-dev-run/Exam_6002_Answer_Advanced.extract.json` and Fire adapter files were not cleaned or reverted.
 
 Do not clean or revert these automatically in the next session. Inspect them first and preserve user changes unless explicitly instructed otherwise.
 

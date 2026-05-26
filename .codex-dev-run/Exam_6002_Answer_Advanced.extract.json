@@ -4,7 +4,7 @@
   "source": {
     "fileName": "Exam_6002_Answer_Advanced.cpd",
     "cpdVersion": "3.6.0",
-    "exportedAt": "2026-05-23T14:21:54.9538461Z"
+    "exportedAt": "2026-05-24T11:45:34.3056365Z"
   },
   "panelCount": 1,
   "loopCount": 2,
@@ -15,6 +15,42 @@
       "name": "Panel 1",
       "model": "ControlPanel6002_N",
       "role": "main",
+      "general": {
+        "CompanyName": "",
+        "Language": 0,
+        "PanelNumber": 0,
+        "TestSounderMode": 0,
+        "SounderMode": 0,
+        "FaultIOGroup": 0,
+        "EvacuteDelayMM": 0,
+        "EvacuteDelaySS": 0,
+        "EvacuteMode": 0,
+        "SounderDelayMM": 0,
+        "SounderDelaySS": 60,
+        "SounderActiveOn": 0,
+        "SounderMode1": 0,
+        "InputOutputDelayMM": 0,
+        "InputOutputDelaySS": 0,
+        "FireBrigadeDelayMM": 0,
+        "FireBrigadeDelaySS": 0,
+        "FireBrigadeActiveOn": 0,
+        "FireBrigadeMode": 0,
+        "OnManualCallPoints": false,
+        "OnTwoDevices": false,
+        "DelayOffAtNight": false,
+        "MonFri": 0,
+        "Saturday": 0,
+        "Sunday": 0,
+        "StartTimeDayHH": 8,
+        "StartTimeDayMM": 0,
+        "StartTimeDayTimedSensitivity": 0,
+        "StartTimeNightHH": 20,
+        "StartTimeNightMM": 0,
+        "StartTimeNightTimedSensitivity": 0,
+        "BoradIP": "0.0.0.0",
+        "ServerIP": "0.0.0.0",
+        "ServerPort": 8999
+      },
       "maxLoop": 24,
       "maxZoneCount": 128,
       "maxLoopAddress": 125,
@@ -4448,6 +4484,124 @@
     }
   ],
   "sounderGroups": [
+    {
+      "groupId": 1,
+      "title": "Sounder Group 1",
+      "nonAddressable1": "Intermittent",
+      "nonAddressable2": "Continuous",
+      "description": "Non Description",
+      "members": [
+        {
+          "panelNumber": 1,
+          "panelId": "panel-1",
+          "loopId": 1,
+          "physicalAddress": 94,
+          "status": "Continuous",
+          "description": "",
+          "raw": {
+            "SounderGroupID": 1,
+            "LoopID": 1,
+            "PhysicalAddress": 94,
+            "SounderStatus": "Continuous"
+          }
+        },
+        {
+          "panelNumber": 1,
+          "panelId": "panel-1",
+          "loopId": 1,
+          "physicalAddress": 95,
+          "status": "Continuous",
+          "description": "",
+          "raw": {
+            "SounderGroupID": 1,
+            "LoopID": 1,
+            "PhysicalAddress": 95,
+            "SounderStatus": "Continuous"
+          }
+        }
+      ],
+      "raw": {
+        "SounderGroupID": 1,
+        "SounderGroupTitle": "Sounder Group 1",
+        "NonAddressable1": "Intermittent",
+        "NonAddressable2": "Continuous",
+        "Description": "Non Description"
+      }
+    },
+    {
+      "groupId": 2,
+      "title": "Sounder Group 2",
+      "nonAddressable1": "Intermittent",
+      "nonAddressable2": "Continuous",
+      "description": "Non Description",
+      "members": [
+        {
+          "panelNumber": 1,
+          "panelId": "panel-1",
+          "loopId": 1,
+          "physicalAddress": 104,
+          "status": "Continuous",
+          "description": "",
+          "raw": {
+            "SounderGroupID": 2,
+            "LoopID": 1,
+            "PhysicalAddress": 104,
+            "SounderStatus": "Continuous"
+          }
+        },
+        {
+          "panelNumber": 1,
+          "panelId": "panel-1",
+          "loopId": 1,
+          "physicalAddress": 105,
+          "status": "Continuous",
+          "description": "",
+          "raw": {
+            "SounderGroupID": 2,
+            "LoopID": 1,
+            "PhysicalAddress": 105,
+            "SounderStatus": "Continuous"
+          }
+        }
+      ],
+      "raw": {
+        "SounderGroupID": 2,
+        "SounderGroupTitle": "Sounder Group 2",
+        "NonAddressable1": "Intermittent",
+        "NonAddressable2": "Continuous",
+        "Description": "Non Description"
+      }
+    },
+    {
+      "groupId": 3,
+      "title": "Sounder Group 3",
+      "nonAddressable1": "Intermittent",
+      "nonAddressable2": "Continuous",
+      "description": "Non Description",
+      "members": [
+        {
+          "panelNumber": 1,
+          "panelId": "panel-1",
+          "loopId": 1,
+          "physicalAddress": 114,
+          "status": "Continuous",
+          "description": "",
+          "raw": {
+            "SounderGroupID": 3,
+            "LoopID": 1,
+            "PhysicalAddress": 114,
+            "SounderStatus": "Continuous"
+          }
+        }
+      ],
+      "raw": {
+        "SounderGroupID": 3,
+        "SounderGroupTitle": "Sounder Group 3",
+        "NonAddressable1": "Intermittent",
+        "NonAddressable2": "Continuous",
+        "Description": "Non Description"
+      }
+    },
     {
       "groupId": 10,
       "title": "All Evacuation",

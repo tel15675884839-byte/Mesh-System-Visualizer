@@ -8,6 +8,7 @@ export interface SimulationEngineInput {
   devices: FireDevice[]
   nonAddressablePoints: NonAddressableSounderPoint[]
   now: number
+  sounderDelaysEnabled?: boolean
 }
 
 export type SimulationAction =
@@ -17,9 +18,11 @@ export type SimulationAction =
   | { type: 'restore-fault'; deviceId: string; at: number }
   | { type: 'evacuate'; at: number }
   | { type: 'buzzer-silence'; at: number }
+  | { type: 'sounder-silence'; at: number }
   | { type: 'system-reset'; at: number }
   | { type: 'tick'; at: number; elapsedSeconds: number }
   | { type: 'skip-delay'; outputId: string; at: number }
+  | { type: 'skip-sounder-delays'; at: number }
 
 export function createInitialSimulationState(): SimulationState {
   return {
@@ -58,6 +61,23 @@ export function reduceSimulation(
     }
   }
 
+  if (action.type === 'skip-sounder-delays') {
+    return {
+      ...state,
+      outputs: skipSounderOutputDelays(state.outputs, input.devices),
+      eventLog: appendEvent(
+        state.eventLog,
+        action.at,
+        'skip-sounder-delays',
+        'Skipped sounder delays'
+      )
+    }
+  }
+
+  if (action.type === 'system-reset') {
+    return createInitialSimulationState()
+  }
+
   const nextSources = reduceSources(state, action)
   const resolved = resolveCauseAndEffect({
     network: input.network,
@@ -65,12 +85,21 @@ export function reduceSimulation(
     nonAddressablePoints: input.nonAddressablePoints,
     activeInputAlarms: nextSources.activeInputAlarms,
     activeFaults: nextSources.activeFaults,
-    evacuateActive: nextSources.manualEvacuateActive
+    evacuateActive: nextSources.manualEvacuateActive,
+    sounderDelaysEnabled: input.sounderDelaysEnabled ?? true
   })
 
   const buzzerSilenced =
     action.type === 'buzzer-silence' ? true : shouldKeepBuzzerSilenced(state, action)
-  const soundState = buzzerSilenced ? 'silent' : resolved.soundState
+  const soundersSilenced =
+    action.type === 'sounder-silence' ? true : shouldKeepSoundersSilenced(state, action)
+  const resolvedOutputs = soundersSilenced
+    ? filterSounderOutputs([...resolved], input.devices)
+    : [...resolved]
+  const soundState =
+    buzzerSilenced || (soundersSilenced && resolved.soundState === 'fire')
+      ? 'silent'
+      : resolved.soundState
 
   return {
     ...state,
@@ -78,7 +107,8 @@ export function reduceSimulation(
     systemState: resolved.systemState,
     soundState,
     buzzerSilenced,
-    outputs: mergeContinuingOutputState(state.outputs, [...resolved]),
+    soundersSilenced,
+    outputs: mergeContinuingOutputState(state.outputs, resolvedOutputs),
     eventLog: appendEvent(
       state.eventLog,
       action.at,
@@ -130,6 +160,7 @@ function reduceSources(
     SimulationAction,
     | { type: 'tick'; at: number; elapsedSeconds: number }
     | { type: 'skip-delay'; outputId: string; at: number }
+    | { type: 'skip-sounder-delays'; at: number }
   >
 ): Pick<
   SimulationState,
@@ -187,6 +218,13 @@ function reduceSources(
         manualEvacuateActive: state.manualEvacuateActive,
         evacuatedAt: state.evacuatedAt
       }
+    case 'sounder-silence':
+      return {
+        activeInputAlarms: state.activeInputAlarms,
+        activeFaults: state.activeFaults,
+        manualEvacuateActive: false,
+        evacuatedAt: undefined
+      }
   }
 }
 
@@ -212,6 +250,51 @@ function shouldKeepBuzzerSilenced(state: SimulationState, action: SimulationActi
     action.type !== 'trigger-fault' &&
     action.type !== 'evacuate'
   )
+}
+
+function shouldKeepSoundersSilenced(state: SimulationState, action: SimulationAction): boolean {
+  if (!state.soundersSilenced) {
+    return false
+  }
+
+  return action.type !== 'activate-input' && action.type !== 'evacuate'
+}
+
+function skipSounderOutputDelays(
+  outputs: SimulationState['outputs'],
+  devices: FireDevice[]
+): SimulationState['outputs'] {
+  return outputs.map((output) => {
+    if (output.state !== 'delayActive' || !isSounderOutput(output.outputId, devices)) {
+      return output
+    }
+
+    return {
+      ...output,
+      state: 'active',
+      remainingDelaySeconds: 0
+    }
+  })
+}
+
+function filterSounderOutputs(
+  outputs: SimulationState['outputs'],
+  devices: FireDevice[]
+): SimulationState['outputs'] {
+  return outputs.filter((output) => !isSounderOutput(output.outputId, devices))
+}
+
+function isSounderOutput(outputId: string, devices: FireDevice[]): boolean {
+  if (outputId.startsWith('sounder-group:') || outputId.startsWith('non-addressable-sounder:')) {
+    return true
+  }
+
+  if (!outputId.startsWith('device:')) {
+    return false
+  }
+
+  const deviceId = outputId.slice('device:'.length)
+  return devices.some((device) => device.id === deviceId && device.isSounder)
 }
 
 function appendEvent(
@@ -247,12 +330,16 @@ function eventMessage(action: SimulationAction): string {
       return 'Manual evacuate started'
     case 'buzzer-silence':
       return 'Buzzer silenced'
+    case 'sounder-silence':
+      return 'Sounders silenced'
     case 'system-reset':
       return 'System reset requested'
     case 'tick':
       return 'Simulation tick'
     case 'skip-delay':
       return `Skipped delay for ${action.outputId}`
+    case 'skip-sounder-delays':
+      return 'Skipped sounder delays'
   }
 }
 

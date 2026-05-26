@@ -62,6 +62,58 @@ describe('CPD re-import diff', () => {
     expect(applied.networks[0].panels[0].zones[0].visualAreas).toHaveLength(1)
     expect(applied.networks[0].panels[0].loops[0].manualDeviceOrder).toEqual(['existing-1'])
   })
+
+  it('remaps configured loop order to preserved device ids when applying a re-import', () => {
+    const existing = makeProject()
+    const incoming = makeIncoming()
+    const diff = diffCpdImport(existing, incoming)
+
+    const applied = applyCpdDiff(existing, incoming, diff)
+
+    expect(applied.networks[0].panels[0].loops[0].configuredDeviceOrder).toEqual([
+      'existing-1',
+      'incoming-2'
+    ])
+  })
+
+  it('does not preserve zone visual areas for deleted building or floor targets', () => {
+    const existing = makeProject()
+    existing.buildings = [
+      {
+        id: 'building-1',
+        name: 'Building 1',
+        floors: [{ id: 'floor-1', buildingId: 'building-1', name: 'Floor 1', levelIndex: 0 }]
+      }
+    ]
+    existing.networks[0].panels[0].zones[0].visualAreas = [
+      ...existing.networks[0].panels[0].zones[0].visualAreas,
+      {
+        id: 'area-deleted-floor',
+        networkId: 'network-1',
+        panelId: 'panel-1',
+        zoneNumber: 1,
+        buildingId: 'building-1',
+        floorId: 'floor-deleted',
+        kind: 'rectangle',
+        points: [
+          { x: 20, y: 20 },
+          { x: 30, y: 20 },
+          { x: 30, y: 30 },
+          { x: 20, y: 30 }
+        ],
+        color: '#ef4444',
+        opacity: 0.2
+      }
+    ]
+    const incoming = makeIncoming()
+    const diff = diffCpdImport(existing, incoming)
+
+    const applied = applyCpdDiff(existing, incoming, diff)
+
+    expect(applied.networks[0].panels[0].zones[0].visualAreas.map((area) => area.id)).toEqual([
+      'area-1'
+    ])
+  })
 })
 
 function makeProject(): FireProject & { devices: FireDevice[] } {
@@ -76,7 +128,13 @@ function makeProject(): FireProject & { devices: FireDevice[] } {
     updatedAt: 1,
     language: 'en',
     networks: [makeNetwork('existing-network', [loop], [zone])],
-    buildings: [],
+    buildings: [
+      {
+        id: 'building-1',
+        name: 'Building 1',
+        floors: [{ id: 'floor-1', buildingId: 'building-1', name: 'Floor 1', levelIndex: 0 }]
+      }
+    ],
     assets: [],
     viewSettings: {
       deviceIconScale2D: 1,

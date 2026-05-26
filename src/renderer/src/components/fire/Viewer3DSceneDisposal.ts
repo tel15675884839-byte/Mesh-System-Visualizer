@@ -29,6 +29,8 @@ function disposeObject(object: THREE.Object3D): void {
 
 function disposeMaterial(material: THREE.Material): void {
   const mapMaterial = material as THREE.Material & { map?: THREE.Texture }
-  mapMaterial.map?.dispose()
+  if (mapMaterial.map && mapMaterial.map.userData.preserveOnSceneClear !== true) {
+    mapMaterial.map.dispose()
+  }
   material.dispose()
 }

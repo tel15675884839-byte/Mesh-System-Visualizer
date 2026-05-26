@@ -1,4 +1,4 @@
-import type { FireDevice, FireFloor } from './types'
+import type { FireDevice, FireFloor, ZoneVisualArea } from './types'
 
 export type Viewer3DScopeKind = 'all' | 'building' | 'floor'
 
@@ -17,6 +17,11 @@ export interface Viewer3DDeviceVisibilityArgs {
   device: FireDevice
   scope: Viewer3DScopeSelection
   relationContextDeviceIds: Set<string>
+}
+
+export interface Viewer3DZoneAreaVisibilityArgs {
+  area: Pick<ZoneVisualArea, 'buildingId' | 'floorId'>
+  scope: Viewer3DScopeSelection
 }
 
 export function getViewer3DMapOpacity(globalOpacity: number, floorOverride?: number): number {
@@ -61,6 +66,21 @@ export function shouldRenderViewer3DDevice({
   }
 
   return device.placement.floorId === scope.targetId
+}
+
+export function shouldRenderViewer3DZoneArea({
+  area,
+  scope
+}: Viewer3DZoneAreaVisibilityArgs): boolean {
+  if (scope.kind === 'all' || !scope.targetId) {
+    return true
+  }
+
+  if (scope.kind === 'building') {
+    return area.buildingId === scope.targetId
+  }
+
+  return area.floorId === scope.targetId
 }
 
 function clampOpacity(value: number): number {

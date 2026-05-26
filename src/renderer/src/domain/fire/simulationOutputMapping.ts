@@ -7,6 +7,7 @@ export type SounderOutputPattern = 'silent' | 'continuous' | 'pulse'
 export interface DeviceSimulationOutput {
   state: Exclude<DeviceSimulationOutputState, null>
   sounderPattern?: SounderOutputPattern
+  remainingDelaySeconds?: number
 }
 
 export function getDeviceSimulationOutputState(
@@ -52,7 +53,8 @@ export function getDeviceSimulationOutput(
 
     delayedOutput = {
       state: 'delayActive',
-      sounderPattern: match.sounderPattern
+      sounderPattern: match.sounderPattern,
+      remainingDelaySeconds: output.remainingDelaySeconds
     }
   }
 
