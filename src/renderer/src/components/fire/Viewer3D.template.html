@@ -209,6 +209,7 @@
       @click="toggleSounders"
     >
       <img class="simulation-action-icon" src="/panel bottom/sounders active_silence.svg" alt="" />
+      <span v-if="soundersActive" class="active-dot"></span>
       <span>SOUNDERS ACTIVE/SILENCE</span>
     </button>
     <button
@@ -221,6 +222,7 @@
       @click="toggleSounderDelays"
     >
       <img class="simulation-action-icon" src="/panel bottom/delays active.svg" alt="" />
+      <span v-if="sounderDelaysEnabled" class="active-dot"></span>
       <span>DELAYS ACTIVE</span>
     </button>
     <button
