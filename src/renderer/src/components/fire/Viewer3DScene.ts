@@ -70,6 +70,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
   }
   const radarRipples: RadarRipple[] = []
   const radarZones: RadarZone[] = []
+  const sounderRipples: RadarRipple[] = []
 
   const PLAN_SCALE = 0.08
   const DEFAULT_FLOOR_WIDTH = 1200
@@ -104,6 +105,7 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     animatedDeviceObjects,
     radarRipples,
     radarZones,
+    sounderRipples,
     getControls: () => controls,
     getRenderer: () => renderer,
     getScene: () => scene,
@@ -122,6 +124,8 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     outputState: Viewer3DDeviceOutputState
     sounderPattern?: SounderOutputPattern
     isSounder: boolean
+    inputActive: boolean
+    isIO: boolean
   }
 
   function initScene(): void {
@@ -156,6 +160,15 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
   function rebuildScene(): void {
     if (!scene) return
     clearViewer3DScene(scene, radarRipples, radarZones)
+    sounderRipples.forEach((ripple) => {
+      ripple.mesh.geometry.dispose()
+      if (Array.isArray(ripple.mesh.material)) {
+        ripple.mesh.material.forEach((m) => m.dispose())
+      } else {
+        ripple.mesh.material.dispose()
+      }
+    })
+    sounderRipples.length = 0
     pickableDeviceObjects.length = 0
     animatedDeviceObjects.length = 0
 
@@ -363,7 +376,11 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
       renderDelayCountdownLabel(point, size, outputState?.remainingDelaySeconds)
     }
 
-    if (outputState !== null && !isDelayedSounder) {
+    const inputActive = hasActiveInput(device.id)
+    const isIO = device.type === 'input_output' || device.type === 'wireless_input_output'
+    const shouldAnimate = inputActive || (outputState !== null && !isDelayedSounder)
+
+    if (shouldAnimate) {
       animatedDeviceObjects.push({
         sprite,
         spriteMaterial: material,
@@ -371,10 +388,37 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
         baseSize: size,
         baseColor: deviceColor,
         baseOpacity: highlightAppearance.opacity * statusAppearance.iconOpacity,
-        outputState: outputState.state,
-        sounderPattern: outputState.sounderPattern,
-        isSounder: device.isSounder
+        outputState: outputState?.state ?? null,
+        sounderPattern: outputState?.sounderPattern,
+        isSounder: device.isSounder,
+        inputActive,
+        isIO
       })
+    }
+
+    if (device.isSounder && outputState?.state === 'active') {
+      for (let i = 0; i < 3; i++) {
+        const rippleMat = new THREE.MeshBasicMaterial({
+          color: '#ef4444',
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+        const ripple = new THREE.Mesh(
+          new THREE.RingGeometry(size * 0.45, size * 0.5, 32),
+          rippleMat
+        )
+        ripple.position.copy(point)
+        ripple.rotation.x = Math.PI / 2
+        scene?.add(ripple)
+        sounderRipples.push({
+          mesh: ripple,
+          progress: i / 3,
+          baseScale: 1.0,
+          deviceSize: size
+        })
+      }
     }
   }
 
@@ -570,6 +614,15 @@ export function createViewer3DScene(context: Viewer3DSceneContext): {
     renderer?.domElement.removeEventListener('contextmenu', handleRendererContextMenu)
     renderer?.dispose()
     clearViewer3DScene(scene, radarRipples, radarZones)
+    sounderRipples.forEach((ripple) => {
+      ripple.mesh.geometry.dispose()
+      if (Array.isArray(ripple.mesh.material)) {
+        ripple.mesh.material.forEach((m) => m.dispose())
+      } else {
+        ripple.mesh.material.dispose()
+      }
+    })
+    sounderRipples.length = 0
     disposeTextureCache()
   }
 
