@@ -122,11 +122,19 @@
   bottom: 1px;
   width: 8px;
   height: 8px;
-  background-color: #f97316;
   border-radius: 50%;
   border: 1px solid #ffffff;
-  box-shadow: 0 0 5px #f97316;
   z-index: 2;
+}
+
+.active-dot.dot-orange {
+  background-color: #f97316;
+  box-shadow: 0 0 5px #f97316;
+}
+
+.active-dot.dot-red {
+  background-color: #ef4444;
+  box-shadow: 0 0 5px #ef4444;
 }
 
 .simulation-action-momentary:active {
